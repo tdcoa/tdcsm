@@ -25,7 +25,7 @@ BT;
 
 Delete from coat_dim_app;
 
-/*{{loop:1010.coat_dim_app.coa.csv}}*/
+/*{{loop:0101.coat_dim_app.coa.csv}}*/
 insert into coat_dim_app (
    2 -- ArtPI
   ,'{SiteID}'
