@@ -33,13 +33,14 @@ insert into coat_dim_app (
   ,'{App_Bucket}'
   ,'{Use_Bucket}'
   ,{Priority}
-  ,'{Record_Status}'
-  ,{Process_ID}
+  ,'Initial Load'
+  ,0
   ,current_timestamp(0)
 );
 
 ET;
 
-Select '{account}' as Account_Name, a.*
-from coat_dim_app as a
+/*{{save-to:coat_dim_app.coa.csv}}*/
+/*{{load-to:adlste_coa.coatmp_dim_app}}*/
+Select * from coat_dim_app
 ;
