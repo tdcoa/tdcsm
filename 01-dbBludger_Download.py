@@ -26,7 +26,7 @@ for gitfile in gitfiles:
     file.write(filecontent.decode('utf-8'))
     file.close
 
-    if gitfile=='motd.txt' or gitfile[:-3]=='.py':
+    if gitfile=='motd.txt' or gitfile[-3:]=='.py':
         os.replace(os.path.join('.', coafolders['download'].strip(), gitfile), os.path.join('.', gitfile))
 
 print('done!')
