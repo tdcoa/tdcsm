@@ -12,7 +12,6 @@ Create Volatile Table coat_dim_Statement
 on commit preserve rows
 ;
 
-BT;
 
 Delete From coat_dim_Statement;
 
@@ -28,8 +27,7 @@ insert into coat_dim_Statement (
 )
 ;
 
-ET;
 
-/*{{save-to:coat_dim_statement.coa.csv}}*/
-/*{{load-to:adlste_coa.coatmp_dim_statement}}*/
+/*{{save:coat_dim_statement.coa.csv}}*/
+/*{{load:adlste_coa.coatmp_dim_statement}}*/
 Select * from coat_dim_Statement where ArtPI=3;

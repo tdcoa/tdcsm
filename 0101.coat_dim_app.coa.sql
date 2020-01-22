@@ -21,8 +21,6 @@ Create Volatile Table coat_dim_App
 on commit preserve rows
 ;
 
-BT;
-
 Delete from coat_dim_app;
 
 /*{{loop:0101.coat_dim_app.coa.csv}}*/
@@ -38,9 +36,7 @@ insert into coat_dim_app (
   ,current_timestamp(0)
 );
 
-ET;
-
-/*{{save-to:coat_dim_app.coa.csv}}*/
-/*{{load-to:adlste_coa.coatmp_dim_app}}*/
+/*{{save:coat_dim_app.coa.csv}}*/
+/*{{load:adlste_coa.coatmp_dim_app}}*/
 Select * from coat_dim_app
 ;
