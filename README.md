@@ -5,6 +5,8 @@ To get started:  until I get pypi done, you'll need to download
 
 Running the 01-dbBludger_Download.py will download and setup the rest of the application.  if you hit download problems from git, you may need to login... for now, you'll have to email stephen hilton and get the credentials. 
 
+You'll also have to pip install the latest version of https://pypi.org/project/teradatasqlalchemy/
+
 Update Notes
 
 dbBludger is a gross program that slams together python automation, csv drive-files, and teradata sql files to provide a broaad and dangerous set of capabilities for abuse.
