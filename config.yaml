@@ -1,0 +1,41 @@
+
+substitutions:
+  - account:     "Teradata"
+  - startdate:   "'2020-01-01'"
+  - enddate:     "Current_Date - 1"
+  - timezone:    "US/Pacific"         # https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+
+
+siteids:
+#  - APPLE55CRESCENT: "teradatasql://{username}:{password}@{host}"
+#  - APPLE48EDDIES:   "teradatasql://{username}:{password}@{host}"
+#  - APPLE46REDWOOD:  "teradatasql://{username}:{password}@{host}"
+#  - APPLE50BLANEY:   "teradatasql://{username}:{password}@{host}"
+#  - APPLE41MEGADEW:  "teradatasql://{username}:{password}@{host}"
+# for testing:
+  - TranscendIFX:  "teradatasql://{username}:{password}@tdprdcop3.td.teradata.com/?logmech=LDAP"
+
+
+transcend:
+  - TranscendIFX:  "teradatasql://{username}:{password}@tdprdcop3.td.teradata.com/?logmech=LDAP"
+#  - TranscendAWS:   "teradatasql://{username}:{password}@tdprd2cop3.td.teradata.com/?logmech=LDAP"
+
+
+folders:
+  - run:       "_run"
+  - output:    "_output"
+  - download:  "coa_default"
+
+
+download-files:
+  - motd.txt
+  - 01-dbBludger_Download.py
+  - 02-dbBludger_PrepRun.py
+  - 03-dbBludger_LoopAndExecute.py
+  - 04-dbBludger_TranscendUpload.py
+
+  - 0000.dbcinfo.coa.sql
+  - 0101.coat_dim_app.coa.csv
+  - 0101.coat_dim_app.coa.sql
+  - 0102.coat_dim_statement.coa.csv
+  - 0102.coat_dim_statement.coa.sql
