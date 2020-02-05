@@ -1,0 +1,8 @@
+build
+demo
+dist
+tdcsm*
+.DS_Store
+.last_run_output_path.txt
+*cheatsheet.txt
+setup.py

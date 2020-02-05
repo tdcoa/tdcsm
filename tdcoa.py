@@ -1,4 +1,4 @@
-import os, sys, io, re, errno, yaml, json, requests
+import os, sys, io, re, errno, yaml, json, requests, time
 from shutil import copyfile
 import datetime as dt
 import pandas as pd
@@ -133,6 +133,7 @@ class tdcoa():
             if gitfile=='motd.txt':
                 os.replace(os.path.join(self.approot, self.folders['download'].strip(), gitfile), os.path.join(self.approot, gitfile))
 
+        time.sleep(5) # give OS time to update newly created files
         self.log('done!')
         self.log('time', str(dt.datetime.now()))
 
@@ -230,6 +231,7 @@ class tdcoa():
                     self.log('  (copy only)')
                     copyfile(os.path.join(self.approot, self.folders['sql'], coafile), os.path.join(self.approot, self.folders['run'], coafile))
 
+        time.sleep(5) # give OS time to update newly created files
         self.log('done!')
         self.log('time', str(dt.datetime.now()))
 
@@ -705,6 +707,7 @@ class tdcoa():
         cf.append('\n\nsettings:')
         cf.append('  - debug:  True  # if true, will NOT connect to database, instead emulate output only (for testing)')
         cf.append('  - githost: "https://raw.githubusercontent.com/tdcoa/sql/master/"')
+        cf.append('  - gitrepo: "https://github.com/tdcoa/sql.git"')
         cf.append('\n\nfolders:')
         cf.append('  - download:  "coa_default" # download_files step saves downloaded sql to this folder')
         cf.append('  - sql:       "coa_default" # prepare_sql step pulls static sql from here, applies substitution, and saves to the run folder')
