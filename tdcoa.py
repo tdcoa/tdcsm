@@ -31,13 +31,14 @@ class tdcoa():
 
 
     def __init__(self, approot='.', printlog=True):
-        self.printlog = printlog
         self.bufferlog = True
-        self.approot = self.getvalidpath(approot)
+        self.printlog = printlog
+        self.approot = os.path.join('.', approot)
         self.configpath = os.path.join(self.approot,'config.yaml')
         self.secretpath = os.path.join(self.approot,'secrets.yaml')
         self.log('tdcoa started', header=True)
         self.log('time', str(dt.datetime.now()))
+        self.log('app root', self.approot)
 
         if not os.path.isfile(self.configpath):
             self.log('missing config.yaml', 'creating %s' %self.configpath)
@@ -57,9 +58,10 @@ class tdcoa():
         """Load configuration YAML file from the supplied path.
            Default is ./config.yaml"""
 
+        self.bufferlogs = True
         self.log('load_config started', header=True)
         self.log('time',str(dt.datetime.now()))
-        self.bufferlogs = True
+
 
         # load secret.yaml
         self.log('loading secrets', os.path.basename(self.secretpath))
@@ -99,11 +101,12 @@ class tdcoa():
         # create missing folders
         self.log('validating folder structures')
         for nm, subfo in self.folders.items():
-            if not os.path.exists(subfo):
-                self.log('creating missing folder', subfo)
-                os.mkdir(subfo)
+            fopath = os.path.join(self.approot, subfo)
+            if not os.path.exists(fopath):
+                self.log('creating missing folder', fopath)
+                os.mkdir(fopath)
 
-        self.logpath = os.path.join(self.folders['run'], 'runlog.txt')
+        self.logpath = os.path.join(self.approot, self.folders['run'], 'runlog.txt')
         if os.path.isfile(self.logpath): os.remove(self.logpath)
         self.bufferlogs = False
         self.log('unbuffering log to "run" folder')
@@ -133,7 +136,6 @@ class tdcoa():
             if gitfile=='motd.txt':
                 os.replace(os.path.join(self.approot, self.folders['download'].strip(), gitfile), os.path.join(self.approot, gitfile))
 
-        time.sleep(5) # give OS time to update newly created files
         self.log('done!')
         self.log('time', str(dt.datetime.now()))
 
@@ -158,16 +160,16 @@ class tdcoa():
 
         #load .coa.sql files into the _run directory, with all replacements done (ready to run sql)
         self.log('\nprocessing all .coa.sql files found in %s and save output to %s' %(self.folders['sql'], self.folders['run']))
-        for coafile in os.listdir(self.folders['sql']):
+        for coafile in os.listdir(os.path.join(self.approot, self.folders['sql'])):
             if coafile[:1] != '.':
                 self.log('\n'+ ('-'*20))
                 if coafile[-8:]=='.coa.sql':  # if SQL, do substitutions
                     self.log('\nPROCESSING COA.SQL FILE', coafile)
-                    with open(os.path.join(self.folders['sql'], coafile), 'r') as coasqlfile:           # read from template
+                    with open(os.path.join(self.approot, self.folders['sql'], coafile), 'r') as coasqlfile:           # read from template
                         coasqls = coasqlfile.read()
                         self.log('characters in file', str(len(coasqls)))
 
-                    with open(os.path.join(self.folders['run'],coafile),'w') as runsqlfile:  # write to _run file
+                    with open(os.path.join(self.approot, self.folders['run'],coafile),'w') as runsqlfile:  # write to _run file
 
                         #light formatting of supplied sql
                         sqls = coasqls.split(';')
@@ -188,8 +190,33 @@ class tdcoa():
                                     self.log('find: %s' %str(find), 'replace: %s' %str(replace))
                                     sql = sql.replace('{%s}' %str(find),str(replace))
 
+
+                                # look for any {{temp: commands, and insert that SQL first
+                                while '/*{{temp:' in sql:
+
+                                    iposA = sql.find('/*{{temp:',0)
+                                    iposB = sql.find('}}*/',iposA)+4
+
+                                    start = sql[0:iposA]
+                                    cmd = sql[iposA:iposB]
+                                    end = sql[iposB:]
+                                    csvfile = cmd[9:-4].strip()
+                                    sql = start + end
+
+                                    self.log('TEMP FOUND, file', csvfile)
+                                    if os.path.isfile(os.path.join(self.approot, self.folders['run'],csvfile)): # csv file found!  let's open:
+                                        self.log('file found!')
+                                        df = pd.read_csv(os.path.join(self.approot, self.folders['run'],csvfile))
+                                        self.log('rows in file', str(len(df)) )
+                                        self.log('transcribing sql...')
+                                        tempsql = str('%s\n\n' %self.__buildtemptablesql(csvfile))
+                                        runsqlfile.write(tempsql)
+
+                                    else:  # file not found, raise error
+                                        self.log('\n\tERROR:\n\tFile Not Found\n\t%s' %csvfile)
+                                        raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), csvfile)
+
                                 # if there are any {{loop: commands, go get the csv
-                                self.log('process any loop commands')
                                 if '/*{{loop:' in sql:
 
                                     # parse csv file name from {{loop:csvfilename}} string
@@ -197,9 +224,9 @@ class tdcoa():
                                     self.log('LOOP FOUND, file', csvfile)
 
                                     # can we find the file?
-                                    if os.path.isfile(os.path.join(self.folders['run'],csvfile)): # csv file found!  let's open:
+                                    if os.path.isfile(os.path.join(self.approot, self.folders['run'],csvfile)): # csv file found!  let's open:
                                         self.log('file found!')
-                                        df = pd.read_csv(os.path.join(self.folders['run'],csvfile))
+                                        df = pd.read_csv(os.path.join(self.approot, self.folders['run'],csvfile))
                                         self.log('rows in file', str(len(df)) )
 
                                         # perform csv substitutions
@@ -213,17 +240,12 @@ class tdcoa():
                                             self.log('sql generated from row data', 'character length = %i' %len(tempsql))
                                             runsqlfile.write(tempsql)
 
-
                                     else:  # file not found, raise error
                                         self.log('\n\tERROR:\n\tFile Not Found\n\t%s' %csvfile)
                                         raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), csvfile)
 
-                                elif '/*{{temp' in sql:
-                                    self.log('temp command found, will upload during "execute_run()"')
-                                    runsqlfile.write(sql)
-
-                                else:  # not a loop or temp, just write file as-is (post-replace)
-                                    self.log('no special commands found')
+                                else:  # not a loop, just write file as-is (post-replace)
+                                    self.log('writing out final sql')
                                     runsqlfile.write(sql)
 
                 else:  # if not a .coa.sql file... just copy
@@ -231,7 +253,7 @@ class tdcoa():
                     self.log('  (copy only)')
                     copyfile(os.path.join(self.approot, self.folders['sql'], coafile), os.path.join(self.approot, self.folders['run'], coafile))
 
-        time.sleep(5) # give OS time to update newly created files
+        # time.sleep(5) # give OS time to update newly created files
         self.log('done!')
         self.log('time', str(dt.datetime.now()))
 
@@ -299,49 +321,14 @@ class tdcoa():
                         while '  ' in sql:
                             sql = sql.replace('\n',' ').replace('  ',' ')
 
+                        #if 'temp' in sqlcmd: # build a create table statement, so we're sure it's volatile...
+                        #    self.__buildtemptable(str(sqlcmd['temp']), True)
+
                         if len(sql.strip()) !=0:
                             self.log('sql submitted', str(dt.datetime.now()))
                             df = pd.read_sql(sql, conn)# <------------------------------- Run SQL
                             self.log('sql completed', str(dt.datetime.now()))
                             self.log('record count', str(len(df)))
-
-                        if 'temp' in sqlcmd: # build a create table statement, so we're sure it's volatile...
-                            tbl = sqlcmd['temp']
-                            self.log('fill temp table', tbl)
-
-                            # open csv
-                            self.log('open csv', sqlcmd['temp'])
-                            csvfile = sqlcmd['temp']
-                            dfcsv  = pd.read_csv(csvfile)
-
-                            # upload to temp table:
-                            self.log('uploading', str(dt.datetime.now()))
-                            # dfcsv.to_sql(tbl, conn, if_exists='append', index=False)
-
-                            # build manual transactions for now...
-                            sql = []
-                            sqlprefix = 'create multiset volatile table "%s" as (\nselect ' %csvfile
-                            for idx, row in dfcsv.iterrows():
-                                sql.append(sqlprefix)
-                                sqlprefix = 'union all \nselect '
-                                delim = ' '
-                                for col, val in row.items():
-                                    colnm = re.sub('[^0-9a-zA-Z]+', '_', col)
-                                    if type(val) is int:
-                                        coltype = 'BIGINT'
-                                    elif type(val) is float:
-                                        coltype = 'FLOAT'
-                                    else:
-                                        collen = dfcsv[col].map(len).max()
-                                        coltype = 'VARCHAR(%i)' %(collen+100)
-                                    sql.append('%scast(\'%s\' as %s) as %s' %(delim,val,coltype,colnm))
-                                    delim = ','
-                                sql.append('from (sel 1 one) i%i' %idx)
-                            sql.append(') with data \n  no primary index \n  on commit preserve rows;')
-
-                            sql = '\n'.join(sql)
-                            df = pd.read_sql(sql, conn)
-                            self.log('complete', str(dt.datetime.now()))
 
 
                         if len(df) != 0:  # Save non-empty returns to .csv
@@ -354,7 +341,7 @@ class tdcoa():
                                 sqlcmd['save'] = '%s--%s' %(siteid, coasqlfile) + '%04d' %sqlcnt + '.csv'
 
                             # once built, append output folder, SiteID on the front, iterative counter on back if needed for uniquess
-                            csvfile = os.path.join(self.approot, outputfo, sqlcmd['save'])
+                            csvfile = os.path.join(outputfo, sqlcmd['save'])
                             i=0
                             while os.path.isfile(csvfile):
                                 i +=1
@@ -640,21 +627,6 @@ class tdcoa():
             exit()
 
 
-    def create_upload_helper(self):
-        helper = os.path.join(self.approot, self.folders['run'], 'upload_helper.py' )
-        pf=['# this is a helper script to more eaily upload to Transcend ']
-        pf.append('# from inside a dated "output" folder.')
-        pf.append('')
-        pf.append('# todo: get cwd, backup two levels, then ')
-        pf.append('import os')
-        pf.append('os.setcwd("../..")')
-        pf.append('from tdcoa import tdcoa')
-        pf.append("coa = tdcoa()")
-        pf.append('coa.test()')
-        self.log('creating helper.py file', os.path.basename(helper))
-        with open(helper, 'w') as fh:
-            fh.write('\n'.join(pf))
-
     def create_secrets(self):
         secrets = os.path.join(self.getvalidpath(self.approot,True), 'secrets.yaml' )
         pf=['# this file contains sensitive information in a Name:Value format, i.e.,']
@@ -697,6 +669,16 @@ class tdcoa():
         cf.append('  - startdate:   "\'2020-01-01\'"')
         cf.append('  - enddate:     "Current_Date - 1"')
         cf.append('  - whatever:    "anything you want"')
+        cf.append('  #common table-name replacements:')
+        cf.append('  - default_database:  "pdcrinfo"')
+        cf.append('  - dbqlogtbl_hst:     "pdcrinfo.DBQLogTbl_hst"')
+        cf.append('  - resusagescpu_hst:  "pdcrinfo.ResUsageScpu_hst"')
+        cf.append('  - resusagespdsk_hst: "pdcrinfo.ResUsageSpdsk_hst"')
+        cf.append('  - resusagespma_hst:  "pdcrinfo.ResUsageSpma_hst"')
+        cf.append('  - resusagesldv_hst:  "pdcrinfo.ResUsageSldv_hst"')
+        cf.append('  - resusagesawt_hst:  "pdcrinfo.ResUsageSawt_hst"')
+        cf.append('  # do NOT set siteid here, is substituted at run-time per connection name below')
+
         cf.append('\n\nsiteids:')
         cf.append('  # for testing:')
         cf.append('  - Altans_VDB:  "teradatasql://{username}:{password}@tdap278t1.labs.teradata.com"')
@@ -717,8 +699,36 @@ class tdcoa():
         cf.append('  - motd.txt')
         cf.append('  - 0000.dbcinfo.coa.sql')
         cf.append('  - 0000.dates.csv')
+        cf.append('  # un-comment these when ready for real work:')
+        cf.append('  #- 0001.DBQL_Summary.1620.v02.coa.sql')
         with open( os.path.join(configpath), 'w') as fh:
             fh.write('\n'.join(cf))
+
+
+    def copyconfig(self, configpath='.'):
+        self.log('copyconfig() called', configpath)
+        files = ['config.yaml','secrets.yaml']
+        for file in files:
+            src = os.path.join(self.approot, configpath,file)
+            dst = os.path.join(self.approot,file)
+            self.log(' file: %s' %file)
+            self.log('   source', src)
+            self.log('   destination', dst)
+            copyfile(src, dst)
+        self.load_config()
+
+    def copysqlfiles(self, sqlfiles=[]):
+        self.log('copysqlfiles() called', str(sqlfiles))
+        for file in sqlfiles:
+            src = os.path.join(self.approot, self.folders['download'], file)
+            dst = os.path.join(self.approot, self.folders['sql'], file)
+            self.log(' file: %s' %file)
+            self.log('   source', src)
+            self.log('   destination', dst)
+            if src==dst:
+                self.log(' source==destination, skipping')
+            else:
+                copyfile(src, dst)
 
 
     def __get_sqlcommands(self, sql):
@@ -738,3 +748,40 @@ class tdcoa():
                 sql = sql.replace(cmdstr,'/* %s */' %cmdlst[0])
         cmd['sql'] = sql
         return cmd
+
+
+    def __buildtemptablesql(self, csvfilename):
+        tbl = csvfilename
+        self.log('fill temp table', tbl)
+
+        # open csv
+        self.log('open csv', tbl)
+        csvfile = os.path.join(self.approot, self.folders['run'], tbl)
+        dfcsv  = pd.read_csv(csvfile)
+
+        # upload to temp table:
+        self.log('uploading', str(dt.datetime.now()))
+
+        # build manual transactions for now...
+        sql = []
+        sqlprefix = 'create multiset volatile table "%s" as (\nselect ' %tbl
+        for idx, row in dfcsv.iterrows():
+            sql.append(sqlprefix)
+            sqlprefix = 'union all \nselect '
+            delim = ' '
+            for col, val in row.items():
+                colnm = re.sub('[^0-9a-zA-Z]+', '_', col)
+                if type(val) is int:
+                    coltype = 'BIGINT'
+                elif type(val) is float:
+                    coltype = 'FLOAT'
+                else:
+                    collen = dfcsv[col].map(len).max()
+                    coltype = 'VARCHAR(%i)' %(collen+100)
+                sql.append('%scast(\'%s\' as %s) as %s' %(delim,val,coltype,colnm))
+                delim = ','
+            sql.append('from (sel 1 one) i%i' %idx)
+        sql.append(') with data \n  no primary index \n  on commit preserve rows;\n\n')
+
+        self.log('sql built for', tbl)
+        return  '\n'.join(sql)
