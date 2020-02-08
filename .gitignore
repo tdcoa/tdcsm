@@ -2,7 +2,5 @@
 build
 demo
 dist
-setup.py
 tdcsm*
-*cheatsheet.txt
 *__pycache*

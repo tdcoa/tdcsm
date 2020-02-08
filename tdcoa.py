@@ -30,15 +30,17 @@ class tdcoa():
     gitfiles = []
 
 
-    def __init__(self, approot='.', printlog=True):
+    def __init__(self, approot='.', printlog=True, config='config.yaml', secrets='secrets.yaml'):
         self.bufferlog = True
         self.printlog = printlog
         self.approot = os.path.join('.', approot)
-        self.configpath = os.path.join(self.approot,'config.yaml')
-        self.secretpath = os.path.join(self.approot,'secrets.yaml')
+        self.configpath = os.path.join(self.approot, config)
+        self.secretpath = os.path.join(self.approot, secrets)
         self.log('tdcoa started', header=True)
         self.log('time', str(dt.datetime.now()))
         self.log('app root', self.approot)
+        self.log('config file', self.configpath)
+        self.log('secrets file', self.secretpath)
 
         if not os.path.isfile(self.configpath):
             self.log('missing config.yaml', 'creating %s' %self.configpath)
