@@ -6,7 +6,7 @@ from sqlalchemy.engine import create_engine
 
 class tdcoa():
 
-    # paths
+    # paths 
     approot = ''
     configpath = ''
     logpath = ''
@@ -49,21 +49,30 @@ class tdcoa():
             self.log('missing secrets.yaml', 'creating %s' %self.secretpath)
             self.create_secrets()
 
-        self.load_config()
+        self.reload_config()
 
 
     def __str__(self):
         self.help()
 
 
-    def load_config(self):
-        """Load configuration YAML file from the supplied path.
-           Default is ./config.yaml"""
+    def reload_config(self, config=''):
+        """Reloads configuration YAML files (config & secrets) used as process driver.  This will also perform any local environment checks, such as creating missing folders (download|sql|run|output), change siteid and transcend definitions, change gitfile and host pointers, change runlog.txt location, etc.  This process is called once during class instance initialization phase (i.e., "coa = tdcoa()" )
+
+        Parameters:
+          config == file path for the config.yaml file.  Default is ./config.yaml
+
+         Examples:
+           coa.reload_config() # reloads default ./config.yaml
+           coa.reload_config('./config_customerABC.yaml')
+           coa.reload_config('./configs/config_mthly_dbql.yaml')
+        """
 
         self.bufferlogs = True
-        self.log('load_config started', header=True)
+        self.log('reload_config started', header=True)
         self.log('time',str(dt.datetime.now()))
-
+        if config != '':
+            self.configpath = os.path.join(self.approot, config)
 
         # load secret.yaml
         self.log('loading secrets', os.path.basename(self.secretpath))
@@ -160,100 +169,106 @@ class tdcoa():
                 self.log('deleting', file)
                 os.remove(os.path.join(self.approot, self.folders['run'],file))
 
-        #load .coa.sql files into the _run directory, with all replacements done (ready to run sql)
-        self.log('\nprocessing all .coa.sql files found in %s and save output to %s' %(self.folders['sql'], self.folders['run']))
+        # move over all non-coa.sql files first, in case they're needed
+        # during sql prep
+        self.log('\nmove all non ".coa.sql" files found in %s ' %self.folders['sql'])
         for coafile in os.listdir(os.path.join(self.approot, self.folders['sql'])):
-            if coafile[:1] != '.':
-                self.log('\n'+ ('-'*20))
-                if coafile[-8:]=='.coa.sql':  # if SQL, do substitutions
-                    self.log('\nPROCESSING COA.SQL FILE', coafile)
-                    with open(os.path.join(self.approot, self.folders['sql'], coafile), 'r') as coasqlfile:           # read from template
-                        coasqls = coasqlfile.read()
-                        self.log('characters in file', str(len(coasqls)))
-
-                    with open(os.path.join(self.approot, self.folders['run'],coafile),'w') as runsqlfile:  # write to _run file
-
-                        #light formatting of supplied sql
-                        sqls = coasqls.split(';')
-                        self.log('sql statements in file', str(len(sqls)))
-                        i=0
-                        for sql in sqls:
-                            while '\n\n' in sql:
-                                sql = sql.replace('\n\n','\n').strip()
-                            sql = sql.strip() + '\n;\n\n'
-
-                            if sql != '\n;\n\n':  # exclude null statements (only ; and newlines)
-                                i+=1
-                                self.log('\nprocessing sql %i' %i, '%s...' %sql[:50].replace('\n',' '))
-
-                                # do substitutions first... (allows for substitution in {{loop}} command)
-                                self.log('perform config.yaml substitutions')
-                                for find,replace in self.substitutions.items():
-                                    self.log('find: %s' %str(find), 'replace: %s' %str(replace))
-                                    sql = sql.replace('{%s}' %str(find),str(replace))
+            sqlfilepath = os.path.join(self.approot, self.folders['sql'], coafile) # source
+            runfilepath = os.path.join(self.approot, self.folders['run'], coafile) # destination
+            if os.path.isfile(sqlfilepath) and coafile[-8:] != '.coa.sql':
+                self.log('Copy non-SQL file', coafile)
+                copyfile(sqlfilepath, runfilepath)
 
 
-                                # look for any {{temp: commands, and insert that SQL first
-                                while '/*{{temp:' in sql:
+        #load .coa.sql files into the _run directory, with all replacements done (ready to run sql)
+        self.log('\nprocessing all ".coa.sql" files found in %s and save output to %s' %(self.folders['sql'], self.folders['run']))
+        for coafile in os.listdir(os.path.join(self.approot, self.folders['sql'])):
+            if coafile[-8:]=='.coa.sql':  # if SQL, do substitutions
+                self.log('-'*20)
+                self.log('PROCESSING COA.SQL FILE', coafile)
+                with open(os.path.join(self.approot, self.folders['sql'], coafile), 'r') as coasqlfile:           # read from template
+                    coasqls = coasqlfile.read()
+                    self.log('characters in file', str(len(coasqls)))
 
-                                    iposA = sql.find('/*{{temp:',0)
-                                    iposB = sql.find('}}*/',iposA)+4
+                with open(os.path.join(self.approot, self.folders['run'],coafile),'w') as runsqlfile:  # write to _run file
 
-                                    start = sql[0:iposA]
-                                    cmd = sql[iposA:iposB]
-                                    end = sql[iposB:]
-                                    csvfile = cmd[9:-4].strip()
-                                    sql = start + end
+                    #light formatting of supplied sql
+                    sqls = coasqls.split(';')
+                    self.log('sql statements in file', str(len(sqls)))
+                    i=0
+                    for sql in sqls:
+                        while '\n\n' in sql:
+                            sql = sql.replace('\n\n','\n').strip()
+                        sql = sql.strip() + '\n;\n\n'
 
-                                    self.log('TEMP FOUND, file', csvfile)
-                                    if os.path.isfile(os.path.join(self.approot, self.folders['run'],csvfile)): # csv file found!  let's open:
-                                        self.log('file found!')
-                                        df = pd.read_csv(os.path.join(self.approot, self.folders['run'],csvfile))
-                                        self.log('rows in file', str(len(df)) )
-                                        self.log('transcribing sql...')
-                                        tempsql = str('%s\n\n' %self.__buildtemptablesql(csvfile))
+                        if sql != '\n;\n\n':  # exclude null statements (only ; and newlines)
+                            i+=1
+                            self.log('\nprocessing sql %i' %i, '%s...' %sql[:50].replace('\n',' '))
+
+                            # do substitutions first... (allows for substitution in {{loop}} command)
+                            self.log('perform config.yaml substitutions')
+                            for find,replace in self.substitutions.items():
+                                self.log('find: %s' %str(find), 'replace: %s' %str(replace))
+                                sql = sql.replace('{%s}' %str(find),str(replace))
+
+
+                            # look for any {{temp: commands, and insert that SQL first
+                            while '/*{{temp:' in sql:
+
+                                iposA = sql.find('/*{{temp:',0)
+                                iposB = sql.find('}}*/',iposA)+4
+
+                                start = sql[0:iposA]
+                                cmd = sql[iposA:iposB]
+                                end = sql[iposB:]
+                                csvfile = cmd[9:-4].strip()
+                                sql = start + end
+
+                                self.log('TEMP FOUND, file', csvfile)
+                                if os.path.isfile(os.path.join(self.approot, self.folders['run'],csvfile)): # csv file found!  let's open:
+                                    self.log('file found!')
+                                    df = pd.read_csv(os.path.join(self.approot, self.folders['run'],csvfile))
+                                    self.log('rows in file', str(len(df)) )
+                                    self.log('transcribing sql...')
+                                    tempsql = str('%s\n\n' %self.__buildtemptablesql(csvfile))
+                                    runsqlfile.write(tempsql)
+
+                                else:  # file not found, raise error
+                                    self.log('\n\tERROR:\n\tFile Not Found\n\t%s' %csvfile)
+                                    raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), csvfile)
+
+                            # if there are any {{loop: commands, go get the csv
+                            if '/*{{loop:' in sql:
+
+                                # parse csv file name from {{loop:csvfilename}} string
+                                csvfile = sql[(sql.find('/*{{loop:') + len('/*{{loop:')):sql.find('}}*/')].strip()
+                                self.log('LOOP FOUND, file', csvfile)
+
+                                # can we find the file?
+                                if os.path.isfile(os.path.join(self.approot, self.folders['run'],csvfile)): # csv file found!  let's open:
+                                    self.log('file found!')
+                                    df = pd.read_csv(os.path.join(self.approot, self.folders['run'],csvfile))
+                                    self.log('rows in file', str(len(df)) )
+
+                                    # perform csv substitutions
+                                    self.log('perform csv file substitutions (find {column_name}, replace row value)')
+                                    for index, row in df.iterrows():  # one row = one sql written to file
+                                        tempsql = sql
+                                        for col in df.columns:
+                                            tempsql = tempsql.replace(str('{%s}' %col), str(row[col]))
+                                        tempsql = tempsql.replace(csvfile,' csv row %i out of %i ' %(index+1, len(df)))
+                                        tempsql = tempsql.replace('/*{{loop:','/*').replace('}}*/','*/')
+                                        self.log('sql generated from row data', 'character length = %i' %len(tempsql))
                                         runsqlfile.write(tempsql)
 
-                                    else:  # file not found, raise error
-                                        self.log('\n\tERROR:\n\tFile Not Found\n\t%s' %csvfile)
-                                        raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), csvfile)
+                                else:  # file not found, raise error
+                                    self.log('\n\tERROR:\n\tFile Not Found\n\t%s' %csvfile)
+                                    raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), csvfile)
 
-                                # if there are any {{loop: commands, go get the csv
-                                if '/*{{loop:' in sql:
+                            else:  # not a loop, just write file as-is (post-replace)
+                                self.log('writing out final sql')
+                                runsqlfile.write(sql)
 
-                                    # parse csv file name from {{loop:csvfilename}} string
-                                    csvfile = sql[(sql.find('/*{{loop:') + len('/*{{loop:')):sql.find('}}*/')].strip()
-                                    self.log('LOOP FOUND, file', csvfile)
-
-                                    # can we find the file?
-                                    if os.path.isfile(os.path.join(self.approot, self.folders['run'],csvfile)): # csv file found!  let's open:
-                                        self.log('file found!')
-                                        df = pd.read_csv(os.path.join(self.approot, self.folders['run'],csvfile))
-                                        self.log('rows in file', str(len(df)) )
-
-                                        # perform csv substitutions
-                                        self.log('perform csv file substitutions (find {column_name}, replace row value)')
-                                        for index, row in df.iterrows():  # one row = one sql written to file
-                                            tempsql = sql
-                                            for col in df.columns:
-                                                tempsql = tempsql.replace(str('{%s}' %col), str(row[col]))
-                                            tempsql = tempsql.replace(csvfile,' csv row %i out of %i ' %(index+1, len(df)))
-                                            tempsql = tempsql.replace('/*{{loop:','/*').replace('}}*/','*/')
-                                            self.log('sql generated from row data', 'character length = %i' %len(tempsql))
-                                            runsqlfile.write(tempsql)
-
-                                    else:  # file not found, raise error
-                                        self.log('\n\tERROR:\n\tFile Not Found\n\t%s' %csvfile)
-                                        raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), csvfile)
-
-                                else:  # not a loop, just write file as-is (post-replace)
-                                    self.log('writing out final sql')
-                                    runsqlfile.write(sql)
-
-                else:  # if not a .coa.sql file... just copy
-                    self.log('\nPROCESSING NON-COA.SQL', coafile)
-                    self.log('  (copy only)')
-                    copyfile(os.path.join(self.approot, self.folders['sql'], coafile), os.path.join(self.approot, self.folders['run'], coafile))
 
         # time.sleep(5) # give OS time to update newly created files
         self.log('done!')
@@ -461,29 +476,37 @@ class tdcoa():
                 self.log('  into table', entry['table'])
                 self.log('  then call', entry['call'])
 
-                # open CSV file for reading
-                self.log('opening file', entry['file'])
-                dfcsv = pd.read_csv(os.path.join(outputfo, entry['file']))
-                self.log('records found', str(len(dfcsv)))
 
-                for col in dfcsv.columns:
-                    if col[:8] == 'Unnamed:':
-                        self.log('unnamed column dropped', col)
-                        self.log('  (usually the pandas index as a column, "Unnamed: 0")')
-                        dfcsv = dfcsv.drop(columns=[col])
-                self.log('final column count', str(len(dfcsv.columns)))
-
-                if len(entry['table'].split('.')) == 1:
-                    db = 'adlste_coa'
-                    tbl = entry['table']
+                if 0==1:
+                    self.__bulkinsert(conn,
+                                      tablename,
+                                      schema,
+                                      csvfilepath=os.path.join(outputfo, entry['file']))
                 else:
-                    db = entry['table'].split('.')[0]
-                    tbl = entry['table'].split('.')[1]
 
-                # APPEND data set to table
-                self.log('uploading', str(dt.datetime.now()))
-                dfcsv.to_sql(tbl, conn, schema=db, if_exists='append', index=False)
-                self.log('complete', str(dt.datetime.now()))
+                    # open CSV file for reading
+                    self.log('opening file', entry['file'])
+                    dfcsv = pd.read_csv(os.path.join(outputfo, entry['file']))
+                    self.log('records found', str(len(dfcsv)))
+
+                    for col in dfcsv.columns:
+                        if col[:8] == 'Unnamed:':
+                            self.log('unnamed column dropped', col)
+                            self.log('  (usually the pandas index as a column, "Unnamed: 0")')
+                            dfcsv = dfcsv.drop(columns=[col])
+                    self.log('final column count', str(len(dfcsv.columns)))
+
+                    if len(entry['table'].split('.')) == 1:
+                        db = 'adlste_coa'
+                        tbl = entry['table']
+                    else:
+                        db = entry['table'].split('.')[0]
+                        tbl = entry['table'].split('.')[1]
+
+                    # APPEND data set to table
+                    self.log('uploading', str(dt.datetime.now()))
+                    dfcsv.to_sql(tbl, conn, schema=db, if_exists='append', index=False)
+                    self.log('complete', str(dt.datetime.now()))
 
                 # CALL any specified SPs:
                 if str(entry['call']).strip() != "":
@@ -717,10 +740,10 @@ class tdcoa():
             self.log('   source', src)
             self.log('   destination', dst)
             copyfile(src, dst)
-        self.load_config()
+        self.reload_config()
 
-    def copysqlfiles(self, sqlfiles=[]):
-        self.log('copysqlfiles() called', str(sqlfiles))
+    def copydownloadtosql(self, sqlfiles=[]):
+        self.log('copydownloadtosql() called', str(sqlfiles))
         for file in sqlfiles:
             src = os.path.join(self.approot, self.folders['download'], file)
             dst = os.path.join(self.approot, self.folders['sql'], file)
@@ -761,15 +784,16 @@ class tdcoa():
         csvfile = os.path.join(self.approot, self.folders['run'], tbl)
         dfcsv  = pd.read_csv(csvfile)
 
-        # upload to temp table:
-        self.log('uploading', str(dt.datetime.now()))
+        maxrows=100
+        tblcreated = False
+        sqlclosed=False
 
         # build manual transactions for now...
         sql = []
         sqlprefix = 'create multiset volatile table "%s" as (\nselect ' %tbl
         for idx, row in dfcsv.iterrows():
+            sqlclosed = False
             sql.append(sqlprefix)
-            sqlprefix = 'union all \nselect '
             delim = ' '
             for col, val in row.items():
                 colnm = re.sub('[^0-9a-zA-Z]+', '_', col)
@@ -783,7 +807,53 @@ class tdcoa():
                 sql.append('%scast(\'%s\' as %s) as %s' %(delim,val,coltype,colnm))
                 delim = ','
             sql.append('from (sel 1 one) i%i' %idx)
-        sql.append(') with data \n  no primary index \n  on commit preserve rows;\n\n')
+            if (idx+1) % maxrows == 0:
+                if tblcreated:
+                    sql.append(';\n')
+                elif not tblcreated:
+                    sql.append(') with data \n  no primary index \n  on commit preserve rows;\n\n')
+                    sqlclosed = True
+                    tblcreated = True
+                sqlprefix = 'insert into "%s" \nselect ' %tbl
+            else:
+                sqlprefix = 'union all \nselect '
+
+        if not sqlclosed and not tblcreated:
+            sql.append(') with data \n  no primary index \n  on commit preserve rows;\n\n')
+        else:
+            sql.append(';\n\n')
 
         self.log('sql built for', tbl)
         return  '\n'.join(sql)
+
+
+
+    def __bulkinsert(self, conn, tablename, schema='', csvfilepath=''):
+        self.log('initiating bulk insert')
+
+        if '.' in tablename:
+            schema = tablename.split('.')[0]
+            tablename = tablename.split('.')[1]
+        self.log('  tablename', '%s.%s' %(tablename,schema))
+
+        self.log('  opening csv', csvfilepath)
+        dfcsv = pd.read_csv(csvfilepath)
+        self.log('  records found', str(len(dfcsv)))
+
+        for col in dfcsv.columns:
+            if col[:8] == 'Unnamed:':
+                self.log('  unnamed column dropped', col)
+                self.log('    (usually the pandas index as a column, "Unnamed: 0")')
+                dfcsv = dfcsv.drop(columns=[col])
+        self.log('  final column count', str(len(dfcsv.columns)))
+
+        if len(tablename.split('.')) == 1:
+            db =  schema
+            tbl = tablename
+        else:
+            db =  tablename.split('.')[0]
+            tbl = tablename.split('.')[1]
+
+        self.log('  upload started', str(dt.datetime.now()))
+        dfcsv.to_sql(tbl, conn, db, if_exists='append', index=False, chunksize=1000, method='multi')
+        self.log('  upload completed', str(dt.datetime.now()))

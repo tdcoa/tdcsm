@@ -1,6 +1,9 @@
 .*
 build
 demo
+test
 dist
-tdcsm*
+customers
+tdcsm.egg*
+tdcsm_test*
 *__pycache*
