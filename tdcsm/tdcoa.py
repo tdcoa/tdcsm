@@ -2,11 +2,16 @@ import os, sys, io, re, errno, yaml, json, requests, time
 from shutil import copyfile
 import datetime as dt
 import pandas as pd
-from sqlalchemy.engine import create_engine
+#from sqlalchemy.engine import create_engine
+from sqlalchemy import create_engine
+from teradataml.dataframe.copy_to import copy_to_sql
+from teradataml.context.context import *
+from teradataml import *
+
 
 class tdcoa():
 
-    # paths 
+    # paths
     approot = ''
     configpath = ''
     logpath = ''
@@ -62,10 +67,17 @@ class tdcoa():
         Parameters:
           config == file path for the config.yaml file.  Default is ./config.yaml
 
-         Examples:
-           coa.reload_config() # reloads default ./config.yaml
-           coa.reload_config('./config_customerABC.yaml')
-           coa.reload_config('./configs/config_mthly_dbql.yaml')
+        Examples:
+          from tdcsm.tdcoa import tdcoa
+          coa = tdcoa()
+
+          coa.reload_config() # reloads default ./config.yaml
+          coa.reload_config('./config_customerABC.yaml')
+          coa.reload_config('./configs/config_mthly_dbql.yaml')
+
+          # this also effectively does the same thing:
+          from tdcsm.tdcoa import tdcoa
+          coa = tdcoa('./config_customerABC.yaml')
         """
 
         self.bufferlogs = True
@@ -128,6 +140,16 @@ class tdcoa():
 
 
     def download_files(self):
+        """First of four major functions of TDCOA - downloads selected files (sql, csv) from github and deposits them in the local 'download' folder as defined in the config.yaml.
+
+        Parameters:  none
+
+        Examples:
+          from tdcsm.tdcoa import tdcoa
+          coa = tdcoa()
+
+          coa.download_files()
+        """
         self.log('download_files started', header=True)
         self.log('time',str(dt.datetime.now()))
         githost = self.settings['githost']
@@ -230,7 +252,7 @@ class tdcoa():
                                     df = pd.read_csv(os.path.join(self.approot, self.folders['run'],csvfile))
                                     self.log('rows in file', str(len(df)) )
                                     self.log('transcribing sql...')
-                                    tempsql = str('%s\n\n' %self.__buildtemptablesql(csvfile))
+                                    tempsql = str('%s\n\n' %self.buildtemptablesql(csvfile))
                                     runsqlfile.write(tempsql)
 
                                 else:  # file not found, raise error
@@ -422,6 +444,8 @@ class tdcoa():
 
 
 
+
+
     def upload_to_transcend(self, outputpath=''):
         self.bufferlogs = True
         self.log('upload_to_transcend started', header=True)
@@ -436,7 +460,7 @@ class tdcoa():
             self.log('output folder= manual param', outputfo)
         elif self.outputpath !='':  # local variable set
             outputfo = self.outputpath
-            self.log('output folder= class var', outputfo)
+            self.log('output folder = class var', outputfo)
         else:
             if os.path.isfile(os.path.join(self.approot, '.last_run_output_path.txt')):
                 with open(os.path.join(self.approot, '.last_run_output_path.txt'),'r') as fh:
@@ -453,7 +477,7 @@ class tdcoa():
         else:
             self.outputpath = outputfo
 
-        # update log file  to correct location
+        # update log file to correct location
         self.logpath = os.path.join(outputfo, 'runlog.txt')
         self.bufferlogs = False
 
@@ -464,58 +488,68 @@ class tdcoa():
             manifest = json.loads(manjson)
             self.log('upload count found', str(len(manifest)) )
 
+
         # loop thru all TRANSCEND systems and execute manifest
         for name, connstring in self.transcend.items():
             self.log('connecting to', name, header=True)
-            conn = create_engine(connstring) # <-------------------- Connect to the database
+            username = self.stringbetween(connstring,'://',':')
+            password = self.stringbetween(connstring,':','@', 14)
+            hostname = self.stringbetween(connstring,'@','/?')
+            logmech  = self.stringbetween(connstring,'/?','')
+            if '=' in logmech: logmech = logmech.split('=')[1]
+
+            # connect to Transcend using TeradataML lib, for fastest bulk uploads
+            transcend = create_context(host=hostname, username=username,  logmech=logmech, password=password)
 
             for entry in manifest['entries']:
+
+                # define database and table names
+                if '.' in entry['table']:
+                    entry['schema'] = entry['table'].split('.')[0]
+                    entry['table'] = entry['table'].split('.')[1]
+                else:
+                    entry['schema'] = 'adlste_coa'
 
                 self.log('\nPROCESSING NEW ENTRY')
                 self.log('  load file', entry['file'])
                 self.log('  into table', entry['table'])
+                self.log('  of schema', entry['schema'])
                 self.log('  then call', entry['call'])
+                self.log('-'*10)
 
+                # open CSV and prepare for appending
+                csvfilepath = os.path.join(outputfo, entry['file'])
+                self.log('opening csv', csvfilepath)
+                dfcsv = pd.read_csv(csvfilepath)
+                self.log('records found', str(len(dfcsv)))
 
-                if 0==1:
-                    self.__bulkinsert(conn,
-                                      tablename,
-                                      schema,
-                                      csvfilepath=os.path.join(outputfo, entry['file']))
-                else:
+                # strip out any unnamed columns
+                for col in dfcsv.columns:
+                    if col[:8] == 'Unnamed:':
+                        self.log('unnamed column dropped', col)
+                        self.log('  (usually the pandas index as a column, "Unnamed: 0")')
+                        dfcsv = dfcsv.drop(columns=[col])
+                self.log('final column count', str(len(dfcsv.columns)))
 
-                    # open CSV file for reading
-                    self.log('opening file', entry['file'])
-                    dfcsv = pd.read_csv(os.path.join(outputfo, entry['file']))
-                    self.log('records found', str(len(dfcsv)))
-
-                    for col in dfcsv.columns:
-                        if col[:8] == 'Unnamed:':
-                            self.log('unnamed column dropped', col)
-                            self.log('  (usually the pandas index as a column, "Unnamed: 0")')
-                            dfcsv = dfcsv.drop(columns=[col])
-                    self.log('final column count', str(len(dfcsv.columns)))
-
-                    if len(entry['table'].split('.')) == 1:
-                        db = 'adlste_coa'
-                        tbl = entry['table']
-                    else:
-                        db = entry['table'].split('.')[0]
-                        tbl = entry['table'].split('.')[1]
-
-                    # APPEND data set to table
-                    self.log('uploading', str(dt.datetime.now()))
-                    dfcsv.to_sql(tbl, conn, schema=db, if_exists='append', index=False)
-                    self.log('complete', str(dt.datetime.now()))
+                # APPEND data to database
+                self.log('uploading', str(dt.datetime.now()))
+                copy_to_sql(dfcsv, entry['table'], entry['schema'], if_exists = 'append')
+                self.log('complete', str(dt.datetime.now()))
 
                 # CALL any specified SPs:
                 if str(entry['call']).strip() != "":
                     self.log('Stored Proc', str(dt.datetime.now()) )
-                    conn.execute('call %s ;' %str(entry['call']) )
+                    transcend.execute('call %s ;' %str(entry['call']) )
                     self.log('complete', str(dt.datetime.now()))
+
+            # after all upload_manifest entries are complete,
+            # close connection and move to the next Transcend instance
+            remove_context()
 
         self.log('\ndone!')
         self.log('time', str(dt.datetime.now()))
+
+
 
 
 
@@ -691,7 +725,7 @@ class tdcoa():
         cf = ['']
         cf.append('substitutions:')
         cf.append('  - account:     "Teradata"')
-        cf.append('  - startdate:   "\'2020-01-01\'"')
+        cf.append('  - startdate:   "\'2020-02-01\'"')
         cf.append('  - enddate:     "Current_Date - 1"')
         cf.append('  - whatever:    "anything you want"')
         cf.append('  #common table-name replacements:')
@@ -707,12 +741,12 @@ class tdcoa():
         cf.append('\n\nsiteids:')
         cf.append('  # for testing:')
         cf.append('  - Altans_VDB:  "teradatasql://{username}:{password}@tdap278t1.labs.teradata.com"')
-        cf.append('  # customer systems:')
+        cf.append('  # customer systems... name should match their CIS SiteID:')
         cf.append('#  - CUSTOMER001: "teradatasql://{username}:{password}@{host}"')
         cf.append('\n\ntranscend:')
         cf.append('  - TranscendIFX:  "teradatasql://{quicklook}:{td_password}@tdprdcop3.td.teradata.com/?logmech=LDAP"')
         cf.append('\n\nsettings:')
-        cf.append('  - debug:  True  # if true, will NOT connect to database, instead emulate output only (for testing)')
+        #cf.append('  - debug:  True  # if true, will NOT connect to database, instead emulate output only (for testing)')
         cf.append('  - githost: "https://raw.githubusercontent.com/tdcoa/sql/master/"')
         cf.append('  - gitrepo: "https://github.com/tdcoa/sql.git"')
         cf.append('\n\nfolders:')
@@ -724,8 +758,11 @@ class tdcoa():
         cf.append('  - motd.txt')
         cf.append('  - 0000.dbcinfo.coa.sql')
         cf.append('  - 0000.dates.csv')
-        cf.append('  # un-comment these when ready for real work:')
-        cf.append('  #- 0001.DBQL_Summary.1620.v02.coa.sql')
+        cf.append('  - dim_app.csv')
+        cf.append('  - dim_statement.csv')
+        cf.append('  - dim_user.csv')
+        cf.append('  - dim_querytype.csv')
+        cf.append('  #- 0001.DBQL_Summary.1620.v03.coa.sql')
         with open( os.path.join(configpath), 'w') as fh:
             fh.write('\n'.join(cf))
 
@@ -744,6 +781,10 @@ class tdcoa():
 
     def copydownloadtosql(self, sqlfiles=[]):
         self.log('copydownloadtosql() called', str(sqlfiles))
+        if sqlfiles==[]:
+            for file in os.listdir(os.path.join(self.approot, self.folders['download'])):
+                if file[:1] != '.':
+                    sqlfiles.append(file)
         for file in sqlfiles:
             src = os.path.join(self.approot, self.folders['download'], file)
             dst = os.path.join(self.approot, self.folders['sql'], file)
@@ -775,7 +816,7 @@ class tdcoa():
         return cmd
 
 
-    def __buildtemptablesql(self, csvfilename):
+    def buildtemptablesql(self, csvfilename):
         tbl = csvfilename
         self.log('fill temp table', tbl)
 
@@ -799,12 +840,19 @@ class tdcoa():
                 colnm = re.sub('[^0-9a-zA-Z]+', '_', col)
                 if type(val) is int:
                     coltype = 'BIGINT'
+                    quote = ''
                 elif type(val) is float:
                     coltype = 'FLOAT'
+                    quote = ''
                 else:
                     collen = dfcsv[col].map(len).max()
                     coltype = 'VARCHAR(%i)' %(collen+100)
-                sql.append('%scast(\'%s\' as %s) as %s' %(delim,val,coltype,colnm))
+                    quote = "'"
+                if pd.isna(val):
+                    val='NULL'
+                    quote=''
+                val = '%s%s%s' %(quote,val,quote)
+                sql.append('%scast(%s as %s) as %s' %(delim,val,coltype,colnm))
                 delim = ','
             sql.append('from (sel 1 one) i%i' %idx)
             if (idx+1) % maxrows == 0:
@@ -827,33 +875,11 @@ class tdcoa():
         return  '\n'.join(sql)
 
 
-
-    def __bulkinsert(self, conn, tablename, schema='', csvfilepath=''):
-        self.log('initiating bulk insert')
-
-        if '.' in tablename:
-            schema = tablename.split('.')[0]
-            tablename = tablename.split('.')[1]
-        self.log('  tablename', '%s.%s' %(tablename,schema))
-
-        self.log('  opening csv', csvfilepath)
-        dfcsv = pd.read_csv(csvfilepath)
-        self.log('  records found', str(len(dfcsv)))
-
-        for col in dfcsv.columns:
-            if col[:8] == 'Unnamed:':
-                self.log('  unnamed column dropped', col)
-                self.log('    (usually the pandas index as a column, "Unnamed: 0")')
-                dfcsv = dfcsv.drop(columns=[col])
-        self.log('  final column count', str(len(dfcsv.columns)))
-
-        if len(tablename.split('.')) == 1:
-            db =  schema
-            tbl = tablename
-        else:
-            db =  tablename.split('.')[0]
-            tbl = tablename.split('.')[1]
-
-        self.log('  upload started', str(dt.datetime.now()))
-        dfcsv.to_sql(tbl, conn, db, if_exists='append', index=False, chunksize=1000, method='multi')
-        self.log('  upload completed', str(dt.datetime.now()))
+    def stringbetween(self, fullstring,firststring,secondstring, startposition=0):
+        rtn = ''
+        fullstring = fullstring[startposition:]
+        if firststring in fullstring:
+            rtn = fullstring
+            if firststring != '':  rtn = fullstring[fullstring.find(firststring)+len(firststring):]
+            if secondstring != '': rtn = rtn[:rtn.find(secondstring)]
+        return rtn
