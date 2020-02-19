@@ -33,6 +33,7 @@ class tdcoa():
     transcend = {}
     settings = {}
     gitfiles = []
+    gitfilesets = []
 
 
     def __init__(self, approot='.', printlog=True, config='config.yaml', secrets='secrets.yaml'):
@@ -116,10 +117,19 @@ class tdcoa():
                 obj.update(x)
                 self.log('    %s' %str(x))
 
-        self.log('  parsing gitfiles')
-        self.gitfiles=self.configyaml['gitfiles']
-        for x in self.gitfiles:
-            self.log('    %s' %str(x))
+        # load gitfiles
+        if 'gitfiles' in self.configyaml:
+            self.log('  parsing gitfiles')
+            self.gitfiles=self.configyaml['gitfiles']
+            for x in self.gitfiles:
+                self.log('    %s' %str(x))
+
+        # load gitfilesets
+        if 'gitfilesets' in self.configyaml:
+            self.log('  parsing gitfilesets')
+            self.gitfilesets=self.configyaml['gitfilesets']
+            for x in self.gitfilesets:
+                self.log('    %s' %str(x))
 
         # create missing folders
         self.log('validating folder structures')
@@ -171,6 +181,77 @@ class tdcoa():
 
         self.log('done!')
         self.log('time', str(dt.datetime.now()))
+
+
+
+
+    def download_file_sets(self, setname=None):
+        """Alternate to download_files() - downloads a set of selected files (sql, csv) from github and deposits them in the local 'download' folder as defined in the config.yaml.  The SQL sets comprise a collection of collateral that collectively completes a single logical peice of work.
+
+        Parameters: (optional) name of sql set.
+                     - If null, will look in config.yaml for entries under "gitfilesets:"
+                     - If string, will pull the single file set corresponding to that name
+                     - If list type, will iterate the list and pull all file set name corresponding to each entry
+
+        Examples:
+          from tdcsm.tdcoa import tdcoa
+          coa = tdcoa()
+
+          # pull file set list from config.yaml
+          coa.download_file_sets()
+
+          # pull the 'demo' file set
+          coa.download_file_sets('demo')
+
+          # pull the 'demo' and '1620pdcr--dbql_core' file set
+          coa.download_file_sets(['demo','1620pdcr--dbql_core'])
+        """
+        self.log('download_file_sets() started', header=True)
+        self.log('time',str(dt.datetime.now()))
+
+        # sort out parameters / list to iterate
+        if setname is None:
+            setlists = self.gitfilesets
+            self.log('processing from config.yaml')
+        elif type(setname) is str:
+            setlists = [setname]
+            self.log('processing from string parameter')
+        elif type(setname) is list:
+            setlists = setname
+            self.log('processing from list parameter')
+        else:
+            self.log('unknown parameter type',setlists)
+            raise ValueError('unknown parameter type: %s (%s)' %(setname,type(setname)))
+
+        for setlist in setlists:
+            self.log('Processing File Set',setlist)
+            githost = '%s/sets/%s/' %(self.settings['githost'], setlist)
+            self.log('githost',githost)
+
+            #first, go get the file manifest:
+            giturl = githost+'files.yaml'
+            filecontent = requests.get(giturl).content
+            self.log('file set manifest', str(filecontent).replace('files:','').strip() )
+            gitfilelist = yaml.load(filecontent)['files']
+            self.log('')
+
+            for gitfile in gitfilelist:
+                self.log('attempting to download', gitfile)
+                giturl = githost+gitfile
+                self.log('requesting url', giturl)
+                filecontent = requests.get(giturl).content
+                self.log('saving locally', 'file character length = %i' %len(filecontent))
+                file = open(os.path.join(self.approot, self.folders['download'].strip(), gitfile), 'w+')
+                file.write(filecontent.decode('utf-8'))
+                file.close
+                self.log('file saved', 'OK!\n')
+
+                if gitfile=='motd.txt':
+                    os.replace(os.path.join(self.approot, self.folders['download'].strip(), gitfile), os.path.join(self.approot, gitfile))
+
+        self.log('done!')
+        self.log('time', str(dt.datetime.now()))
+
 
 
 
@@ -728,41 +809,32 @@ class tdcoa():
         cf.append('  - startdate:   "\'2020-02-01\'"')
         cf.append('  - enddate:     "Current_Date - 1"')
         cf.append('  - whatever:    "anything you want"')
-        cf.append('  #common table-name replacements:')
-        cf.append('  - default_database:  "pdcrinfo"')
-        cf.append('  - dbqlogtbl_hst:     "pdcrinfo.DBQLogTbl_hst"')
-        cf.append('  - resusagescpu_hst:  "pdcrinfo.ResUsageScpu_hst"')
-        cf.append('  - resusagespdsk_hst: "pdcrinfo.ResUsageSpdsk_hst"')
-        cf.append('  - resusagespma_hst:  "pdcrinfo.ResUsageSpma_hst"')
-        cf.append('  - resusagesldv_hst:  "pdcrinfo.ResUsageSldv_hst"')
-        cf.append('  - resusagesawt_hst:  "pdcrinfo.ResUsageSawt_hst"')
-        cf.append('  # do NOT set siteid here, is substituted at run-time per connection name below')
+        cf.append('  - default_db:  "pdcrinfo"')
 
         cf.append('\n\nsiteids:')
-        cf.append('  # for testing:')
         cf.append('  - Altans_VDB:  "teradatasql://{username}:{password}@tdap278t1.labs.teradata.com"')
-        cf.append('  # customer systems... name should match their CIS SiteID:')
-        cf.append('#  - CUSTOMER001: "teradatasql://{username}:{password}@{host}"')
         cf.append('\n\ntranscend:')
         cf.append('  - TranscendIFX:  "teradatasql://{quicklook}:{td_password}@tdprdcop3.td.teradata.com/?logmech=LDAP"')
         cf.append('\n\nsettings:')
-        #cf.append('  - debug:  True  # if true, will NOT connect to database, instead emulate output only (for testing)')
         cf.append('  - githost: "https://raw.githubusercontent.com/tdcoa/sql/master/"')
         cf.append('  - gitrepo: "https://github.com/tdcoa/sql.git"')
         cf.append('\n\nfolders:')
-        cf.append('  - download:  "coa_default" # download_files step saves downloaded sql to this folder')
-        cf.append('  - sql:       "coa_default" # prepare_sql step pulls static sql from here, applies substitution, and saves to the run folder')
+        cf.append('  - download:  "_demo" # download_files step saves downloaded sql to this folder')
+        cf.append('  - sql:       "_demo" # prepare_sql step pulls static sql from here, applies substitution, and saves to the run folder')
         cf.append('  - run:       "_run" # execute_run step reads prepared sql from here and executes against database')
         cf.append('  - output:    "_output" # historical run (dated) folders, including all csv output, completed sql files, and logs')
+        cf.append('\n\ngitfilesets:')
+        cf.append('  - demo')
         cf.append('\n\ngitfiles:')
         cf.append('  - motd.txt')
-        cf.append('  - 0000.dbcinfo.coa.sql')
-        cf.append('  - 0000.dates.csv')
-        cf.append('  - dim_app.csv')
-        cf.append('  - dim_statement.csv')
-        cf.append('  - dim_user.csv')
-        cf.append('  - dim_querytype.csv')
-        cf.append('  #- 0001.DBQL_Summary.1620.v03.coa.sql')
+
+        #cf.append('  - 0000.dbcinfo.coa.sql')
+        #cf.append('  - 0000.dates.csv')
+        #cf.append('  - dim_app.csv')
+        #cf.append('  - dim_statement.csv')
+        #cf.append('  - dim_user.csv')
+        #cf.append('  - dim_querytype.csv')
+        #cf.append('  #- 0001.DBQL_Summary.1620.v03.coa.sql')
         with open( os.path.join(configpath), 'w') as fh:
             fh.write('\n'.join(cf))
 
