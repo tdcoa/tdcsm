@@ -602,6 +602,7 @@ class tdcoa():
                 csvfilepath = os.path.join(outputfo, entry['file'])
                 self.log('opening csv', csvfilepath)
                 dfcsv = pd.read_csv(csvfilepath)
+                dfcsv = dfcsv.where(pd.notnull(dfcsv), None)
                 self.log('records found', str(len(dfcsv)))
 
                 # strip out any unnamed columns
