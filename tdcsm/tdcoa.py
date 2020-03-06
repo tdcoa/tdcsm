@@ -2,14 +2,14 @@ import os, sys, io, re, errno, yaml, json, requests, time
 from shutil import copyfile
 import datetime as dt
 import pandas as pd
+import numpy as np
 #from sqlalchemy.engine import create_engine
 from sqlalchemy import create_engine
 from teradataml.dataframe.copy_to import copy_to_sql
 from teradataml.context.context import *
 from teradataml import *
 
-
-class tdcoa():
+class v2():
 
     # paths
     approot = '.'
@@ -65,6 +65,451 @@ class tdcoa():
 
         self.reload_config()
 
+
+
+
+
+
+
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# -=-=  utilities... some of these should move to a new tdcsm.tdutil.tdutil()
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+
+    def yaml_filesets(self, writefile=False):
+        self.log('generating filesets.yaml from internal default')
+        cy=[]
+        cy.append('demo:')
+        cy.append('  active:          "True"')
+        cy.append('  fileset_version: "1.0"')
+        cy.append('  startdate:       "Current_Date - 7"')
+        cy.append('  enddate:         "Current_Date - 1"')
+        cy.append('  some_value:      "Donkey"')
+        cy.append('  files: ')
+        cy.append('    - "demo/0000.dates.csv"')
+        cy.append('    - "demo/0000.dbcinfo.coa.sql"')
+        cy.append('')
+        cy.append('level1_how_much_1620pdcr: &current_level1')
+        cy.append('  active:          "True"')
+        cy.append('  fileset_version: "1.0"')
+        cy.append('  startdate:       "Current_Date - 45"')
+        cy.append('  enddate:         "Current_Date - 1"')
+        cy.append('  dbqlogtbl:       "pdcr.DBQLogTbl"')
+        cy.append('  resusagesldv:    "pdcr.ResUsageSldv"')
+        cy.append('  resusagespma:    "pdcr.ResUsageSpma"')
+        cy.append('  databasespace:   "pdcrinfo.DatabaseSpace_hst"')
+        cy.append('  files: ')
+        cy.append('    - "level1_how_much_1620pdcr/cpu_trend_spma.1620.pdcr.v11.coa.sql"')
+        cy.append('    - "level1_how_much_1620pdcr/io_trend_sldv.1620.pdcr.v12.coa.sql"')
+        cy.append('    - "level1_how_much_1620pdcr/storage_trend.1620.pdcr.v12.coa.sql"')
+        cy.append('')
+        cy.append('level1_how_much_1620dbc:')
+        cy.append('  active:          "True"')
+        cy.append('  fileset_version: "1.0"')
+        cy.append('  startdate:       "Current_Date - 45"')
+        cy.append('  enddate:         "Current_Date - 1"')
+        cy.append('  dbqlogtbl:       "dbc.DBQLogTbl"')
+        cy.append('  resusagesldv:    "dbc.ResUsageSldv"')
+        cy.append('  resusagespma:    "dbc.ResUsageSpma"')
+        cy.append('  files: ')
+        cy.append('    - "level1_how_much_1620pdcr/cpu_trend_spma.1620.pdcr.v11.coa.sql"')
+        cy.append('    - "level1_how_much_1620pdcr/io_trend_sldv.1620.pdcr.v12.coa.sql"')
+        cy.append('')
+        cy.append('level1_how_much: *current_level1')
+
+        rtn = '\n'.join(cy)
+        if writefile:
+            with open( os.path.join(self.filesetpath), 'w') as fh:
+                fh.write(rtn)
+            self.log('  saving file', self.filesetpath)
+        return rtn
+
+
+
+
+    def yaml_secrets(self, writefile=False):
+        self.log('generating secrets.yaml from internal default')
+        cy=[]
+        cy.append('# this file contains sensitive information that')
+        cy.append('# is typically NOT SHARED beyond one user, for')
+        cy.append('# example, passwords, some usernames, and IPs.')
+        cy.append('')
+        cy.append('secrets:')
+        cy.append('  tdpwd1:   "P@22w0rd"')
+        cy.append('')
+        cy.append('  custpwd2: "p0Pc0r4-@2020"')
+        cy.append('  custIP:   "123.234.231.100"')
+        cy.append('')
+        cy.append('  td_quicklook: "sh186014"')
+        cy.append('  td_password:  "qlikpassword"')
+        cy.append('')
+        cy.append('  custabc_username: "custUsername"')
+        cy.append('  custabc_password: "Ter@custabc_password"')
+        cy.append('')
+        cy.append('  username:   "vantagelabuser"')
+        cy.append('  password:   "vantagelabpwd"')
+        cy.append('')
+        rtn = '\n'.join(cy)
+        if writefile:
+            with open( os.path.join(self.secretpath), 'w') as fh:
+                fh.write(rtn)
+            self.log('  saving file', self.secretpath)
+        return rtn
+
+
+
+    def yaml_config(self, writefile=False, skipgit=False, skipdbs=True):
+        self.log('generating config.yaml from internal default')
+        cy=[]
+        cy.append('# Substitutions can be used in both the config.yaml (below), ')
+        cy.append('#   as well as all .coa.sql files generated in later steps.')
+        cy.append('#   format is {name} --> value   (all instances)')
+        cy.append('#   Order of config substitution is: ')
+        cy.append('#      - secrets.yaml')
+        cy.append('#      - config.yaml: substitutions, folders, settings, transcend')
+        cy.append('#   Order of sql substitution is, per file set: ')
+        cy.append('#      - config.yaml: system, substitutions, filesets (in download folder)')
+        cy.append('')
+        cy.append('')
+        cy.append('substitutions:')
+        cy.append('  account:            "Demo Customer"')
+        cy.append('  startdate:          "Current_Date - 7"')
+        cy.append('  enddate:            "Current_Date - 1"')
+        cy.append('  td_quicklook:       "sh186014"')
+        cy.append('  some_value:         "Camel"')
+        cy.append('')
+        cy.append('')
+        cy.append('systems:')
+        cy.append('  Altans_VDB:')
+        cy.append('    siteid:      "tdaltanvbd01"')
+        cy.append('    active:      "True"')
+        cy.append('    host:        "tdap278t1.labs.teradata.com"')
+        cy.append('    username:    "{username}"')
+        cy.append('    password:    "{password}"')
+        cy.append('    logmech:     "" ')
+        cy.append('    use:         "test"   # prod/qa/dr/dev/etc')
+        cy.append('    some_value:  "Bear"')
+        cy.append('    filesets:')
+        cy.append('      demo:')
+        cy.append('        active:     "True"')
+        cy.append('        some_value: "Aardvark" ')
+        cy.append('')
+        cy.append('  Customer_System:')
+        cy.append('    siteid:     "custabcprod01"')
+        cy.append('    active:     "false"')
+        cy.append('    host:       "prod.custabc.com"')
+        cy.append('    username:   "{custabc_username}"')
+        cy.append('    password:   "{custabc_password}"')
+        cy.append('    logmech:    "" ')
+        cy.append('    use:        "prod"')
+        cy.append('    filesets:')
+        cy.append('      demo:')
+        cy.append('        active: "False"')
+        cy.append('      level1_how_much_1620pdcr:')
+        cy.append('        active: "True"')
+        cy.append('        startdate:  "Current_Date - 45"')
+        cy.append('        enddate:    "Current_Date - 1"')
+        cy.append('        ')
+        cy.append('  Customer_System_disabled:')
+        cy.append('    siteid:     "custabcprod02"')
+        cy.append('    active:     "false"')
+        cy.append('    host:       "prod.custabc.com"')
+        cy.append('    username:   "{custabc_username}"')
+        cy.append('    password:   "{custabc_password}"')
+        cy.append('    logmech:    "" ')
+        cy.append('    use:        "dr" ')
+        cy.append('    filesets:')
+        cy.append('      demo:')
+        cy.append('        active: "True" # doesnt matter if parent is disabled')
+        cy.append('      level1_how_much_1620pdcr:')
+        cy.append('        active: "True" ')
+        cy.append('        startdate:  "Current_Date - 45"')
+        cy.append('        enddate:    "Current_Date - 1"')
+        cy.append('')
+        cy.append('')
+        cy.append('transcend:')
+        cy.append('  host:       "tdprdcop3.td.teradata.com"')
+        cy.append('  username:   "{td_quicklook}"')
+        cy.append('  password:   "{td_password}"')
+        cy.append('  logmech:    "LDAP"')
+        cy.append('')
+        cy.append('')
+        cy.append('folders:')
+        cy.append('  download:  "1_download"')
+        cy.append('  sql:       "2_sql_store"')
+        cy.append('  run:       "3_ready_to_run"')
+        cy.append('  output:    "4_output"')
+        cy.append('')
+        cy.append('')
+        cy.append('settings:')
+        cy.append('  githost:    "https://raw.githubusercontent.com/tdcoa/sql/master/"')
+        cy.append('  gitfileset: "filesets.yaml"')
+        cy.append('  gitmotd:    "motd.txt"')
+        cy.append('  localfilesets:   "./{download}/filesets.yaml"')
+        cy.append('  skip_git:   "%s"' %str(skipgit))
+        cy.append('  skip_dbs:   "%s"' %str(skipdbs))
+        cy.append('  run_non_fileset_folders: "True" ')
+        rtn = '\n'.join(cy)
+        if writefile:
+            with open( os.path.join(self.configpath), 'w') as fh:
+                fh.write(rtn)
+            self.log('  saving file', self.configpath)
+        return rtn
+
+
+
+    def sql_create_temp_from_csv(self, csvfilepath):
+        tbl = os.path.basename(csvfilepath)
+        self.log('    transcribing sql', tbl)
+
+        # open csv
+        self.log('    open csv', tbl)
+        dfcsv  = pd.read_csv(csvfilepath)
+        self.log('    rows in file', str(len(dfcsv)))
+
+        maxrows=100
+        tblcreated = False
+        sqlclosed=False
+
+        # build manual transactions for now...
+        sql = []
+        sqlprefix = 'create multiset volatile table "%s" as (\nselect ' %tbl
+        for idx, row in dfcsv.iterrows():
+            sqlclosed = False
+            sql.append(sqlprefix)
+            delim = ' '
+            for col, val in row.items():
+                colnm = re.sub('[^0-9a-zA-Z]+', '_', col)
+                if type(val) is int:
+                    coltype = 'BIGINT'
+                    quote = ''
+                elif type(val) is float:
+                    coltype = 'FLOAT'
+                    quote = ''
+                else:
+                    collen = dfcsv[col].map(len).max()
+                    coltype = 'VARCHAR(%i)' %(collen+100)
+                    quote = "'"
+                if pd.isna(val):
+                    val='NULL'
+                    quote=''
+                val = '%s%s%s' %(quote,val,quote)
+                sql.append('%scast(%s as %s) as %s' %(delim,val,coltype,colnm))
+                delim = ','
+            sql.append('from (sel 1 one) i%i' %idx)
+            if (idx+1) % maxrows == 0:
+                if tblcreated:
+                    sql.append(';\n')
+                elif not tblcreated:
+                    sql.append(') with data \n  no primary index \n  on commit preserve rows;\n\n')
+                    sqlclosed = True
+                    tblcreated = True
+                sqlprefix = 'insert into "%s" \nselect ' %tbl
+            else:
+                sqlprefix = 'union all \nselect '
+
+        if not sqlclosed and not tblcreated:
+            sql.append(') with data \n  no primary index \n  on commit preserve rows;\n\n')
+        else:
+            sql.append(';\n\n')
+
+        self.log('sql built for', tbl)
+        rtn =  '\n'.join(sql)
+        rtn = rtn + '\n\n'
+        return rtn
+
+
+
+
+
+
+    def substitute(self, string_content='', dict_replace={}, subname='', skipkeys=[]):
+        rtn = str(string_content)
+        self.log('    performing substitution', subname)
+        for n,v in dict_replace.items():
+            if n not in skipkeys:
+                if str('{%s}' %n) in rtn:
+                    rtn = rtn.replace('{%s}' %n, str(v))
+                    self.log('     {%s}' %n, str(v))
+        return str(rtn)
+
+
+
+    def format_sql(self, sqltext):
+        sql = str(sqltext).strip().split(';')[0]
+        while '\n\n' in sql:
+            sql = sql.replace('\n\n','\n').strip()
+        sql = sql.strip() + '\n;\n\n'
+
+        if sql.replace(';','').strip() == '':
+            sql=''
+        else:
+            # replce --comments with /* comments */
+            newsql = []
+            for line in sql.split('\n'):
+                if line.strip()[:2] != '/*': #skip comment-starting  lines
+                    lineparts = line.split('--')
+                    if len(lineparts) !=1:
+                        firstpart = lineparts[0].strip()
+                        secondpart = line[len(firstpart)+2:].strip()
+                        newsql.append('%s /* %s */' %(firstpart, secondpart))
+                    else:
+                        newsql.append(line)
+                else:
+                    newsql.append(line)
+            sql = '\n'.join(newsql).strip()
+
+        return sql
+
+
+
+    def log(self, msgleft='', msgright='', header=False, error=False, warning=False):
+        delim = ':'
+        if  msgright=='': delim=''
+        msg = '%s%s' %(str(msgleft+delim).ljust(self.logspace), msgright)
+
+        if error: msg='%s\nERROR:\n%s\n%s' %('-='*self.logspace, msg, '-='*self.logspace)
+        if warning: msg='%s\nWARNING:\n%s\n%s' %('-'*self.logspace, msg, '-'*self.logspace)
+        # prevent secrets from appearing in log:
+        for nm,secret in self.secrets.items():
+            if secret in msg:
+                msg = msg.replace(secret, '%s%s%s' %(secret[:1],'*'*(len(secret)-2),secret[-1:]))
+        if header: msg = '\n\n%s\n%s\n%s' %('='*40, msg.upper(), '-'*40)
+        if self.bufferlogs:
+            self.logs.append(msg)
+            if self.printlog: print(msg)
+        else: # no buffer
+            if len(self.logs) ==0:
+                if self.printlog: print(msg)
+                # self.__writelog(msg)
+                with open(self.logpath,'a') as logfile:
+                    logfile.write(msg + '\n')
+            else:
+                if self.printlog: print(msg)
+                for log in self.logs:
+                    #self.__writelog(log)
+                    with open(self.logpath,'a') as logfile:
+                        logfile.write(log + '\n')
+                    self.logs=[]
+                #self.__writelog(msg)
+                with open(self.logpath,'a') as logfile:
+                    logfile.write(msg + '\n')
+
+
+    def check_setting(self, settings_dict={}, required_item_list=[], defaults=[]):
+        i=-1
+        for itm in required_item_list:
+            i+=1
+            if str(itm) not in settings_dict:
+                if defaults != [] and defaults[i]!='':
+                    settings_dict[str(itm)]=defaults[i]
+                    msgsuffix = 'Substituting missing value', '%s=%s' %(str(itm),settings_dict[str(itm)])
+                else:
+                    msgsuffix = 'No default provided, leaving as empty-string'
+                    settings_dict[str(itm)]=''
+
+                msg = '%s\n      %s\n%s\n%s\n%s' %('Required Config name/value pair MISSING:',
+                        str(itm),
+                        '(note: names are case-sensitive)',
+                        'Some functionality may not work until this is added and you reload_config()',
+                        msgsuffix)
+                self.log(msg, warning=True)
+
+
+
+    def get_special_commands(self, sql, replace_with=''):
+        cmdstart = '/*{{'
+        cmdend = '}}*/'
+        cmd = {}
+        if replace_with !='': replace_with = '/* %s */' %replace_with
+        self.log('  parsing for special sql commands')
+        while cmdstart in sql and cmdend in sql:
+            pos1 = sql.find(cmdstart)
+            pos2 = sql.find(cmdend)
+            cmdstr = sql[pos1:pos2+len(cmdend)]
+            cmdlst = cmdstr.replace(cmdstart,'').replace(cmdend,'').split(':')
+            if len(cmdlst) == 2:
+                cmdkey = cmdlst[0].strip()
+                cmdval = cmdlst[1].strip()
+                cmd[cmdkey] = cmdval
+                self.log('   special command found', '%s = %s' %(cmdkey,cmdval))
+                sql = sql.replace(cmdstr, replace_with)
+            else:
+                sql = sql.replace(cmdstr,'/* %s */' %cmdlst[0])
+        cmd['sql'] = sql
+        return cmd
+
+
+    def dict_active(self, dictTarget={}, dictName='', also_contains_key=''):
+        if 'active' not in dictTarget:
+            self.log('!! dictionary missing "active" flag, assuming "True"')
+            dictTarget['active'] = 'True'
+        if str(dictTarget['active']).lower() == 'true':
+            if also_contains_key=='' or (also_contains_key != '' and also_contains_key in dictTarget):
+                self.log('  active dictionary', dictName)
+                return True
+        self.log('  INACTIVE dictionary',dictName)
+        return False
+
+
+
+    def recursively_delete_subfolders(self, parentpath):
+        self.log('purge all subfolders',parentpath)
+        for itm in os.listdir(parentpath):
+            if os.path.isdir(os.path.join(parentpath,itm)):
+                self.log(' recursively deleting', itm)
+                os.popen('rm -r %s' %os.path.join(parentpath, itm))
+                time.sleep(.333)  # give os time to catch-up
+
+    def recursive_delete(self, delpath):
+        if os.path.isdir(delpath):
+            self.log(' recursively deleting', delpath)
+            os.popen('rm -r %s' %delpath)
+            time.sleep(.333)  # give os time to catch-up
+
+
+
+    def recursive_copy(self, sourcepath, destpath, replace_existing=False, skippattern='' ):
+        self.log(' recursive_copyfolder source', sourcepath)
+
+        if not os.path.isdir(sourcepath):
+            self.log('  ERROR: source path does not exist', sourcepath)
+        else:
+            if not os.path.exists(destpath):
+                self.log('    destination folder absent, creating', destpath)
+                os.mkdir(destpath)
+            for itm in os.listdir(sourcepath):
+                srcpath = os.path.join(sourcepath,itm)
+                dstpath = os.path.join(destpath,itm)
+
+                if skippattern != '' and skippattern in itm:
+                    self.log('    skip: matched skip-pattern', srcparh)
+                else:
+                    if os.path.exists(dstpath) and not replace_existing:
+                        self.log('    skip: replace_existing=False', dstpath)
+                    else:
+                        if os.path.exists(dstpath) and replace_existing:
+                            self.log(' replace_existing=True')
+                            self.recursive_delete(dstpath)
+
+                        if os.path.isfile(srcpath):
+                            self.log('    file copied', dstpath)
+                            copyfile(srcpath, dstpath)
+                        elif os.path.isdir(os.path.join(sourcepath,itm)):
+                            self.log('    folder copied', dstpath)
+                            os.mkdir(dstpath)
+                            self.recursive_copy(srcpath, dstpath, replace_existing, skippattern)
+                        else:
+                            self.log('    um... unknown filetype: %s' %srcpath)
+
+
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# -=-=  end utilities
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
 
 
@@ -140,11 +585,13 @@ class tdcoa():
         self.log('loading dictionary', 'transcend')
         self.transcend = configyaml['transcend']
         self.check_setting(self.transcend,
-                           required_item_list=['username','password','host'],
-                           defaults=['{td_quicklook}','{td_password}','"tdprdcop3.td.teradata.com/?logmech=LDAP"'])
-        self.transcend['connectionstring'] = 'teradatasql://%s:%s@%s' %(self.transcend['username'],
-                                                                        self.transcend['password'],
-                                                                        self.transcend['host'])
+                           required_item_list=['username','password','host','logmech'],
+                           defaults=['{td_quicklook}','{td_password}','"tdprdcop3.td.teradata.com"','LDAP'])
+        self.transcend['connectionstring'] = 'teradatasql://%s:%s@%s/?logmech=%s' %(
+                                                    self.transcend['username'],
+                                                    self.transcend['password'],
+                                                    self.transcend['host'],
+                                                    self.transcend['logmech'])
         # check and set required Folders
         self.log('loading dictionary', 'folders')
         self.folders = configyaml['folders']
@@ -155,13 +602,14 @@ class tdcoa():
         self.log('loading dictionary', 'settings')
         self.settings = configyaml['settings']
         self.check_setting(self.settings,
-                           required_item_list=['githost','gitfileset','gitmotd','localfilesets','skip_git','skip_dbs'],
+                           required_item_list=['githost','gitfileset','gitmotd','localfilesets','skip_git','skip_dbs','run_non_fileset_folders'],
                            defaults=['"https://raw.githubusercontent.com/tdcoa/sql/master/"'
                                     ,'"filesets.yaml"'
                                     ,'"motd.txt"'
                                     ,'"{download}/filesets.yaml"'
                                     ,'"False"'
-                                    ,'"False"'])
+                                    ,'"False"'
+                                    ,'"True"'])
         self.filesetpath = self.settings['localfilesets']
 
         if 'skip_git' in self.settings and str(self.settings['skip_git']).lower() in['true']:
@@ -225,13 +673,19 @@ class tdcoa():
             if self.dict_active(sysobject, sysname):
                 self.systems.update({sysname: sysobject})
 
-            if 'host' not in sysobject: sysobject['host']='customer.host.missing.com'
-            if 'username' not in sysobject: sysobject['username']='username_missing'
-            if 'password' not in sysobject: sysobject['password']='password_missing'
-            if 'connectionstring' not in sysobject:
-                sysobject['connectionstring'] = 'teradatasql://%s:%s@%s' %(sysobject['username'],
-                                                                           sysobject['password'],
-                                                                           sysobject['host'])
+                self.check_setting(self.systems[sysname],
+                           required_item_list=['active','siteid','use','host','username','password','logmech'],
+                           defaults=['True', 'siteid123', 'unknown', 'customer.host.missing.com', 'username_missing', 'password_missing', ''] )
+
+                if 'connectionstring' not in sysobject:
+                    if sysobject['logmech'].strip() == '':
+                        logmech = ''
+                    else:
+                        logmech = '/?logmech=%s' %sysobject['logmech']
+                    sysobject['connectionstring'] = 'teradatasql://%s:%s@%s%s' %(sysobject['username'],
+                                                                                sysobject['password'],
+                                                                                sysobject['host'],
+                                                                                logmech)
 
         self.log('done!')
         self.log('time', str(dt.datetime.now()))
@@ -377,155 +831,233 @@ class tdcoa():
         self.log(' sql folder', self.folders['sql'])
         self.log(' run folder', self.folders['run'])
 
-        # clear pre-existing subfolders (file sets)
+        # clear pre-existing subfolders in "run" directory (file sets)
         self.log('empty run folder entirely')
         self.recursively_delete_subfolders(os.path.join(self.approot, self.folders['run']))
 
-        # copy over new subfolders (file sets) from sql store
-        self.log('copy over contents from', self.folders['sql'])
-        self.recursive_copy(sourcepath = os.path.join(self.approot, self.folders['sql']),
-                              destpath = os.path.join(self.approot, self.folders['run']),
-                            replace_existing = True)
-
-
         # iterate all system level folders in "run" folder...
-        for sysfolder in os.listdir(os.path.join(self.approot, self.folders['run'])):
-            self.log('processing folder', sysfolder)
-            if os.path.isdir(os.path.join(self.approot, self.folders['run'], sysfolder)):
+        for sysfolder in os.listdir(os.path.join(self.approot, self.folders['sql'])):
+            if os.path.isdir(os.path.join(self.approot, self.folders['sql'])):
                 self.log('\n' + '-'*self.logspace)
-                self.log('SYSTEM found', sysfolder)
+                self.log('SYSTEM FOLDER FOUND', sysfolder)
 
-                # then iterate all fileset subfolders in system folder...
-                for setfolder in os.listdir(os.path.join(self.approot, self.folders['run'], sysfolder)):
-                    if os.path.isdir(setfolder):
-                        self.log(' FilesSets found', setfolder)
+                if sysfolder not in self.systems or self.dict_active(self.systems[sysfolder])==False:
+                    self.log('folder not defined as an active system, skipping...')
+                else:
 
-                    # then iterate all .sql.coa files in the fileset subfolder...
-                    runpath = os.path.join(self.approot, self.folders['run'], sysfolder, setfolder)
-                    for runfile in os.listdir(runpath):
-                        runfilepath = os.path.join(runpath, runfile)
-                        if os.path.isfile(runfilepath) and runfile[-8:]=='.coa.sql':
+                    # iterate all fileset subfolders in system folder...
+                    for setfolder in os.listdir(os.path.join(self.approot, self.folders['sql'], sysfolder)):
+                        if os.path.isdir(os.path.join(self.approot, self.folders['sql'], sysfolder, setfolder)):
+                            self.log('FILESET FOLDER FOUND', setfolder)
 
+                            # what to do with non-fileset folders?  well, depends:
+                            _continue = False
+                            if setfolder not in self.filesets:
+                                self.log('  folder does NOT MATCH a defined fileset name', setfolder)
+                                if self.settings['run_non_fileset_folders'].strip().lower() == 'true':
+                                    self.log('  however setting: "run_non_fileset_folders" equals "true", continuing...')
+                                    _continue = False
+                                else:
+                                    self.log('  and setting: "run_non_fileset_folders" not equal "true", skipping...')
+                                    _continue = True
+                            else: # setfolder in self.filesets
+                                self.log('  folder MATCHES a defined fileset name', setfolder)
+                                if self.dict_active(self.systems[sysfolder]['filesets'][setfolder])==False:
+                                    self.log("  however the system's fileset-override is marked as in-active, skipping...")
+                                    _continue = False
+                                elif self.dict_active(self.filesets[setfolder])==False:
+                                    self.log('  however fileset itself is marked as in-active, skipping...')
+                                    _continue = False
+                                else:
+                                    self.log('  and fileset record is active, continuing...')
+                                    _continue = True
 
-                            # if .coa.sql file, read into memory
-                            self.log('  PROCESSING COA.SQL FILE', runfile)
-                            with open(runfilepath, 'r') as fh:
-                                runfiletext = fh.read()
-                                self.log('  characters in file', str(len(runfiletext)))
+                            if  _continue:
 
+                                # define paths
+                                sqlpath = os.path.join(self.approot, self.folders['sql'], sysfolder, setfolder)
+                                runpath = os.path.join(self.approot, self.folders['run'], sysfolder)
+                                if not os.path.isdir(runpath):
+                                    self.log('  creating system folder', runpath)
+                                    os.mkdir(runpath)
+                                runpath = os.path.join(self.approot, self.folders['run'], sysfolder, setfolder)
+                                if not os.path.isdir(runpath):
+                                    self.log('  creating fileset folder', runpath)
+                                    os.mkdir(runpath)
 
-                            # SUBSTITUTE values for:  system-fileset override
-                            sub_dict = self.systems[sysfolder]['filesets'][setfolder]
-                            if self.dict_active(sub_dict, 'system-fileset overrides'):
-                                runfiletext = self.substitute(runfiletext, sub_dict, subname='system-fileset overrides (highest priority)')
+                                self.recursive_copy(sqlpath, runpath, replace_existing=True)
 
-                            # SUBSTITUTE values for:  system-defaults
-                            sub_dict = self.systems[sysfolder]
-                            if self.dict_active(sub_dict, 'system defaults'):
-                                runfiletext = self.substitute(runfiletext, sub_dict, skipkeys=['filesets'], subname='system defaults')
-
-                            # SUBSTITUTE values for:   overall application defaults (never inactive)
-                            self.log('  always use dictionary')
-                            runfiletext = self.substitute(runfiletext, self.substitutions, subname='overall app defaults (config.substitutions)')
-
-                            # SUBSTITUTE values for:   fileset defaults
-                            sub_dict = self.filesets[setfolder]
-                            if self.dict_active(sub_dict, 'fileset defaults'):
-                                runfiletext = self.substitute(runfiletext, sub_dict, skipkeys=['files'], subname='fileset defaults (lowest priority)')
-
-
-                            # split sql file into many sql statements
-                            sqls_raw = runfiletext.split(';')
-                            self.log('  sql statements in file', str(len(sqls_raw)-1))
-                            sqls_done = []
-                            i = 0
-
-
-                            # loop thru individual sql statements within file
-                            for sql_raw in sqls_raw:
-
-                                # light formatting...
-                                sql = self.format_sql(sql_raw)
-
-                                if sql != '':
-                                    i+=1
-                                    self.log('  SQL %i' %i, '%s...' %sql[:50].replace('\n',' '))
+                                # iterate all .sql.coa files in the fileset subfolder...
+                                for runfile in os.listdir(runpath):
+                                    runfilepath = os.path.join(runpath, runfile)
+                                    if os.path.isfile(runfilepath) and runfile[-8:]=='.coa.sql':
 
 
-                                    # Get SPECIAL COMMANDS
-                                    cmds = self.get_special_commands(sql, '{{replaceMe}}')
-                                    sql = cmds['sql'] # sql stripped of commands (now in dict)
-
-                                    self.log('  processing special commands')
-                                    for cmdname, cmdvalue in cmds.items():
-
-                                        # --> TEMP <--: load temp file from .csv
-                                        if str(cmdname[:4]).lower() == 'temp':
-                                            self.log('   create temp (volatile) table from .csv')
-
-                                            if not os.path.isfile(os.path.join(runpath, cmdvalue)):
-                                                self.log('csv file missing!!!', os.path.join(runpath, cmdvalue), warning=True)
-                                                raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), os.path.join(runpath, cmdvalue))
-                                            else:
-                                                self.log('   csv file found', cmdvalue)
-                                                tempsql = self.sql_create_temp_from_csv(os.path.join(runpath, cmdvalue))
-                                                sqls_done.append(tempsql)
-                                                sql = sql.replace('{{replaceMe}}','above volatile table create script for %s' %cmdvalue)
+                                        # if .coa.sql file, read into memory
+                                        self.log('\n  PROCESSING COA.SQL FILE', runfile)
+                                        with open(runfilepath, 'r') as fh:
+                                            runfiletext = fh.read()
+                                            self.log('  characters in file', str(len(runfiletext)))
 
 
-                                        # --> LOOP <--: loop thru csv and generate one sql per csv row, with substitutions
-                                        if str(cmdname[:4]).lower() == 'loop':
-                                            self.log('   loop sql once per row in .csv, with substitutions')
+                                        # SUBSTITUTE values for:  system-fileset override
+                                        sub_dict = self.systems[sysfolder]['filesets'][setfolder]
+                                        if self.dict_active(sub_dict, 'system-fileset overrides'):
+                                            runfiletext = self.substitute(runfiletext, sub_dict, subname='system-fileset overrides (highest priority)')
 
-                                            # can we find the file?
-                                            if not os.path.isfile(os.path.join(runpath, cmdvalue)):
-                                                self.log('csv file missing!!!', os.path.join(runpath, cmdvalue), warning=True)
-                                            else:
-                                                self.log('   file found!')
-                                                df = pd.read_csv(os.path.join(runpath, cmdvalue))
-                                                self.log('   rows in file', str(len(df)))
+                                        # SUBSTITUTE values for:  system-defaults
+                                        sub_dict = self.systems[sysfolder]
+                                        if self.dict_active(sub_dict, 'system defaults'):
+                                            runfiletext = self.substitute(runfiletext, sub_dict, skipkeys=['filesets'], subname='system defaults')
 
-                                                # perform csv substitutions
-                                                self.log('   perform csv file substitutions (find: {column_name}, replace: row value)')
-                                                for index, row in df.iterrows():
-                                                    tempsql = sql
-                                                    for col in df.columns:
-                                                        tempsql = tempsql.replace(str('{%s}' %col), str(row[col]))
-                                                    tempsql = tempsql.replace('{{replaceMe}}',' csv row %i out of %i ' %(index+1, len(df)))
-                                                    self.log('   sql generated from row data', 'character length = %i' %len(tempsql))
-                                                    sqls_done.append(tempsql)
-                                                sql = '' # don't append original sql again - it is only a template
+                                        # SUBSTITUTE values for:   overall application defaults (never inactive)
+                                        self.log('  always use dictionary')
+                                        runfiletext = self.substitute(runfiletext, self.substitutions, subname='overall app defaults (config.substitutions)')
+
+                                        # SUBSTITUTE values for:   fileset defaults
+                                        sub_dict = self.filesets[setfolder]
+                                        if self.dict_active(sub_dict, 'fileset defaults'):
+                                            runfiletext = self.substitute(runfiletext, sub_dict, skipkeys=['files'], subname='fileset defaults (lowest priority)')
 
 
-                                        # --> others, append special command back to the SQL for processing in the run phase
-                                        if str(cmdname[:4]).lower() in ['save','load','call']:
-                                            sql = sql.replace('/* {{replaceMe}} */','/*{{%s:%s}}*/' %(cmdname, cmdvalue), 1)
+                                        # split sql file into many sql statements
+                                        sqls_raw = runfiletext.split(';')
+                                        self.log('  sql statements in file', str(len(sqls_raw)-1))
+                                        sqls_done = []
+                                        i = 0
 
 
-                                # after all special commands, append the original sql
-                                sqls_done.append(sql)
+                                        # loop thru individual sql statements within file
+                                        for sql_raw in sqls_raw:
 
-                            # write out new finalized file content:
-                            self.log('  writing out final sql\n'+'-'*self.logspace)
-                            with open(runfilepath,'w') as fh:
-                                fh.write( '\n\n'.join(sqls_done) )
+                                            # light formatting...
+                                            sql = self.format_sql(sql_raw)
+
+                                            if sql != '':
+                                                i+=1
+                                                self.log('  SQL %i' %i, '%s...' %sql[:50].replace('\n',' '))
+
+
+                                                # Get SPECIAL COMMANDS
+                                                cmds = self.get_special_commands(sql, '{{replaceMe}}')
+                                                sql = cmds['sql'] # sql stripped of commands (now in dict)
+
+                                                self.log('  processing special commands')
+                                                for cmdname, cmdvalue in cmds.items():
+
+                                                    # --> TEMP <--: load temp file from .csv
+                                                    if str(cmdname[:4]).lower() == 'temp':
+                                                        self.log('   create temp (volatile) table from .csv')
+
+                                                        if not os.path.isfile(os.path.join(runpath, cmdvalue)):
+                                                            self.log('csv file missing!!!', os.path.join(runpath, cmdvalue), warning=True)
+                                                            raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), os.path.join(runpath, cmdvalue))
+                                                        else:
+                                                            self.log('   csv file found', cmdvalue)
+                                                            tempsql = self.sql_create_temp_from_csv(os.path.join(runpath, cmdvalue))
+                                                            sqls_done.append(tempsql)
+                                                            sql = sql.replace('{{replaceMe}}','above volatile table create script for %s' %cmdvalue)
+
+
+                                                    # --> LOOP <--: loop thru csv and generate one sql per csv row, with substitutions
+                                                    if str(cmdname[:4]).lower() == 'loop':
+                                                        self.log('   loop sql once per row in .csv, with substitutions')
+
+                                                        # can we find the file?
+                                                        if not os.path.isfile(os.path.join(runpath, cmdvalue)):
+                                                            self.log('csv file missing!!!', os.path.join(runpath, cmdvalue), warning=True)
+                                                        else:
+                                                            self.log('   file found!')
+                                                            df = pd.read_csv(os.path.join(runpath, cmdvalue))
+                                                            self.log('   rows in file', str(len(df)))
+
+                                                            # perform csv substitutions
+                                                            self.log('   perform csv file substitutions (find: {column_name}, replace: row value)')
+                                                            for index, row in df.iterrows():
+                                                                tempsql = sql
+                                                                for col in df.columns:
+                                                                    tempsql = tempsql.replace(str('{%s}' %col), str(row[col]))
+                                                                tempsql = tempsql.replace('{{replaceMe}}',' csv row %i out of %i ' %(index+1, len(df)))
+                                                                self.log('   sql generated from row data', 'character length = %i' %len(tempsql))
+                                                                sqls_done.append(tempsql)
+                                                            sql = '' # don't append original sql again - it is only a template
+
+
+                                                    # --> others, append special command back to the SQL for processing in the run phase
+                                                    if str(cmdname[:4]).lower() in ['save','load','call']:
+                                                        sql = sql.replace('/* {{replaceMe}} */','/*{{%s:%s}}*/' %(cmdname, cmdvalue), 1)
+
+
+                                            # after all special commands, append the original sql
+                                            sqls_done.append(sql)
+
+                                        # write out new finalized file content:
+                                        self.log('  writing out final sql')
+                                        with open(runfilepath,'w') as fh:
+                                            fh.write( '\n\n'.join(sqls_done) )
 
         self.log('done!')
         self.log('time', str(dt.datetime.now()))
 
 
+    def archive_prepared_sql(self, name=''):
+        """Manually archives (moves) all folders / files in the 'run' folder, where
+        prepared sql is stored after the prepare_sql() function.  This includes the
+        runlog.txt.  All  files are moved, leaving the 'run' folder empty after the
+        operation. The destination folder is a new time-stamped output folder (with
+        optional name).  Useful when you don't have access to execute_sql() (the
+        process that normally archives collateral) against customer system directly,
+        but still want to keep a record of that 'run'.   For example, if you need to
+        prepare sql to send to a customer DBA for execution - you cannot execute_run()
+        yourself, but still want to keep a record of what was sent.
+
+        USAGE:
+        tdcoa.archive_prepared_sql(name = 'name_of_archive')
+          - name: optional string to append to folder name (after timestamp)
+                  all non-alphanumeric characters in name are replaced with underscore
+
+        EXAMPLE:
+        from tdcsm.tdcoa import tdcoa
+        coa = tdcoa()             # instantiates objects
+        coa.download_files()      # get some collateral to move
+        coa.copy_download_to_sql  # move download to sql store
+        coa.prepare_sql()         # prepare sql for execution
+
+        # now we should have some files worth archiving:
+        coa.archive_prepared_sql ('march run for CustABC')
+        """
+        self.log('archive_prepared_sql started', header=True)
+        self.log('time',str(dt.datetime.now()))
+        outputpath = self.make_output_folder(name)
+        runpath = os.path.join(self.approot, self.folders['run'])
+        self.log('created output folder', outputpath)
+        self.log('moving all content from',runpath )
+        self.recursive_copy(runpath, outputpath)
+        self.logpath = os.path.join(outputpath, 'runlog.txt')
+        self.recursive_delete(os.path.join(self.approot, self.folders['run']))
+        os.mkdir(os.path.join(self.approot, self.folders['run']))
+        self.log('done!')
+        self.log('time', str(dt.datetime.now()))
 
 
 
-    def execute_run(self):
+    def make_output_folder(self, name=''):
+        outputpath = os.path.join(self.approot, self.folders['output'], str(dt.datetime.now())[:-7].replace(' ','_').replace(':',''))
+        if name.strip() !='': name = '-%s' %str(re.sub('[^0-9a-zA-Z]+', '_', name.strip()))
+        outputpath = outputpath + name
+        os.makedirs(outputpath)
+        return outputpath
+
+
+    def execute_run(self, name=''):
         self.log('execute_run started', header=True)
         self.log('time',str(dt.datetime.now()))
 
         # at this point, we make the assumption that everything in the "run" directory is valid
 
+        # make output directory for execution output and other collateral
         runpath = os.path.join(self.approot,self.folders['run'])
-        outputpath = os.path.join(self.approot, self.folders['output'], str(dt.datetime.now())[:-7].replace(' ','_').replace(':',''))
-        os.makedirs(outputpath)
+        outputpath = self.make_output_folder(name)
 
         # create hidden file containing last run's output -- to remain in the root folder
         with open(os.path.join(self.approot, '.last_run_output_path.txt'), 'w') as lastoutput:
@@ -731,13 +1263,16 @@ class tdcoa():
         self.log('    logmech', self.transcend['logmech'])
         self.log('    username', self.transcend['username'])
         self.log('    password', self.transcend['password'])
+        self.log("\nNOTE:  if you happen to see a scary WARNING below, DON'T PANIC!")
+        self.log("       it just means you already had an active connection that was replaced.\n")
         if self.skipdbs:
             self.log('skipdbs = True', 'emulating connection')
         else:
             transcend = create_context(host = self.transcend['host'],
                                        username = self.transcend['username'],
-                                       logmech = self.transcend['logmech'],
-                                       password = self.transcend['password'])
+                                       password = self.transcend['password'],
+                                       logmech = self.transcend['logmech'] )  # <--------- Connect
+        self.log('connected!')
 
 
         # Walk the directory structure looking for upload_manifest.json files
@@ -794,7 +1329,30 @@ class tdcoa():
                             if self.skipdbs:
                                 self.log('skipdbs = True', 'emulating upload')
                             else:
-                                copy_to_sql(dfcsv, entry['table'], entry['schema'], if_exists = 'append')
+                                try:
+                                    copy_to_sql(dfcsv, entry['table'], entry['schema'], if_exists = 'append')
+                                except Exception as err:
+                                    self.log('\n\nERROR during UPLOAD', error=True)
+                                    self.log(str(err))
+                                    self.log('   (error repeated below)')
+                                    self.log('\n    first 10 records of what was being uploaded (dataframe):')
+                                    self.log(dfcsv[0:10])
+                                    self.log('')
+                                    sql =["Select ColumnName, ColumnType, ColumnFormat, ColumnLength, ColumnId"]
+                                    sql.append("from dbc.columns ")
+                                    sql.append("where databasename = '%s' " %entry['schema'])
+                                    sql.append("  and tablename = '%s' " %entry['table'])
+                                    #sql.append("order by ColumnID;")
+                                    sql = '\n'.join(sql)
+                                    self.log(sql)
+                                    df = DataFrame.from_query(sql)
+                                    df = df.sort(['ColumnId'], ascending=[True])
+                                    self.log('\n\n    structure of destination table:')
+                                    print(df)
+                                    self.log('')
+                                    raise err
+
+
                             self.log('complete', str(dt.datetime.now()))
 
                             # CALL any specified SPs:
@@ -812,436 +1370,3 @@ class tdcoa():
 
         self.log('\ndone!')
         self.log('time', str(dt.datetime.now()))
-
-
-
-
-
-
-
-
-
-
-# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# -=-=  utilities... some of these should move to a new tdcsm.tdutil.tdutil()
-# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-
-
-    def yaml_filesets(self, writefile=False):
-        self.log('generating filesets.yaml from internal default')
-        cy=[]
-        cy.append('demo:')
-        cy.append('  active:     "True"')
-        cy.append('  startdate:  "Current_Date - 7"')
-        cy.append('  enddate:    "Current_Date - 1"')
-        cy.append('  anything:   "Donkey"')
-        cy.append('  files: ')
-        cy.append('    - "demo/0000.dates.csv"')
-        cy.append('    - "demo/0000.dbcinfo.coa.sql"')
-        cy.append('')
-        cy.append('level1_how_much_1620pdcr: &current_level1')
-        cy.append('  active:        "True"')
-        cy.append('  startdate:     "Current_Date - 45"')
-        cy.append('  enddate:       "Current_Date - 1"')
-        cy.append('  dbqlogtbl:     "pdcr.DBQLogTbl"')
-        cy.append('  resusagesldv:  "pdcr.ResUsageSldv"')
-        cy.append('  resusagespma:  "pdcr.ResUsageSpma"')
-        cy.append('  databasespace: "pdcrinfo.DatabaseSpace_hst"')
-        cy.append('  files: ')
-        cy.append('    - "level1_how_much_1620pdcr/cpu_trend_spma.1620.pdcr.v11.coa.sql"')
-        cy.append('    - "level1_how_much_1620pdcr/io_trend_sldv.1620.pdcr.v12.coa.sql"')
-        cy.append('    - "level1_how_much_1620pdcr/storage_trend.1620.pdcr.v12.coa.sql"')
-        cy.append('')
-        cy.append('level1_how_much: *current_level1')
-
-        rtn = '\n'.join(cy)
-        if writefile:
-            with open( os.path.join(self.filesetpath), 'w') as fh:
-                fh.write(rtn)
-            self.log('  saving file', self.filesetpath)
-        return rtn
-
-
-
-
-    def yaml_secrets(self, writefile=False):
-        self.log('generating secrets.yaml from internal default')
-        cy=[]
-        cy.append('# this file contains sensitive information that')
-        cy.append('# is typically NOT SHARED beyond one user, for')
-        cy.append('# example, passwords, some usernames, and IPs.')
-        cy.append('')
-        cy.append('secrets:')
-        cy.append('  tdpwd1:   "P@22w0rd"')
-        cy.append('')
-        cy.append('  custpwd2: "p0Pc0r4-@2020"')
-        cy.append('  custIP:   "123.234.231.100"')
-        cy.append('')
-        cy.append('  td_quicklook: "sh186014"')
-        cy.append('  td_password:  "qlikpassword"')
-        cy.append('')
-        cy.append('  custabc_username: "custUsername"')
-        cy.append('  custabc_password: "Ter@custabc_password"')
-        cy.append('')
-        cy.append('  username:   "vantagelabuser"')
-        cy.append('  password:   "vantagelabpwd"')
-        cy.append('')
-        rtn = '\n'.join(cy)
-        if writefile:
-            with open( os.path.join(self.secretpath), 'w') as fh:
-                fh.write(rtn)
-            self.log('  saving file', self.secretpath)
-        return rtn
-
-
-
-    def yaml_config(self, writefile=False, skipgit=False, skipdbs=True):
-        self.log('generating config.yaml from internal default')
-        cy=[]
-        cy.append('# Substitutions can be used in both the config.yaml (below), ')
-        cy.append('#   as well as all .coa.sql files generated in later steps.')
-        cy.append('#   format is {name} --> value   (all instances)')
-        cy.append('#   Order of config substitution is: ')
-        cy.append('#      - secrets.yaml')
-        cy.append('#      - config.yaml: substitutions, folders, settings, transcend')
-        cy.append('#   Order of sql substitution is, per file set: ')
-        cy.append('#      - config.yaml: system, substitutions, filesets (in download folder)')
-        cy.append('')
-        cy.append('')
-        cy.append('substitutions:')
-        cy.append('  account:            "Demo Customer"')
-        cy.append('  startdate:          "Current_Date - 7"')
-        cy.append('  enddate:            "Current_Date - 1"')
-        #cy.append('  resusagespma:       "pdcrinfo.ResUsageSpma_hst"')
-        #cy.append('  resusagesldv:       "pdcrinfo.ResUsageSldv_hst"')
-        #cy.append('  databasespace:      "pdcrinfo.DatabaseSpace_hst"')
-        #cy.append('  dbqlogtbl:          "pdcrinfo.DBQLogTbl_Hst"')
-        #cy.append('  qrylogfeaturelistv: "dbc.QryLogFeatureListV"')
-        cy.append('  td_quicklook:       "sh186014"')
-        cy.append('  anything:           "Camel"')
-        cy.append('')
-        cy.append('')
-        cy.append('systems:')
-        cy.append('  Altans_VDB:')
-        cy.append('    siteid:     "tdaltanvbd01"')
-        cy.append('    active:     "True"')
-        cy.append('    host:       "tdap278t1.labs.teradata.com"')
-        cy.append('    username:   "{username}"')
-        cy.append('    password:   "{password}"')
-        cy.append('    use:        "test"   # prod/qa/dr/dev/etc')
-        cy.append('    anything:   "Bear"')
-        cy.append('    filesets:')
-        cy.append('      demo:')
-        cy.append('        active: "True"')
-        cy.append('        anything:   "Aardvark" ')
-        cy.append('')
-        cy.append('  Customer_System:')
-        cy.append('    siteid:     "custabcprod01"')
-        cy.append('    active:     "false"')
-        cy.append('    host:       "prod.custabc.com"')
-        cy.append('    username:   "{custabc_username}"')
-        cy.append('    password:   "{custabc_password}"')
-        cy.append('    use:        "prod"')
-        cy.append('    filesets:')
-        cy.append('      demo:')
-        cy.append('        active: "False"')
-        cy.append('      level1_how_much_1620pdcr:')
-        cy.append('        active: "True"')
-        cy.append('        startdate:  "Current_Date - 45"')
-        cy.append('        enddate:    "Current_Date - 1"')
-        cy.append('        ')
-        cy.append('  Customer_System_disabled:')
-        cy.append('    siteid:     "custabcprod02"')
-        cy.append('    active:     "false"')
-        cy.append('    host:       "prod.custabc.com"')
-        cy.append('    username:   "{custabc_username}"')
-        cy.append('    password:   "{custabc_password}"')
-        cy.append('    use:        "dr" ')
-        cy.append('    filesets:')
-        cy.append('      demo:')
-        cy.append('        active: "True" # doesnt matter if parent is disabled')
-        cy.append('      level1_how_much_1620pdcr:')
-        cy.append('        active: "True" ')
-        cy.append('        startdate:  "Current_Date - 45"')
-        cy.append('        enddate:    "Current_Date - 1"')
-        cy.append('')
-        cy.append('')
-        cy.append('transcend:')
-        cy.append('  host:       "tdprdcop3.td.teradata.com"')
-        cy.append('  logmech:    "LDAP"')
-        cy.append('  username:   "{td_quicklook}"')
-        cy.append('  password:   "{td_password}"')
-        cy.append('')
-        cy.append('')
-        cy.append('folders:')
-        cy.append('  download:  "1_download"')
-        cy.append('  sql:       "2_sql_store"')
-        cy.append('  run:       "3_ready_to_run"')
-        cy.append('  output:    "4_output"')
-        cy.append('')
-        cy.append('')
-        cy.append('settings:')
-        cy.append('  githost:    "https://raw.githubusercontent.com/tdcoa/sql/master/"')
-        cy.append('  gitfileset: "filesets.yaml"')
-        cy.append('  gitmotd:    "motd.txt"')
-        cy.append('  localfilesets:   "./{download}/filesets.yaml"')
-        cy.append('  skip_git:   "%s"' %str(skipgit))
-        cy.append('  skip_dbs:   "%s"' %str(skipdbs))
-        cy.append('')
-        rtn = '\n'.join(cy)
-        if writefile:
-            with open( os.path.join(self.configpath), 'w') as fh:
-                fh.write(rtn)
-            self.log('  saving file', self.configpath)
-        return rtn
-
-
-
-    def sql_create_temp_from_csv(self, csvfilepath):
-        tbl = os.path.basename(csvfilepath)
-        self.log('    transcribing sql', tbl)
-
-        # open csv
-        self.log('    open csv', tbl)
-        dfcsv  = pd.read_csv(csvfilepath)
-        self.log('    rows in file', str(len(dfcsv)))
-
-        maxrows=100
-        tblcreated = False
-        sqlclosed=False
-
-        # build manual transactions for now...
-        sql = []
-        sqlprefix = 'create multiset volatile table "%s" as (\nselect ' %tbl
-        for idx, row in dfcsv.iterrows():
-            sqlclosed = False
-            sql.append(sqlprefix)
-            delim = ' '
-            for col, val in row.items():
-                colnm = re.sub('[^0-9a-zA-Z]+', '_', col)
-                if type(val) is int:
-                    coltype = 'BIGINT'
-                    quote = ''
-                elif type(val) is float:
-                    coltype = 'FLOAT'
-                    quote = ''
-                else:
-                    collen = dfcsv[col].map(len).max()
-                    coltype = 'VARCHAR(%i)' %(collen+100)
-                    quote = "'"
-                if pd.isna(val):
-                    val='NULL'
-                    quote=''
-                val = '%s%s%s' %(quote,val,quote)
-                sql.append('%scast(%s as %s) as %s' %(delim,val,coltype,colnm))
-                delim = ','
-            sql.append('from (sel 1 one) i%i' %idx)
-            if (idx+1) % maxrows == 0:
-                if tblcreated:
-                    sql.append(';\n')
-                elif not tblcreated:
-                    sql.append(') with data \n  no primary index \n  on commit preserve rows;\n\n')
-                    sqlclosed = True
-                    tblcreated = True
-                sqlprefix = 'insert into "%s" \nselect ' %tbl
-            else:
-                sqlprefix = 'union all \nselect '
-
-        if not sqlclosed and not tblcreated:
-            sql.append(') with data \n  no primary index \n  on commit preserve rows;\n\n')
-        else:
-            sql.append(';\n\n')
-
-        self.log('sql built for', tbl)
-        rtn =  '\n'.join(sql)
-        rtn = rtn + '\n\n'
-        return rtn
-
-
-
-
-
-
-    def substitute(self, string_content='', dict_replace={}, subname='', skipkeys=[]):
-        rtn = str(string_content)
-        self.log('    performing substitution', subname)
-        for n,v in dict_replace.items():
-            if n not in skipkeys:
-                if str('{%s}' %n) in rtn:
-                    rtn = rtn.replace('{%s}' %n, str(v))
-                    self.log('     {%s}' %n, str(v))
-        return str(rtn)
-
-
-
-    def format_sql(self, sqltext):
-        sql = str(sqltext).strip().split(';')[0]
-        while '\n\n' in sql:
-            sql = sql.replace('\n\n','\n').strip()
-        sql = sql.strip() + '\n;\n\n'
-
-        if sql.replace(';','').strip() == '':
-            sql=''
-        else:
-            # replce --comments with /* comments */
-            newsql = []
-            for line in sql.split('\n'):
-                if line.strip()[:2] != '/*': #skip comment-starting  lines
-                    lineparts = line.split('--')
-                    if len(lineparts) !=1:
-                        firstpart = lineparts[0].strip()
-                        secondpart = line[len(firstpart)+2:].strip()
-                        newsql.append('%s /* %s */' %(firstpart, secondpart))
-                    else:
-                        newsql.append(line)
-                else:
-                    newsql.append(line)
-            sql = '\n'.join(newsql).strip()
-
-        return sql
-
-
-
-    def log(self, msgleft='', msgright='', header=False, error=False, warning=False):
-        delim = ':'
-        if  msgright=='': delim=''
-        msg = '%s%s' %(str(msgleft+delim).ljust(self.logspace), msgright)
-
-        if warning: msg='%s\nWARNING:\n%s\n%s' %('-'*self.logspace, msg, '-'*self.logspace)
-        # prevent secrets from appearing in log:
-        for nm,secret in self.secrets.items():
-            if secret in msg:
-                msg = msg.replace(secret, '%s%s%s' %(secret[:1],'*'*(len(secret)-2),secret[-1:]))
-        if header: msg = '\n\n%s\n%s\n%s' %('='*40, msg.upper(), '-'*40)
-        if self.bufferlogs:
-            self.logs.append(msg)
-            if self.printlog: print(msg)
-        else: # no buffer
-            if len(self.logs) ==0:
-                if self.printlog: print(msg)
-                # self.__writelog(msg)
-                with open(self.logpath,'a') as logfile:
-                    logfile.write(msg + '\n')
-            else:
-                if self.printlog: print(msg)
-                for log in self.logs:
-                    #self.__writelog(log)
-                    with open(self.logpath,'a') as logfile:
-                        logfile.write(log + '\n')
-                    self.logs=[]
-                #self.__writelog(msg)
-                with open(self.logpath,'a') as logfile:
-                    logfile.write(msg + '\n')
-
-
-    def check_setting(self, settings_dict={}, required_item_list=[], defaults=[]):
-        i=0
-        for itm in required_item_list:
-            if str(itm) not in settings_dict:
-                self.log('%s\n      %s\n%s\n%s'
-                         %('Required Config name/value pair MISSING:',
-                            str(itm),
-                            '(note: names are case-sensitive)',
-                            'Some functionality may not work until this is added, and you reload_config()'), warning=True)
-                if defaults != []:
-                    strdefault = defaults(i)
-                    settings_dict[str(itm)]=strdefault
-                    self.log('Substituting missing value', '%s=%s' %(str(itm),strdefault))
-            i=+1
-
-
-    def get_special_commands(self, sql, replace_with=''):
-        cmdstart = '/*{{'
-        cmdend = '}}*/'
-        cmd = {}
-        if replace_with !='': replace_with = '/* %s */' %replace_with
-        self.log('  parsing for special sql commands')
-        while cmdstart in sql and cmdend in sql:
-            pos1 = sql.find(cmdstart)
-            pos2 = sql.find(cmdend)
-            cmdstr = sql[pos1:pos2+len(cmdend)]
-            cmdlst = cmdstr.replace(cmdstart,'').replace(cmdend,'').split(':')
-            if len(cmdlst) == 2:
-                cmdkey = cmdlst[0].strip()
-                cmdval = cmdlst[1].strip()
-                cmd[cmdkey] = cmdval
-                self.log('   special command found', '%s = %s' %(cmdkey,cmdval))
-                sql = sql.replace(cmdstr, replace_with)
-            else:
-                sql = sql.replace(cmdstr,'/* %s */' %cmdlst[0])
-        cmd['sql'] = sql
-        return cmd
-
-
-    def dict_active(self, dictTarget={}, dictName='', also_contains_key=''):
-        if 'active' not in dictTarget:
-            self.log('!! dictionary missing "active" flag, assuming "True"')
-            dictTarget['active'] = 'True'
-        if str(dictTarget['active']).lower() == 'true':
-            if also_contains_key=='' or (also_contains_key != '' and also_contains_key in dictTarget):
-                self.log('  active dictionary', dictName)
-                return True
-        self.log('  INACTIVE dictionary',dictName)
-        return False
-
-
-
-    def recursively_delete_subfolders(self, parentpath):
-        self.log('purge all subfolders',parentpath)
-        for itm in os.listdir(parentpath):
-            if os.path.isdir(itm):
-                self.log(' recursively deleting', itm)
-                os.popen('rm -r %s' %os.path.join(parentpath, itm))
-                time.sleep(.333)  # give os time to catch-up
-
-    def recursive_delete(self, delpath):
-        if os.path.isdir(delpath):
-            self.log(' recursively deleting', delpath)
-            os.popen('rm -r %s' %delpath)
-            time.sleep(.333)  # give os time to catch-up
-
-
-
-    def recursive_copy(self, sourcepath, destpath, replace_existing=False, skippattern='' ):
-        self.log(' recursive_copyfolder source', sourcepath)
-
-        if not os.path.isdir(sourcepath):
-            self.log('  ERROR: source path does not exist', sourcepath)
-        else:
-            if not os.path.exists(destpath):
-                self.log('    destination folder absent, creating', destpath)
-                os.mkdir(destpath)
-            for itm in os.listdir(sourcepath):
-                srcpath = os.path.join(sourcepath,itm)
-                dstpath = os.path.join(destpath,itm)
-
-                if skippattern != '' and skippattern in itm:
-                    self.log('    skip: matched skip-pattern', srcparh)
-                else:
-                    if os.path.exists(dstpath) and not replace_existing:
-                        self.log('    skip: replace_existing=False', dstpath)
-                    else:
-                        if os.path.exists(dstpath) and replace_existing:
-                            self.log(' replace_existing=True')
-                            self.recursive_delete(dstpath)
-
-                        if os.path.isfile(srcpath):
-                            self.log('    file copied', dstpath)
-                            copyfile(srcpath, dstpath)
-                        elif os.path.isdir(os.path.join(sourcepath,itm)):
-                            self.log('    folder copied', dstpath)
-                            os.mkdir(dstpath)
-                            self.recursive_copy(srcpath, dstpath, replace_existing, skippattern)
-                        else:
-                            self.log('    um... unknown filetype: %s' %srcpath)
-
-
-
-#self = v2(approot='./demo/newConfig', printlog=True)
-# self.download_files()
-# self.copy_download_to_sql()
-# self.prepare_sql()
-# self.execute_run()
-#self.upload_to_transcend()
