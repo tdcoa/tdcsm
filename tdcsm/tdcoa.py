@@ -9,7 +9,7 @@ from teradataml.dataframe.copy_to import copy_to_sql
 from teradataml.context.context import *
 from teradataml import *
 
-class v2():
+class tdcoa():
 
     # paths
     approot = '.'
@@ -52,7 +52,7 @@ class v2():
         self.log('secrets file', self.secretpath)
 
         self.skipgit = False
-        self.skipdbs = True
+        self.skipdbs = False
 
         # stub in config.yaml, secrets.yaml, if missing
         if not os.path.isfile(self.configpath):
