@@ -124,34 +124,9 @@ class tdcoa():
         cy.append('  files: ')
         cy.append('    - "demo/0000.dates.csv"')
         cy.append('    - "demo/0000.dbcinfo.coa.sql"')
+        cy.append('    - "demo/example.sql"')
         cy.append('')
-        cy.append('level1_how_much_1620pdcr: &current_level1')
-        cy.append('  active:          "True"')
-        cy.append('  fileset_version: "1.0"')
-        cy.append('  startdate:       "Current_Date - 45"')
-        cy.append('  enddate:         "Current_Date - 1"')
-        cy.append('  dbqlogtbl:       "pdcr.DBQLogTbl"')
-        cy.append('  resusagesldv:    "pdcr.ResUsageSldv"')
-        cy.append('  resusagespma:    "pdcr.ResUsageSpma"')
-        cy.append('  databasespace:   "pdcrinfo.DatabaseSpace_hst"')
-        cy.append('  files: ')
-        cy.append('    - "level1_how_much_1620pdcr/cpu_trend_spma.1620.pdcr.v11.coa.sql"')
-        cy.append('    - "level1_how_much_1620pdcr/io_trend_sldv.1620.pdcr.v12.coa.sql"')
-        cy.append('    - "level1_how_much_1620pdcr/storage_trend.1620.pdcr.v12.coa.sql"')
-        cy.append('')
-        cy.append('level1_how_much_1620dbc:')
-        cy.append('  active:          "True"')
-        cy.append('  fileset_version: "1.0"')
-        cy.append('  startdate:       "Current_Date - 45"')
-        cy.append('  enddate:         "Current_Date - 1"')
-        cy.append('  dbqlogtbl:       "dbc.DBQLogTbl"')
-        cy.append('  resusagesldv:    "dbc.ResUsageSldv"')
-        cy.append('  resusagespma:    "dbc.ResUsageSpma"')
-        cy.append('  files: ')
-        cy.append('    - "level1_how_much_1620pdcr/cpu_trend_spma.1620.pdcr.v11.coa.sql"')
-        cy.append('    - "level1_how_much_1620pdcr/io_trend_sldv.1620.pdcr.v12.coa.sql"')
-        cy.append('')
-        cy.append('level1_how_much: *current_level1')
+
 
         rtn = '\n'.join(cy)
         if writefile:
@@ -242,23 +217,19 @@ class tdcoa():
         cy.append('      demo:')
         cy.append('        active: "False"')
         cy.append('      level1_how_much_1620pdcr:')
-        cy.append('        active: "True"')
-        cy.append('        startdate:  "Current_Date - 45"')
+        cy.append('        active: "False"')
+        cy.append('        startdate:  "Current_Date - 365"')
         cy.append('        enddate:    "Current_Date - 1"')
-        cy.append('        ')
-        cy.append('  Customer_System_disabled:')
-        cy.append('    siteid:     "custabcprod02"')
-        cy.append('    active:     "false"')
-        cy.append('    host:       "prod.custabc.com"')
-        cy.append('    username:   "{custabc_username}"')
-        cy.append('    password:   "{custabc_password}"')
-        cy.append('    logmech:    "" ')
-        cy.append('    use:        "dr" ')
-        cy.append('    filesets:')
-        cy.append('      demo:')
-        cy.append('        active: "True" # doesnt matter if parent is disabled')
-        cy.append('      level1_how_much_1620pdcr:')
-        cy.append('        active: "True" ')
+        cy.append('      level1_how_much_1620dbc:')
+        cy.append('        active: "False"')
+        cy.append('        startdate:  "Current_Date - 365"')
+        cy.append('        enddate:    "Current_Date - 1"')
+        cy.append('      level2_how_well_1620pdcr:')
+        cy.append('        active: "False"')
+        cy.append('        startdate:  "Current_Date - 90"')
+        cy.append('        enddate:    "Current_Date - 1"')
+        cy.append('      dbql_core_1620pdcr:')
+        cy.append('        active: "False"')
         cy.append('        startdate:  "Current_Date - 45"')
         cy.append('        enddate:    "Current_Date - 1"')
         cy.append('')
@@ -453,30 +424,54 @@ class tdcoa():
 
 
 
-    def get_special_commands(self, sql, replace_with=''):
+    def get_special_commands(self, sql, replace_with='', keys_to_skip=[]):
         cmdstart = '/*{{'
         cmdend = '}}*/'
-        cmd = {}
+        cmds = {}
+        sqltext = sql
         if replace_with !='': replace_with = '/* %s */' %replace_with
         self.log('  parsing for special sql commands')
-        while cmdstart in sql and cmdend in sql:
-            pos1 = sql.find(cmdstart)
-            pos2 = sql.find(cmdend)
-            cmdstr = sql[pos1:pos2+len(cmdend)]
+
+        # first, get a unique dict of sql commands to iterate:
+        while cmdstart in sqltext and cmdend in sqltext:
+            pos1 = sqltext.find(cmdstart)
+            pos2 = sqltext.find(cmdend)
+            cmdstr = sqltext[pos1:pos2+len(cmdend)]
             cmdlst = cmdstr.replace(cmdstart,'').replace(cmdend,'').split(':')
+            cmdkey = cmdlst[0].strip()
             if len(cmdlst) == 2:
-                cmdkey = cmdlst[0].strip()
                 cmdval = cmdlst[1].strip()
-                cmd[cmdkey] = cmdval
-                self.log('   special command found', '%s = %s' %(cmdkey,cmdval))
-                replace_with = replace_with.replace('{cmdname}', cmdkey)
-                replace_with = replace_with.replace('{cmdkey}', cmdkey)
-                replace_with = replace_with.replace('{cmdvalue}', cmdval)
-                sql = sql.replace(cmdstr, replace_with)
             else:
-                sql = sql.replace(cmdstr,'/* %s */' %cmdlst[0])
-        cmd['sql'] = sql
-        return cmd
+                cmdval = ''
+
+            self.log('   special command found', '%s = %s' %(cmdkey,cmdval))
+
+            cmds[cmdkey] = {}
+            cmds[cmdkey]['name'] = cmdkey
+            cmds[cmdkey]['value'] = cmdval
+            cmds[cmdkey]['find'] = cmdstr
+            cmds[cmdkey]['replace'] = replace_with.replace('{cmdname}', cmdkey).replace('{cmdkey}', cmdkey).replace('{cmdvalue}', cmdval)
+            cmds[cmdkey]['pos1'] = pos1
+            cmds[cmdkey]['pos2'] = pos2
+            if cmdkey in keys_to_skip:
+                cmds[cmdkey]['skip'] = 'True'
+            else:
+                cmds[cmdkey]['skip'] = 'False'
+                self.log('   %s found in keys_to_skip, skipping...' %cmdkey)
+
+            sqltext = sqltext.replace(cmdstr,'')
+
+        # now we have a unique list of candidates, build return object:
+        finalsql = sql
+        rtn = {}
+        for cmd, cmdobj in cmds.items():
+
+            if cmdobj['skip']=='False':
+                rtn[cmd] = cmdobj['value']
+                finalsql = finalsql.replace(cmdobj['find'],cmdobj['replace'])
+
+        rtn['sql'] = finalsql
+        return rtn
 
 
     def dict_active(self, dictTarget={}, dictName='', also_contains_key=''):
@@ -976,7 +971,7 @@ class tdcoa():
 
 
                                                 # Get SPECIAL COMMANDS
-                                                cmds = self.get_special_commands(sql, '{{replaceMe:{cmdkey}}}')
+                                                cmds = self.get_special_commands(sql, '{{replaceMe:{cmdname}}}', keys_to_skip=['save','load','call'])
                                                 sql = cmds['sql'] # sql stripped of commands (now in dict)
 
                                                 self.log('  processing special commands')
@@ -1038,8 +1033,8 @@ class tdcoa():
 
 
                                                     # --> others, append special command back to the SQL for processing in the run phase
-                                                    if str(cmdname[:4]).lower() in ['save','load','call']:
-                                                        sql = sql.replace('/* {{replaceMe:%s}} */' %cmdname,'/*{{%s:%s}}*/' %(cmdname, cmdvalue), 1)
+                                                    #if str(cmdname[:4]).lower() in ['save','load','call']:
+                                                    #    sql = sql.replace('/* {{replaceMe:%s}} */' %cmdname,'/*{{%s:%s}}*/' %(cmdname, cmdvalue), 1)
 
 
                                             # after all special commands, append the original sql
