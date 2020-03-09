@@ -822,7 +822,7 @@ class tdcoa():
 
 
 
-    def copy_download_to_sql(self):
+    def copy_download_to_sql(self, overwrite=False):
         self.log('copy_download_to_sql started', header=True)
         self.log('copy files from download folder (by fileset) to sql folder (by system)')
         self.log('time',str(dt.datetime.now()))
@@ -843,7 +843,7 @@ class tdcoa():
                         dstpath = os.path.join(dstpath, setname)
 
                         # purge existing, and copy over
-                        self.recursive_delete(dstpath)
+                        if overwrite: self.recursive_delete(dstpath)
                         self.recursive_copy(srcpath, dstpath)
 
         self.log('\ndone!')
