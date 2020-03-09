@@ -10,6 +10,40 @@ from teradataml.context.context import *
 from teradataml import *
 
 class tdcoa():
+    """DESCRIPTION:
+    tdcsm.tdcoa is a collection of high-level operations to fully automate
+    the collection of consumption analytics of a Teradata platform.  This
+    class focuses on automating four major steps:
+        1 - DOWNLOAD sets of files (sql, csv)
+        2 - PREPARE those files to be executed
+        3 - EXECUTE files against target system (on target VPN)
+        4 - UPLOAD results to a central repository (on "Transcend" VPN)
+
+    More detail on each step is available via help() per step function below.
+    The only initial requirement is Python 3.6 or higher, and access /login to
+    the required Teradata systems.
+
+    GETTING STARTED:
+    From a command line:
+      pip install tdcsm
+
+    To pickup the most recent updates, it is recommended you
+      pip install tdcsm --upgrade
+
+    EXAMPLE USAGE:
+    The entire process, at it's simpliest, looks like  this:
+      python
+      >>> from tdcsm.tdcoa import tdcoa
+      >>> c = tdcoa()
+      >>> c.download_files()
+      >>> c.copy_download_to_sql()
+      >>> c.prepare_sql()
+      >>> c.execute_run()          # target system VPN
+      >>> c.upload_to_transcend()  # transcend VPN
+
+
+
+    """
 
     # paths
     approot = '.'
@@ -435,6 +469,9 @@ class tdcoa():
                 cmdval = cmdlst[1].strip()
                 cmd[cmdkey] = cmdval
                 self.log('   special command found', '%s = %s' %(cmdkey,cmdval))
+                replace_with = replace_with.replace('{cmdname}', cmdkey)
+                replace_with = replace_with.replace('{cmdkey}', cmdkey)
+                replace_with = replace_with.replace('{cmdvalue}', cmdval)
                 sql = sql.replace(cmdstr, replace_with)
             else:
                 sql = sql.replace(cmdstr,'/* %s */' %cmdlst[0])
@@ -939,24 +976,41 @@ class tdcoa():
 
 
                                                 # Get SPECIAL COMMANDS
-                                                cmds = self.get_special_commands(sql, '{{replaceMe}}')
+                                                cmds = self.get_special_commands(sql, '{{replaceMe:{cmdkey}}}')
                                                 sql = cmds['sql'] # sql stripped of commands (now in dict)
 
                                                 self.log('  processing special commands')
                                                 for cmdname, cmdvalue in cmds.items():
+
+
+                                                    # --> FILE <--: replace with local sql file
+                                                    if str(cmdname[:4]).lower() == 'file':
+                                                        self.log('   replace variable with a local sql file')
+
+                                                        if not os.path.isfile(os.path.join(runpath, cmdvalue)):
+                                                            self.log('custom file missing', os.path.join(runpath, cmdvalue), warning=True)
+                                                            self.log('   This may be by design, consult CSM for details.')
+                                                            # raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), os.path.join(runpath, cmdvalue))
+                                                        else:
+                                                            self.log('   specified file found', cmdvalue)
+                                                            with open(os.path.join(runpath, cmdvalue), 'r') as fh:
+                                                                tempsql = fh.read()
+                                                            sqls_done.append('/* BEGIN file insert: %s */ \n%s' %(cmdvalue,tempsql))
+                                                            sql = sql.replace('{{replaceMe:%s}}' %cmdname, 'END file insert: %s' %(cmdvalue), 1)
+
 
                                                     # --> TEMP <--: load temp file from .csv
                                                     if str(cmdname[:4]).lower() == 'temp':
                                                         self.log('   create temp (volatile) table from .csv')
 
                                                         if not os.path.isfile(os.path.join(runpath, cmdvalue)):
-                                                            self.log('csv file missing!!!', os.path.join(runpath, cmdvalue), warning=True)
+                                                            self.log('csv file missing!!!', os.path.join(runpath, cmdvalue), error=True)
                                                             raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), os.path.join(runpath, cmdvalue))
                                                         else:
                                                             self.log('   csv file found', cmdvalue)
                                                             tempsql = self.sql_create_temp_from_csv(os.path.join(runpath, cmdvalue))
                                                             sqls_done.append(tempsql)
-                                                            sql = sql.replace('{{replaceMe}}','above volatile table create script for %s' %cmdvalue)
+                                                            sql = sql.replace('{{replaceMe:%s}}' %cmdname,'above volatile table create script for %s' %cmdvalue, 1)
 
 
                                                     # --> LOOP <--: loop thru csv and generate one sql per csv row, with substitutions
@@ -977,7 +1031,7 @@ class tdcoa():
                                                                 tempsql = sql
                                                                 for col in df.columns:
                                                                     tempsql = tempsql.replace(str('{%s}' %col), str(row[col]))
-                                                                tempsql = tempsql.replace('{{replaceMe}}',' csv row %i out of %i ' %(index+1, len(df)))
+                                                                tempsql = tempsql.replace('{{replaceMe:%s}}' %cmdname,' csv row %i out of %i ' %(index+1, len(df)))
                                                                 self.log('   sql generated from row data', 'character length = %i' %len(tempsql))
                                                                 sqls_done.append(tempsql)
                                                             sql = '' # don't append original sql again - it is only a template
@@ -985,7 +1039,7 @@ class tdcoa():
 
                                                     # --> others, append special command back to the SQL for processing in the run phase
                                                     if str(cmdname[:4]).lower() in ['save','load','call']:
-                                                        sql = sql.replace('/* {{replaceMe}} */','/*{{%s:%s}}*/' %(cmdname, cmdvalue), 1)
+                                                        sql = sql.replace('/* {{replaceMe:%s}} */' %cmdname,'/*{{%s:%s}}*/' %(cmdname, cmdvalue), 1)
 
 
                                             # after all special commands, append the original sql
