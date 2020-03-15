@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="tdcsm",
-    version="0.2.5",
+    version="0.2.6",
     author="Stephen Hilton",
     author_email="Stephen@FamilyHilton.com",
     description="Teradata tools for CSMs",
@@ -16,7 +16,8 @@ setuptools.setup(
     install_requires=[
           'pandas',
           'teradatasqlalchemy',
-          'teradataml'
+          'teradataml',
+          'teradata'
       ],
     classifiers=[
         "Programming Language :: Python :: 3",

@@ -4,10 +4,11 @@ import datetime as dt
 import pandas as pd
 import numpy as np
 #from sqlalchemy.engine import create_engine
-from sqlalchemy import create_engine
+import teradata  # odbc driver
+import sqlalchemy
+from teradataml.context import context as tdml_context
+from teradataml.dataframe import dataframe as tdml_df
 from teradataml.dataframe.copy_to import copy_to_sql
-from teradataml.context.context import *
-from teradataml import *
 
 class tdcoa():
     """DESCRIPTION:
@@ -52,6 +53,7 @@ class tdcoa():
     secretpath = ''
     filesetpath = ''
     outputpath = ''
+    version = "0.2.6"
 
     # log settings
     logs =  []
@@ -256,6 +258,10 @@ class tdcoa():
         cy.append('  skip_git:   "%s"' %str(skipgit))
         cy.append('  skip_dbs:   "%s"' %str(skipdbs))
         cy.append('  run_non_fileset_folders: "True" ')
+        cy.append('  customer_connection_type:  "sqlalchemy"')
+        # cy.append('  transcend_connection_type: "teradataml"')
+        cy.append('    # valid connection types: "teradataml", "sqlalchemy", or an odbc driver name')
+
         rtn = '\n'.join(cy)
         if writefile:
             with open( os.path.join(self.configpath), 'w') as fh:
@@ -488,12 +494,14 @@ class tdcoa():
 
 
     def recursively_delete_subfolders(self, parentpath):
+        self.bufferlogs=True
         self.log('purge all subfolders',parentpath)
         for itm in os.listdir(parentpath):
             if os.path.isdir(os.path.join(parentpath,itm)):
                 self.log(' recursively deleting', itm)
                 os.popen('rm -r %s' %os.path.join(parentpath, itm))
                 time.sleep(.333)  # give os time to catch-up
+        self.bufferlogs = False
 
     def recursive_delete(self, delpath):
         if os.path.isdir(delpath):
@@ -535,6 +543,132 @@ class tdcoa():
                             self.recursive_copy(srcpath, dstpath, replace_existing, skippattern)
                         else:
                             self.log('    um... unknown filetype: %s' %srcpath)
+
+
+
+    def close_connection(self, connobject, skip=False): # TODO
+        self.log('CLOSE_CONNECTION called',  str(dt.datetime.now()))
+        self.log('*** THIS FUNCTION IS NOT YET IMPLEMENTED ***')
+        conntype = connobject['type']
+        conn = connobject['connection']
+        self.log('  connection type', conntype)
+
+        if skip:
+            self.log('skip dbs setting is true, emulating closure...')
+
+        else:
+            # ------------------------------------
+            if conntype == 'teradataml':
+                pass
+
+            # ------------------------------------
+            elif conntype == 'sqlalchemy':
+                pass
+
+            # ------------------------------------
+            else:  # assume odbc connect
+                pass
+
+        self.log('connection closed', str(dt.datetime.now()))
+        return True
+
+
+
+
+    def open_connection(self, conntype, host='', logmech='', username='', password='', system={}, skip=False):
+        self.log('OPEN_CONNECTION started',  str(dt.datetime.now()))
+        self.log('  connection type', conntype)
+        # check all variables... use system{} as default, individual variables as overrides
+        host=host.strip().lower()
+        logmech=logmech.strip().lower()
+        conntype=conntype.strip().lower()
+
+        if host=='': host=system['host']
+        if logmech=='': logmech=system['logmech']
+        if username=='': username=system['username']
+        if password=='': password=system['password']
+
+        self.log('  host', host)
+        self.log('  logmech', logmech)
+        self.log('  username', username)
+        self.log('  password', password)
+
+        connObject ={'type':conntype, 'skip':skip, 'connection':None, 'components':{}}
+        connObject['components']={'host':host, 'logmech':logmech,
+                                  'username':username, 'password':password}
+
+        self.log('connecting...')
+
+        if skip:
+            self.log('skip dbs setting is true, emulating connection...')
+
+        else:
+            # ------------------------------------
+            if conntype == 'teradataml':
+                if logmech=='': logmech='TD2'
+                connObject['connection'] = tdml_context.create_context(
+                                            host=host,
+                                            logmech=logmech,
+                                            username = username,
+                                            password = password)
+
+            # ------------------------------------
+            elif conntype == 'sqlalchemy':
+                if logmech.strip() != '': logmech = '/?logmech=%s' %logmech
+                connstring = 'teradatasql://%s:%s@%s%s' %(username,password,host,logmech)
+                connObject['connection'] = sqlalchemy.create_engine(connstring)
+
+            # ------------------------------------
+            else:  # assume odbc connect
+                self.log('  (odbc driver)')
+                udaExec = teradata.UdaExec(appName='tdcoa',
+                                           version=self.version,
+                                           logConsole=False)
+                connObject['connection'] = udaExec.connect(method = 'odbc',
+                                           system = host,
+                                           username = username,
+                                           password = password,
+                                           driver = conntype)
+
+        self.log('connected!', str(dt.datetime.now()))
+        return connObject
+
+
+
+
+    def execute_sql(self, connobject, sql, skip=False ):
+        import pandas as pd
+        conntype = connobject['type']
+        conn = connobject['connection']
+
+        self.log('connection type', conntype)
+        self.log('sql, first 100 characters:\n  %s' %sql[:100].replace('\n',' ').strip() + '...')
+        self.log('sql submitted', str(dt.datetime.now()))
+
+        self.log('full sql:', '\n%s\n' %sql)
+
+        if skip:
+            self.log('skip dbs setting is true, emulating execution...')
+            df = pd.DataFrame(columns=list('ABCD'))
+
+        else:
+            # ------------------------------------
+            if conntype == 'teradataml':
+                df = tdml_df.DataFrame.from_query(sql)
+                df = df.to_pandas()
+
+            # ------------------------------------
+            elif conntype == 'sqlalchemy':
+                df = pd.read_sql(sql, conn)
+
+            # ------------------------------------
+            else:  # assume odbc connect
+                df = pd.read_sql(sql, conn)
+
+        self.log('sql completed', str(dt.datetime.now()))
+        self.log('record count', str(len(df)))
+        return df
+
 
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -634,14 +768,17 @@ class tdcoa():
         self.log('loading dictionary', 'settings')
         self.settings = configyaml['settings']
         self.check_setting(self.settings,
-                           required_item_list=['githost','gitfileset','gitmotd','localfilesets','skip_git','skip_dbs','run_non_fileset_folders'],
+                           required_item_list=['githost','gitfileset','gitmotd','localfilesets','skip_git','skip_dbs'
+                                              ,'run_non_fileset_folders','customer_connection_type','transcend_connection_type'],
                            defaults=['"https://raw.githubusercontent.com/tdcoa/sql/master/"'
                                     ,'"filesets.yaml"'
                                     ,'"motd.txt"'
                                     ,'"{download}/filesets.yaml"'
                                     ,'"False"'
                                     ,'"False"'
-                                    ,'"True"'])
+                                    ,'"True"'
+                                    ,'"teradataml"'
+                                    ,'"teradataml"'])
         self.filesetpath = self.settings['localfilesets']
 
         if 'skip_git' in self.settings and str(self.settings['skip_git']).lower() in['true']:
@@ -1054,7 +1191,7 @@ class tdcoa():
         prepared sql is stored after the prepare_sql() function.  This includes the
         runlog.txt.  All  files are moved, leaving the 'run' folder empty after the
         operation. The destination folder is a new time-stamped output folder (with
-        optional name).  Useful when you don't have access to execute_sql() (the
+        optional name).  Useful when you don't have access to execute_run() (the
         process that normally archives collateral) against customer system directly,
         but still want to keep a record of that 'run'.   For example, if you need to
         prepare sql to send to a customer DBA for execution - you cannot execute_run()
@@ -1096,6 +1233,7 @@ class tdcoa():
         outputpath = outputpath + name
         os.makedirs(outputpath)
         return outputpath
+
 
 
     def execute_run(self, name=''):
@@ -1162,13 +1300,10 @@ class tdcoa():
                                 manifestdelim='\n '
 
                                 # connect to customer system:
-                                connstring = self.systems[sysname]['connectionstring']
-                                self.log('CONNECTING TO', connstring)
-                                if self.skipdbs:
-                                    self.log('skipdbs = True', 'emulating connection')
-                                else:
-                                    conn = create_engine(connstring) # <------------------------------- Connect to the database
-
+                                conn = self.open_connection(
+                                                conntype = self.settings['customer_connection_type'],
+                                                skip = self.skipdbs,
+                                                system = self.systems[sysname]) # <------------------------------- Connect to the database
 
                                 for coasqlfile in sorted(coasqlfiles):  # loop thru all sql files:
                                     self.log('\nOPENING SQL FILE', coasqlfile)
@@ -1182,28 +1317,13 @@ class tdcoa():
                                         if sql.strip() == '':
                                             self.log('null statement, skipping')
                                         else:
-                                            self.log('----')
-                                            self.log('execute sql %i' %sqlcnt, sql[:50].replace('\n',' ').strip() + '...')
 
                                             # pull out any embedded SQLcommands:
                                             sqlcmd = self.get_special_commands(sql)
+                                            sql = sqlcmd.pop('sql','')
 
-                                            # sqlformatted = sqlcmd['sql']
-                                            # del sqlcmd['sql']
-                                            # sql = sqlformatted.replace('\n',' ')
-                                            # while '  ' in sql:
-                                            #     sql = sql.replace('\n',' ').replace('  ',' ')
-
-
-                                            self.log('sql submitted', str(dt.datetime.now()))
-                                            if self.skipdbs:
-                                                self.log('skipdbs = True', 'emulating execution')
-                                                df = pd.DataFrame(columns=list('ABCD'))
-                                            else:
-                                                df = pd.read_sql(sql, conn)# <------------------------------- Run SQL
-                                            self.log('sql completed', str(dt.datetime.now()))
-                                            self.log('record count', str(len(df)))
-
+                                            self.log('\n---- SQL #%i' %sqlcnt)
+                                            df = self.execute_sql(conn, sql, skip=self.skipdbs)# <------------------------------- Run SQL
 
                                             if len(df) != 0:  # Save non-empty returns to .csv
 
@@ -1314,15 +1434,11 @@ class tdcoa():
         self.log('    password', self.transcend['password'])
         self.log("\nNOTE:  if you happen to see a scary WARNING below, DON'T PANIC!")
         self.log("       it just means you already had an active connection that was replaced.\n")
-        if self.skipdbs:
-            self.log('skipdbs = True', 'emulating connection')
-        else:
-            transcend = create_context(host = self.transcend['host'],
-                                       username = self.transcend['username'],
-                                       password = self.transcend['password'],
-                                       logmech = self.transcend['logmech'] )  # <--------- Connect
-        self.log('connected!')
 
+        transcend = self.open_connection(
+                        'teradataml',
+                        system = self.transcend,
+                        skip = self.skipdbs)   # <--------------------------------- Connect
 
         # Walk the directory structure looking for upload_manifest.json files
         for workpath, subfo, files in os.walk(outputpath):
@@ -1410,12 +1526,8 @@ class tdcoa():
                                 if self.skipdbs:
                                     self.log('skipdbs = True', 'emulating call')
                                 else:
-                                    transcend.execute('call %s ;' %str(entry['call']) )
+                                    transcend['connection'].execute('call %s ;' %str(entry['call']) )
                                 self.log('complete', str(dt.datetime.now()))
-
-
-        if not self.skipdbs:
-            remove_context()
 
         self.log('\ndone!')
         self.log('time', str(dt.datetime.now()))
