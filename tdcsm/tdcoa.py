@@ -53,7 +53,7 @@ class tdcoa():
     secretpath = ''
     filesetpath = ''
     outputpath = ''
-    version = "0.2.6"
+    version = "0.2.7"
 
     # log settings
     logs =  []
@@ -61,6 +61,7 @@ class tdcoa():
     bufferlogs = True
     configyaml = ''
     printlog = True
+    show_full_sql = False
     skipgit = False
     skipdbs = False
 
@@ -86,6 +87,7 @@ class tdcoa():
         self.log('app root', self.approot)
         self.log('config file', self.configpath)
         self.log('secrets file', self.secretpath)
+        self.log('tdcoa version',  self.version)
 
         self.skipgit = False
         self.skipdbs = False
@@ -268,6 +270,48 @@ class tdcoa():
                 fh.write(rtn)
             self.log('  saving file', self.configpath)
         return rtn
+
+
+
+    def pyfile_setup(self, filename='setup.py'):
+        self.log('\ngenerating setup.py for pypi')
+        cy=[]
+        cy.append('import setuptools ')
+        cy.append('')
+        cy.append('with open("README.md", "r") as fh: ')
+        cy.append('    long_description = fh.read() ')
+        cy.append('')
+        cy.append('setuptools.setup( ')
+        cy.append('    name="tdcsm", ')
+        cy.append('    version="%s", ' %self.version)
+        cy.append('    author="Stephen Hilton", ')
+        cy.append('    author_email="Stephen@FamilyHilton.com", ')
+        cy.append('    description="Teradata tools for CSMs", ')
+        cy.append('    long_description=long_description, ')
+        cy.append('    long_description_content_type="text/markdown", ')
+        cy.append('    url="https://github.com/tdcoa/tdcsm", ')
+        cy.append('    packages=setuptools.find_packages(), ')
+        cy.append('    install_requires=[ ')
+        cy.append('          "pandas", ')
+        cy.append('          "teradatasqlalchemy", ')
+        cy.append('          "teradataml", ')
+        cy.append('          "teradata" ')
+        cy.append('      ], ')
+        cy.append('    classifiers=[ ')
+        cy.append('        "Programming Language :: Python :: 3", ')
+        cy.append('        "License :: OSI Approved :: MIT License", ')
+        cy.append('        "Operating System :: OS Independent", ')
+        cy.append('    ], ')
+        cy.append('    python_requires=">=3.6", ')
+        cy.append(') ')
+
+        rtn = '\n'.join(cy)
+        file = os.path.join('..',filename)
+        with open( file, 'w') as fh:
+            fh.write(rtn)
+        self.log('  saving file', file)
+        return None
+
 
 
 
@@ -645,7 +689,8 @@ class tdcoa():
         self.log('sql, first 100 characters:\n  %s' %sql[:100].replace('\n',' ').strip() + '...')
         self.log('sql submitted', str(dt.datetime.now()))
 
-        self.log('full sql:', '\n%s\n' %sql)
+        if show_full_sql:
+            self.log('full sql:', '\n%s\n' %sql)
 
         if skip:
             self.log('skip dbs setting is true, emulating execution...')
@@ -724,6 +769,7 @@ class tdcoa():
         self.bufferlogs = True
         self.log('reload_config started', header=True)
         self.log('time',str(dt.datetime.now()))
+        self.log('tdcoa version',  self.version)
 
         # load secrets
         self.log('loading secrets', os.path.basename(self.secretpath))
@@ -752,7 +798,7 @@ class tdcoa():
         self.transcend = configyaml['transcend']
         self.check_setting(self.transcend,
                            required_item_list=['username','password','host','logmech'],
-                           defaults=['{td_quicklook}','{td_password}','"tdprdcop3.td.teradata.com"','LDAP'])
+                           defaults=['{td_quicklook}','{td_password}','tdprdcop3.td.teradata.com','LDAP'])
         self.transcend['connectionstring'] = 'teradatasql://%s:%s@%s/?logmech=%s' %(
                                                     self.transcend['username'],
                                                     self.transcend['password'],
@@ -762,23 +808,22 @@ class tdcoa():
         self.log('loading dictionary', 'folders')
         self.folders = configyaml['folders']
         self.check_setting(self.folders, required_item_list=['download','sql','run','output'],
-                           defaults=['"1_download"','"2_sql_store"','"3_ready_to_run"','"4_output"'])
+                           defaults=['1_download','2_sql_store','3_ready_to_run','4_output'])
 
         # check and set required Settings
         self.log('loading dictionary', 'settings')
         self.settings = configyaml['settings']
         self.check_setting(self.settings,
                            required_item_list=['githost','gitfileset','gitmotd','localfilesets','skip_git','skip_dbs'
-                                              ,'run_non_fileset_folders','customer_connection_type','transcend_connection_type'],
-                           defaults=['"https://raw.githubusercontent.com/tdcoa/sql/master/"'
-                                    ,'"filesets.yaml"'
-                                    ,'"motd.txt"'
-                                    ,'"{download}/filesets.yaml"'
-                                    ,'"False"'
-                                    ,'"False"'
-                                    ,'"True"'
-                                    ,'"teradataml"'
-                                    ,'"teradataml"'])
+                                              ,'run_non_fileset_folders','customer_connection_type'],
+                           defaults=['https://raw.githubusercontent.com/tdcoa/sql/master/'
+                                    ,'filesets.yaml'
+                                    ,'motd.txt'
+                                    ,'{download}/filesets.yaml'
+                                    ,'False'
+                                    ,'False'
+                                    ,'True'
+                                    ,'sqlalchemy'])
         self.filesetpath = self.settings['localfilesets']
 
         if 'skip_git' in self.settings and str(self.settings['skip_git']).lower() in['true']:
