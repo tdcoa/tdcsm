@@ -1,9 +1,8 @@
-import os, sys, io, re, errno, yaml, json, requests, time
-from shutil import copyfile
+import os, sys, io, re, errno, yaml, json, requests, time, shutil
 import datetime as dt
 import pandas as pd
 import numpy as np
-#from sqlalchemy.engine import create_engine
+# --  Teradata Drivers:
 import teradata  # odbc driver
 import sqlalchemy
 from teradataml.context import context as tdml_context
@@ -41,9 +40,6 @@ class tdcoa():
       >>> c.prepare_sql()
       >>> c.execute_run()          # target system VPN
       >>> c.upload_to_transcend()  # transcend VPN
-
-
-
     """
 
     # paths
@@ -53,7 +49,7 @@ class tdcoa():
     secretpath = ''
     filesetpath = ''
     outputpath = ''
-    version = "0.2.7"
+    version = "0.3.0"
 
     # log settings
     logs =  []
@@ -190,7 +186,6 @@ class tdcoa():
         cy.append('  account:            "Demo Customer"')
         cy.append('  startdate:          "Current_Date - 7"')
         cy.append('  enddate:            "Current_Date - 1"')
-        cy.append('  td_quicklook:       "sh186014"')
         cy.append('  some_value:         "Camel"')
         cy.append('')
         cy.append('')
@@ -243,6 +238,8 @@ class tdcoa():
         cy.append('  username:   "{td_quicklook}"')
         cy.append('  password:   "{td_password}"')
         cy.append('  logmech:    "LDAP"')
+        cy.append('  db_coa:     "adlste_coa"')
+        cy.append('  db_region:  "adlste_westcomm"')
         cy.append('')
         cy.append('')
         cy.append('folders:')
@@ -293,6 +290,9 @@ class tdcoa():
         cy.append('    packages=setuptools.find_packages(), ')
         cy.append('    install_requires=[ ')
         cy.append('          "pandas", ')
+        cy.append('          "numpy", ')
+        cy.append('          "requests", ')
+        cy.append('          "pyyaml", ')
         cy.append('          "teradatasqlalchemy", ')
         cy.append('          "teradataml", ')
         cy.append('          "teradata" ')
@@ -542,16 +542,16 @@ class tdcoa():
         self.log('purge all subfolders',parentpath)
         for itm in os.listdir(parentpath):
             if os.path.isdir(os.path.join(parentpath,itm)):
-                self.log(' recursively deleting', itm)
-                os.popen('rm -r %s' %os.path.join(parentpath, itm))
-                time.sleep(.333)  # give os time to catch-up
+                self.recursive_delete(os.path.join(parentpath, itm))
         self.bufferlogs = False
+
 
     def recursive_delete(self, delpath):
         if os.path.isdir(delpath):
             self.log(' recursively deleting', delpath)
-            os.popen('rm -r %s' %delpath)
-            time.sleep(.333)  # give os time to catch-up
+            shutil.rmtree(delpath)
+        else:
+            self.log(' path not found', delpath)
 
 
 
@@ -580,7 +580,7 @@ class tdcoa():
 
                         if os.path.isfile(srcpath):
                             self.log('    file copied', dstpath)
-                            copyfile(srcpath, dstpath)
+                            shutil.copyfile(srcpath, dstpath)
                         elif os.path.isdir(os.path.join(sourcepath,itm)):
                             self.log('    folder copied', dstpath)
                             os.mkdir(dstpath)
@@ -680,7 +680,7 @@ class tdcoa():
 
 
 
-    def execute_sql(self, connobject, sql, skip=False ):
+    def open_sql(self, connobject, sql, skip=False ):
         import pandas as pd
         conntype = connobject['type']
         conn = connobject['connection']
@@ -689,7 +689,7 @@ class tdcoa():
         self.log('sql, first 100 characters:\n  %s' %sql[:100].replace('\n',' ').strip() + '...')
         self.log('sql submitted', str(dt.datetime.now()))
 
-        if show_full_sql:
+        if self.show_full_sql:
             self.log('full sql:', '\n%s\n' %sql)
 
         if skip:
@@ -797,13 +797,14 @@ class tdcoa():
         self.log('loading dictionary', 'transcend')
         self.transcend = configyaml['transcend']
         self.check_setting(self.transcend,
-                           required_item_list=['username','password','host','logmech'],
-                           defaults=['{td_quicklook}','{td_password}','tdprdcop3.td.teradata.com','LDAP'])
+                           required_item_list=['username','password','host','logmech','db_coa','db_region'],
+                           defaults=['{td_quicklook}','{td_password}','tdprdcop3.td.teradata.com','TD2','adlste_coa','adlste_westcomm'])
         self.transcend['connectionstring'] = 'teradatasql://%s:%s@%s/?logmech=%s' %(
                                                     self.transcend['username'],
                                                     self.transcend['password'],
                                                     self.transcend['host'],
                                                     self.transcend['logmech'])
+
         # check and set required Folders
         self.log('loading dictionary', 'folders')
         self.folders = configyaml['folders']
@@ -1128,6 +1129,10 @@ class tdcoa():
                                         self.log('  always use dictionary')
                                         runfiletext = self.substitute(runfiletext, self.substitutions, subname='overall app defaults (config.substitutions)')
 
+                                        # SUBSTITUTE values for: TRANSCEND (mostly for db_coa and db_region)
+                                        runfiletext = self.substitute(runfiletext, self.transcend, subname='overall transcend database defaults (db_coa and db_region)',
+                                                                      skipkeys=['host','username','password','logmech'])
+
                                         # SUBSTITUTE values for:   fileset defaults
                                         sub_dict = self.filesets[setfolder]
                                         if self.dict_active(sub_dict, 'fileset defaults'):
@@ -1285,6 +1290,9 @@ class tdcoa():
         self.log('execute_run started', header=True)
         self.log('time',str(dt.datetime.now()))
 
+        # TODO: paramterize final database lcoation (adlste_wetcomm should be {}
+        #  when building out the upload_manifest.json, so EMEA and APAC can use
+
         # at this point, we make the assumption that everything in the "run" directory is valid
 
         # make output directory for execution output and other collateral
@@ -1301,107 +1309,124 @@ class tdcoa():
         for sysname in os.listdir(runpath):
             sysfolder = os.path.join(runpath, sysname)
             if os.path.isdir(sysfolder):
+
+                # iterate system folders  -- must exist in config.yaml!
                 if sysname not in self.systems:
                     self.log('SYSTEM NOT FOUND IN CONFIG.YAML', sysname, warning=True)
                 else:
 
+                    # iterate file set folders -- ok to NOT exist, depending on setting
                     for setname in os.listdir(sysfolder):
                         setfolder = os.path.join(sysfolder, setname)
                         if os.path.isdir(setfolder):
 
-                            self.log('SYSTEM:  %s   FILESET:  %s' %(sysname,setname), header=True)
-
-                            workpath = setfolder
-                            outputfo = os.path.join(outputpath, sysname, setname)
-
-                            self.log('work (sql) path', workpath)
-                            self.log('output path', outputfo)
-
-                            # collect all prepared sql files, place in alpha order
-                            coasqlfiles=[]
-                            for coafile in os.listdir(workpath):
-                                if coafile[:1] != '.' and coafile[-8:]=='.coa.sql' :
-                                    self.log('found prepared sql file', coafile )
-                                    coasqlfiles.append(coafile)
-                            coasqlfiles.sort()
-
-                            if len(coasqlfiles)==0:
-                                self.log('no sql files found', warning=True)
+                            if setname not in self.systems[sysname]['filesets'] and str(self.settings['run_non_fileset_folders']).strip().lower() != 'true':
+                                self.log('-'* self.logspace)
+                                self.log('WARNING!!!\nfileset does not exist', setname)
+                                self.log(' AND setting "run_non_fileset_folders" is not "True"')
+                                self.log(' Skipping folder', setname)
                             else:
 
-                                self.log('all sql files alpha-sorted for exeuction consistency')
-                                self.log('sql files found', len(coasqlfiles))
+                                self.log('SYSTEM:  %s   FILESET:  %s' %(sysname,setname), header=True)
+                                workpath = setfolder
+                                outputfo = os.path.join(outputpath, sysname, setname)
 
-                                # create output folder:
-                                self.log('output folder', outputfo)
-                                if not os.path.exists(outputfo):
-                                    os.makedirs(outputfo)
-                                self.outputpath = outputfo
+                                self.log('work (sql) path', workpath)
+                                self.log('output path', outputfo)
 
-                                # create our upload-manifest:
-                                self.log('creating upload manifest file')
-                                with open(os.path.join(outputfo,'upload-manifest.json'),'w') as manifest:
-                                    manifest.write('{"entries":[ ')
-                                manifestdelim='\n '
+                                # collect all prepared sql files, place in alpha order
+                                coasqlfiles=[]
+                                for coafile in os.listdir(workpath):
+                                    if coafile[:1] != '.' and coafile[-8:]=='.coa.sql' :
+                                        self.log('found prepared sql file', coafile )
+                                        coasqlfiles.append(coafile)
+                                coasqlfiles.sort()
 
-                                # connect to customer system:
-                                conn = self.open_connection(
-                                                conntype = self.settings['customer_connection_type'],
-                                                skip = self.skipdbs,
-                                                system = self.systems[sysname]) # <------------------------------- Connect to the database
+                                if len(coasqlfiles)==0:
+                                    self.log('no .coa.sql files found in\n  %s' %workpath, warning=True)
+                                else:
 
-                                for coasqlfile in sorted(coasqlfiles):  # loop thru all sql files:
-                                    self.log('\nOPENING SQL FILE', coasqlfile)
-                                    with open(os.path.join(workpath, coasqlfile), 'r') as coasqlfilehdlr:
-                                        sqls = coasqlfilehdlr.read()
+                                    self.log('all sql files alpha-sorted for exeuction consistency')
+                                    self.log('sql files found', len(coasqlfiles))
 
-                                    sqlcnt = 0
-                                    for sql in sqls.split(';'):  # loop thru the sql in the files
-                                        sqlcnt +=1
+                                    # create output folder:
+                                    self.log('output folder', outputfo)
+                                    if not os.path.exists(outputfo):
+                                        os.makedirs(outputfo)
+                                    self.outputpath = outputfo
 
-                                        if sql.strip() == '':
-                                            self.log('null statement, skipping')
-                                        else:
+                                    # create our upload-manifest:
+                                    self.log('creating upload manifest file')
+                                    with open(os.path.join(outputfo,'upload-manifest.json'),'w') as manifest:
+                                        manifest.write('{"entries":[ ')
+                                    manifestdelim='\n '
 
-                                            # pull out any embedded SQLcommands:
-                                            sqlcmd = self.get_special_commands(sql)
-                                            sql = sqlcmd.pop('sql','')
+                                    # connect to customer system:
+                                    conn = self.open_connection(
+                                                    conntype = self.settings['customer_connection_type'],
+                                                    skip = self.skipdbs,
+                                                    system = self.systems[sysname]) # <------------------------------- Connect to the database
+                                    # loop thru all sql files:
+                                    for coasqlfile in sorted(coasqlfiles):
+                                        self.log('\nOPENING SQL FILE', coasqlfile)
+                                        with open(os.path.join(workpath, coasqlfile), 'r') as coasqlfilehdlr:
+                                            sqls = coasqlfilehdlr.read()
 
-                                            self.log('\n---- SQL #%i' %sqlcnt)
-                                            df = self.execute_sql(conn, sql, skip=self.skipdbs)# <------------------------------- Run SQL
+                                        sqlcnt = 0
+                                        for sql in sqls.split(';'):  # loop thru the sql in the files
+                                            sqlcnt +=1
 
-                                            if len(df) != 0:  # Save non-empty returns to .csv
+                                            if sql.strip() == '':
+                                                self.log('null statement, skipping')
+                                            else:
 
-                                                if len(sqlcmd)==0:
-                                                    self.log('no special commands found')
+                                                self.log('\n---- SQL #%i' %sqlcnt)
 
-                                                if 'save' not in sqlcmd:
-                                                    sqlcmd['save'] = '%s.%s--%s' %(sysname, setname, coasqlfile) + '%04d' %sqlcnt + '.csv'
+                                                # pull out any embedded SQLcommands:
+                                                sqlcmd = self.get_special_commands(sql)
+                                                sql = sqlcmd.pop('sql','')
 
-                                                # once built, append output folder, SiteID on the front, iterative counter if duplicates
-                                                csvfile = os.path.join(outputfo, sqlcmd['save'])
-                                                i=0
-                                                while os.path.isfile(csvfile):
-                                                    i +=1
-                                                    if i==1:
-                                                        csvfile = csvfile[:-4] + '.%03d' %i + csvfile[-4:]
-                                                    else:
-                                                        csvfile = csvfile[:-8] + '.%03d' %i + csvfile[-4:]
-                                                self.log('CSV save location', csvfile)
+                                                df = self.open_sql(conn, sql, skip=self.skipdbs)# <------------------------------- Run SQL
 
-                                                self.log('saving file...')
-                                                df.to_csv(csvfile) # <---------------------- Save to .csv
-                                                self.log('file saved!')
+                                                if len(df) != 0:  # Save non-empty returns to .csv
 
-                                                if 'load' in sqlcmd:  # add to manifest
-                                                    self.log('file marked for loading to Transcend, adding to upload-manifest.json')
-                                                    if 'call' not in sqlcmd:   sqlcmd['call']=''
-                                                    manifest_entry = '%s{"file": "%s",  "table": "%s",  "call": "%s"}' %(manifestdelim, sqlcmd['save'], sqlcmd['load'], sqlcmd['call'])
-                                                    manifestdelim='\n,'
+                                                    if len(sqlcmd)==0:
+                                                        self.log('no special commands found')
 
-                                                    with open(os.path.join(outputfo,'upload-manifest.json'),'a') as manifest:
-                                                        manifest.write(manifest_entry)
-                                                        self.log('Manifest updated', str(manifest_entry).replace(',',',\n'))
+                                                    if 'save' not in sqlcmd:
+                                                        sqlcmd['save'] = '%s.%s--%s' %(sysname, setname, coasqlfile) + '%04d' %sqlcnt + '.csv'
+
+                                                    # once built, append output folder, SiteID on the front, iterative counter if duplicates
+                                                    csvfile = os.path.join(outputfo, sqlcmd['save'])
+                                                    i=0
+                                                    while os.path.isfile(csvfile):
+                                                        i +=1
+                                                        if i==1:
+                                                            csvfile = csvfile[:-4] + '.%03d' %i + csvfile[-4:]
+                                                        else:
+                                                            csvfile = csvfile[:-8] + '.%03d' %i + csvfile[-4:]
+                                                    self.log('CSV save location', csvfile)
+
+                                                    self.log('saving file...')
+                                                    df.to_csv(csvfile) # <---------------------- Save to .csv
+                                                    self.log('file saved!')
+
+                                                    if 'load' in sqlcmd:  # add to manifest
+                                                        self.log('file marked for loading to Transcend, adding to upload-manifest.json')
+                                                        if 'call' not in sqlcmd:   sqlcmd['call']=''
+                                                        manifest_entry = '%s{"file": "%s",  "table": "%s",  "call": "%s"}' %(manifestdelim, sqlcmd['save'], sqlcmd['load'], sqlcmd['call'])
+                                                        manifestdelim='\n,'
+
+                                                        with open(os.path.join(outputfo,'upload-manifest.json'),'a') as manifest:
+                                                            manifest.write(manifest_entry)
+                                                            self.log('Manifest updated', str(manifest_entry).replace(',',',\n'))
+
+                                        # archive file we just processed (for re-run-ability)
+                                        self.log('Moving coa.sql file to Output folder', coasqlfile)
+                                        src = os.path.join(workpath, coasqlfile)
+                                        dst = os.path.join(outputfo, coasqlfile)
+                                        shutil.move(src, dst)
+                                        self.log('')
 
                                 # close JSON object
                                 with open(os.path.join(outputfo,'upload-manifest.json'),'a') as manifest:
@@ -1409,8 +1434,8 @@ class tdcoa():
                                     self.log('closing out upload-manifest.json')
 
                                 # Move all files from run folder to output, for posterity:
-                                self.log('moving all run artifacts to output folder, for archiving')
-                                self.recursive_copy(workpath, outputfo, True)
+                                self.log('moving all other run artifacts to output folder, for archiving')
+                                self.recursive_copy(workpath, outputfo, replace_existing=False)
                                 self.recursive_delete(workpath)
 
 
@@ -1421,7 +1446,7 @@ class tdcoa():
                      self.configpath, self.filesetpath]:
             self.log('copy to output folder root, for ease of use: \n  %s' %srcpath)
             dstpath = os.path.join(outputpath, os.path.basename(srcpath))
-            copyfile(srcpath, dstpath)
+            shutil.copyfile(srcpath, dstpath)
 
         self.log('\ndone!')
         self.log('time', str(dt.datetime.now()))
@@ -1429,9 +1454,7 @@ class tdcoa():
         # after logging is done, move the log file too...
         runlogsrc = os.path.join(self.approot, self.folders['run'], 'runlog.txt')
         runlogdst = os.path.join(outputpath, 'runlog.txt')
-        copyfile(runlogsrc, runlogdst)
-        os.remove(runlogsrc)
-
+        shutil.move(runlogsrc, runlogdst)
 
 
 
@@ -1477,6 +1500,7 @@ class tdcoa():
         self.log('    logmech', self.transcend['logmech'])
         self.log('    username', self.transcend['username'])
         self.log('    password', self.transcend['password'])
+        self.log('    coa_db', self.transcend['coa_db'])
         self.log("\nNOTE:  if you happen to see a scary WARNING below, DON'T PANIC!")
         self.log("       it just means you already had an active connection that was replaced.\n")
 
