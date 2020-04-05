@@ -49,7 +49,7 @@ class tdcoa():
     secretpath = ''
     filesetpath = ''
     outputpath = ''
-    version = "0.3.0"
+    version = "0.3.5.2"
 
     # log settings
     logs =  []
@@ -72,7 +72,7 @@ class tdcoa():
     settings = {}
 
 
-    def __init__(self, approot='.', printlog=True, config='config.yaml', secrets='secrets.yaml', filesets='filesets.yaml'):
+    def __init__(self, approot='.', printlog=True, config='config.yaml', secrets='secrets.yaml', filesets='filesets.yaml', make_setup_file=False):
         self.bufferlog = True
         self.printlog = printlog
         self.approot = os.path.join('.', approot)
@@ -87,6 +87,9 @@ class tdcoa():
 
         self.skipgit = False
         self.skipdbs = False
+
+        if make_setup_file:
+            self.pyfile_setup(filename='setup.py')
 
         # stub in config.yaml, secrets.yaml, if missing
         if not os.path.isfile(self.configpath):
@@ -243,6 +246,7 @@ class tdcoa():
         cy.append('')
         cy.append('')
         cy.append('folders:')
+        cy.append('  override:  "0_override"')
         cy.append('  download:  "1_download"')
         cy.append('  sql:       "2_sql_store"')
         cy.append('  run:       "3_ready_to_run"')
@@ -270,7 +274,8 @@ class tdcoa():
 
 
 
-    def pyfile_setup(self, filename='setup.py'):
+    def pyfile_setup(self, filename=''):
+        if filename=='': filename = os.path.join('..','setup.py')
         self.log('\ngenerating setup.py for pypi')
         cy=[]
         cy.append('import setuptools ')
@@ -306,10 +311,9 @@ class tdcoa():
         cy.append(') ')
 
         rtn = '\n'.join(cy)
-        file = os.path.join('..',filename)
-        with open( file, 'w') as fh:
+        with open( filename, 'w') as fh:
             fh.write(rtn)
-        self.log('  saving file', file)
+        self.log('  saving file', filename)
         return None
 
 
@@ -808,8 +812,8 @@ class tdcoa():
         # check and set required Folders
         self.log('loading dictionary', 'folders')
         self.folders = configyaml['folders']
-        self.check_setting(self.folders, required_item_list=['download','sql','run','output'],
-                           defaults=['1_download','2_sql_store','3_ready_to_run','4_output'])
+        self.check_setting(self.folders, required_item_list=['download','sql','run','output','override'],
+                           defaults=['1_download','2_sql_store','3_ready_to_run','4_output','0_override'])
 
         # check and set required Settings
         self.log('loading dictionary', 'settings')
@@ -997,9 +1001,10 @@ class tdcoa():
                                     self.log('  saving file to', savefile)
                                     with open(savefile, 'w') as fh:
                                         fh.write(filecontent)
-
         self.log('\ndone!')
         self.log('time', str(dt.datetime.now()))
+
+        self.copy_download_to_sql()
 
 
 
@@ -1011,6 +1016,8 @@ class tdcoa():
         self.log('time',str(dt.datetime.now()))
         downloadpath = os.path.join(self.approot, self.folders['download'])
         sqlpath = os.path.join(self.approot, self.folders['sql'])
+
+        self.recursively_delete_subfolders(sqlpath)
 
         for sysname, sysobject in self.systems.items():
             self.log('processing system', sysname)
@@ -1035,16 +1042,86 @@ class tdcoa():
 
 
 
+    def apply_override(self, override_folder='', target_folder=''):
+        self.log('applying file override')
 
-    def prepare_sql(self, sqlfolder=''):
+        # apply folder default locations
+        if override_folder=='': override_folder = self.folders['override']
+        override_folder = os.path.join(self.approot, override_folder)
+
+        if target_folder=='': target_folder = self.folders['sql']
+        target_folder = os.path.join(self.approot, target_folder)
+
+        self.log(' override folder', override_folder)
+        self.log(' target_folder', target_folder)
+
+        copyops={}
+        allfiles = []
+
+        # map files found in override folder
+        logdone=False
+        reloadconfig=False
+        for fo, subfos, files in os.walk(override_folder):
+            if fo == override_folder:
+                self.log('\nprocessing files found in override root')
+                self.log('these files replace any matching filename, regardless of subfolder location')
+                for file in files:
+                    if file=='config.yaml' or file=='secrets.yaml':
+                        copyops[os.path.join(self.approot,file)] = os.path.join(override_folder, file)
+                        reloadconfig=True
+                        self.log('  config file found, reload imminent',file)
+                    elif file[:1] != '.':
+                        allfiles.append(file)
+                        self.log('  root file found',file)
+            else:
+                if os.path.basename(fo)[:1] != '.':
+                    if not logdone:
+                        logdone=True
+                        self.log('\nprocessing files found in override subfolders')
+                        self.log('these files only replace filenames found in matching subfolders (and overrides root files)')
+
+                    for file in files:
+                        if file[:1] != '.':
+                            specfile = os.path.join(fo, file).replace(override_folder,'.')
+                            keydestfile = os.path.join(target_folder, specfile)
+                            keydestfo = os.path.dirname(keydestfile)
+                            if os.path.exists(keydestfo):
+                                copyops[keydestfile] = os.path.join(override_folder, specfile)
+                                self.log('  subfolder file found', specfile)
+                            else:
+                                self.log('target folder does not exist',keydestfo,warning=True)
+
+        # search for matching allfiles by crawling the target_folder
+        for fo, subfos, files in os.walk(target_folder):
+            for file in files:
+                keydestfile = os.path.join(fo, file)
+                if file in allfiles:
+                    copyops[keydestfile] = os.path.join(override_folder, file)
+
+        # perform final copy:
+        self.log('\nperform override file copy:')
+        for dstpath, srcpath in copyops.items():
+            self.log(' source:  %s' %srcpath)
+            self.log(' target:  %s' %dstpath)
+            shutil.copyfile(srcpath, dstpath)
+
+        if reloadconfig:  self.reload_config()
+        self.log('\napply override complete!')
+
+
+
+
+    def prepare_sql(self, sqlfolder='', override_folder=''):
         self.log('prepare_sql started', header=True)
         self.log('time',str(dt.datetime.now()))
 
         if sqlfolder != '':
-            self.log('sql folder override', sqlfolder)
+            self.log('sql folder', sqlfolder)
             self.folders['sql'] = sqlfolder
         self.log(' sql folder', self.folders['sql'])
         self.log(' run folder', self.folders['run'])
+
+        self.apply_override(target_folder = sqlfolder, override_folder=override_folder)
 
         # clear pre-existing subfolders in "run" directory (file sets)
         self.log('empty run folder entirely')
@@ -1071,10 +1148,10 @@ class tdcoa():
                                 self.log('  folder does NOT MATCH a defined fileset name', setfolder)
                                 if self.settings['run_non_fileset_folders'].strip().lower() == 'true':
                                     self.log('  however setting: "run_non_fileset_folders" equals "true", continuing...')
-                                    _continue = False
+                                    _continue = True
                                 else:
                                     self.log('  and setting: "run_non_fileset_folders" not equal "true", skipping...')
-                                    _continue = True
+                                    _continue = False
                             else: # setfolder in self.filesets
                                 self.log('  folder MATCHES a defined fileset name', setfolder)
                                 if self.dict_active(self.systems[sysfolder]['filesets'][setfolder])==False:
@@ -1116,9 +1193,10 @@ class tdcoa():
 
 
                                         # SUBSTITUTE values for:  system-fileset override
-                                        sub_dict = self.systems[sysfolder]['filesets'][setfolder]
-                                        if self.dict_active(sub_dict, 'system-fileset overrides'):
-                                            runfiletext = self.substitute(runfiletext, sub_dict, subname='system-fileset overrides (highest priority)')
+                                        if setfolder in self.systems[sysfolder]['filesets']:
+                                            sub_dict = self.systems[sysfolder]['filesets'][setfolder]
+                                            if self.dict_active(sub_dict, 'system-fileset overrides'):
+                                                runfiletext = self.substitute(runfiletext, sub_dict, subname='system-fileset overrides (highest priority)')
 
                                         # SUBSTITUTE values for:  system-defaults
                                         sub_dict = self.systems[sysfolder]
@@ -1134,9 +1212,10 @@ class tdcoa():
                                                                       skipkeys=['host','username','password','logmech'])
 
                                         # SUBSTITUTE values for:   fileset defaults
-                                        sub_dict = self.filesets[setfolder]
-                                        if self.dict_active(sub_dict, 'fileset defaults'):
-                                            runfiletext = self.substitute(runfiletext, sub_dict, skipkeys=['files'], subname='fileset defaults (lowest priority)')
+                                        if setfolder in self.filesets:
+                                            sub_dict = self.filesets[setfolder]
+                                            if self.dict_active(sub_dict, 'fileset defaults'):
+                                                runfiletext = self.substitute(runfiletext, sub_dict, skipkeys=['files'], subname='fileset defaults (lowest priority)')
 
 
                                         # split sql file into many sql statements
@@ -1397,7 +1476,8 @@ class tdcoa():
                                                         sqlcmd['save'] = '%s.%s--%s' %(sysname, setname, coasqlfile) + '%04d' %sqlcnt + '.csv'
 
                                                     # once built, append output folder, SiteID on the front, iterative counter if duplicates
-                                                    csvfile = os.path.join(outputfo, sqlcmd['save'])
+                                                    #csvfile = os.path.join(outputfo, sqlcmd['save'])
+                                                    csvfile = os.path.join(workpath, sqlcmd['save'])
                                                     i=0
                                                     while os.path.isfile(csvfile):
                                                         i +=1
@@ -1468,16 +1548,19 @@ class tdcoa():
         if _outputpath !='':   # supplied parameter
             outputpath = _outputpath
             self.log('output folder = manual param', outputpath)
-        elif self.outputpath !='':  # local variable set
+        elif os.path.isfile(os.path.join(self.approot, '.last_run_output_path.txt')):
+            # .last_run_output_path.txt  in approot
+            with open(os.path.join(self.approot, '.last_run_output_path.txt'),'r') as fh:
+                outputpath = fh.read().strip().split('\n')[0]
+            self.log('output folder= .last_run_output_path.txt', outputpath)
+        elif self.outputpath !='':
+            # local variable set
             outputpath = self.outputpath
             self.log('output folder = class variable: coa.outputpath', outputpath)
-        else:  # .last_run_output_path.txt  in approot
-            if os.path.isfile(os.path.join(self.approot, '.last_run_output_path.txt')):
-                with open(os.path.join(self.approot, '.last_run_output_path.txt'),'r') as fh:
-                    outputpath = fh.read().strip().split('\n')[0]
-                self.log('output folder= .last_run_output_path.txt', outputpath)
-            else:
-                outputpath =''
+        else:
+            outputpath =''
+            self.log('no output path defined')
+
 
         # now that outputfo is defined, let's make sure the dir actually exists:
         if not os.path.isdir(outputpath):
@@ -1500,7 +1583,7 @@ class tdcoa():
         self.log('    logmech', self.transcend['logmech'])
         self.log('    username', self.transcend['username'])
         self.log('    password', self.transcend['password'])
-        self.log('    coa_db', self.transcend['coa_db'])
+        self.log('    db_coa', self.transcend['db_coa'])
         self.log("\nNOTE:  if you happen to see a scary WARNING below, DON'T PANIC!")
         self.log("       it just means you already had an active connection that was replaced.\n")
 

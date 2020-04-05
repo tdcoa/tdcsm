@@ -1,0 +1,88 @@
+# Substitutions can be used in both the config.yaml (below), 
+#   as well as all .coa.sql files generated in later steps.
+#   format is {name} --> value   (all instances)
+#   Order of config substitution is: 
+#      - secrets.yaml
+#      - config.yaml: substitutions, folders, settings, transcend
+#   Order of sql substitution is, per file set: 
+#      - config.yaml: system, substitutions, filesets (in download folder)
+
+
+substitutions:
+  account:            "Demo Customer"
+  startdate:          "Current_Date - 7"
+  enddate:            "Current_Date - 1"
+  some_value:         "Camel"
+
+
+systems:
+  Altans_VDB:
+    siteid:      "tdaltanvbd01"
+    active:      "True"
+    host:        "tdap278t1.labs.teradata.com"
+    username:    "{username}"
+    password:    "{password}"
+    logmech:     "" 
+    use:         "test"   # prod/qa/dr/dev/etc
+    some_value:  "Bear"
+    filesets:
+      demo:
+        active:     "True"
+        some_value: "Aardvark" 
+
+  Customer_System:
+    siteid:     "custabcprod01"
+    active:     "false"
+    host:       "prod.custabc.com"
+    username:   "{custabc_username}"
+    password:   "{custabc_password}"
+    logmech:    "" 
+    use:        "prod"
+    filesets:
+      demo:
+        active: "False"
+      level1_how_much_1620pdcr:
+        active: "False"
+        startdate:  "Current_Date - 365"
+        enddate:    "Current_Date - 1"
+      level1_how_much_1620dbc:
+        active: "False"
+        startdate:  "Current_Date - 365"
+        enddate:    "Current_Date - 1"
+      level2_how_well_1620pdcr:
+        active: "False"
+        startdate:  "Current_Date - 90"
+        enddate:    "Current_Date - 1"
+      dbql_core_1620pdcr:
+        active: "False"
+        startdate:  "Current_Date - 45"
+        enddate:    "Current_Date - 1"
+
+
+transcend:
+  host:       "tdprdcop3.td.teradata.com"
+  username:   "{td_quicklook}"
+  password:   "{td_password}"
+  logmech:    "LDAP"
+  db_coa:     "adlste_coa"
+  db_region:  "adlste_westcomm"
+
+
+folders:
+  override:  "0_override"
+  download:  "1_download"
+  sql:       "2_sql_store"
+  run:       "3_ready_to_run"
+  output:    "4_output"
+
+
+settings:
+  githost:    "https://raw.githubusercontent.com/tdcoa/sql/master/"
+  gitfileset: "filesets.yaml"
+  gitmotd:    "motd.txt"
+  localfilesets:   "./{download}/filesets.yaml"
+  skip_git:   "False"
+  skip_dbs:   "False"
+  run_non_fileset_folders: "True" 
+  customer_connection_type:  "sqlalchemy"
+    # valid connection types: "teradataml", "sqlalchemy", or an odbc driver name
