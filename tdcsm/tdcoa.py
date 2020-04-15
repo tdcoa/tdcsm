@@ -36,7 +36,6 @@ class tdcoa():
       >>> from tdcsm.tdcoa import tdcoa
       >>> c = tdcoa()
       >>> c.download_files()
-      >>> c.copy_download_to_sql()
       >>> c.prepare_sql()
       >>> c.execute_run()          # target system VPN
       >>> c.upload_to_transcend()  # transcend VPN
@@ -49,7 +48,7 @@ class tdcoa():
     secretpath = ''
     filesetpath = ''
     outputpath = ''
-    version = "0.3.6.2"
+    version = "0.3.7.2"
 
     # log settings
     logs =  []
@@ -348,7 +347,7 @@ class tdcoa():
                     coltype = 'FLOAT'
                     quote = ''
                 else:
-                    collen = dfcsv[col].map(len).max()
+                    collen = dfcsv[col].map(str).map(len).max()
                     coltype = 'VARCHAR(%i)' %(collen+100)
                     quote = "'"
                 if pd.isna(val):
