@@ -48,7 +48,7 @@ class tdcoa():
     secretpath = ''
     filesetpath = ''
     outputpath = ''
-    version = "0.3.7.2"
+    version = "0.3.8.2"
 
     # log settings
     logs =  []
