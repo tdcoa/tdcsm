@@ -48,7 +48,7 @@ class tdcoa():
     secretpath = ''
     filesetpath = ''
     outputpath = ''
-    version = "0.3.8.2"
+    version = "0.3.8.3.2"
 
     # log settings
     logs =  []
@@ -318,65 +318,141 @@ class tdcoa():
 
 
 
-    def sql_create_temp_from_csv(self, csvfilepath):
+    def sql_create_temp_from_csv(self, csvfilepath, rowsperchunk=100):
         tbl = os.path.basename(csvfilepath)
         self.log('    transcribing sql', tbl)
 
         # open csv
         self.log('    open csv', tbl)
         dfcsv  = pd.read_csv(csvfilepath)
-        self.log('    rows in file', str(len(dfcsv)))
+        rowcount = len(dfcsv)
+        self.log('    rows in file', str(rowcount))
 
-        maxrows=100
-        tblcreated = False
-        sqlclosed=False
+        coldefs = {}
+        chunknumber = 1
+        rowstart = 0
+        rowend = rowsperchunk
+        self.log('    rows per chunk', str(rowsperchunk))
 
-        # build manual transactions for now...
-        sql = []
-        sqlprefix = 'create multiset volatile table "%s" as (\nselect ' %tbl
-        for idx, row in dfcsv.iterrows():
-            sqlclosed = False
-            sql.append(sqlprefix)
-            delim = ' '
-            for col, val in row.items():
-                colnm = re.sub('[^0-9a-zA-Z]+', '_', col)
-                if type(val) is int:
-                    coltype = 'BIGINT'
-                    quote = ''
-                elif type(val) is float:
-                    coltype = 'FLOAT'
-                    quote = ''
-                else:
-                    collen = dfcsv[col].map(str).map(len).max()
-                    coltype = 'VARCHAR(%i)' %(collen+100)
-                    quote = "'"
-                if pd.isna(val):
-                    val='NULL'
-                    quote=''
-                val = '%s%s%s' %(quote,val,quote)
-                sql.append('%scast(%s as %s) as %s' %(delim,val,coltype,colnm))
-                delim = ','
-            sql.append('from (sel 1 one) i%i' %idx)
-            if (idx+1) % maxrows == 0:
-                if tblcreated:
-                    sql.append(';\n')
-                elif not tblcreated:
-                    sql.append(') with data \n  no primary index \n  on commit preserve rows;\n\n')
-                    sqlclosed = True
-                    tblcreated = True
-                sqlprefix = 'insert into "%s" \nselect ' %tbl
-            else:
-                sqlprefix = 'union all \nselect '
+        # iterrate in chunks of records, as defined above
+        while rowstart <= rowcount-1:
+            df = dfcsv[rowstart:rowend]
+            rowend = rowstart + len(df)
+            delim = '('
+            self.log('building chunk %i containing rows %i thru %i' %(chunknumber, rowstart, rowend))
 
-        if not sqlclosed and not tblcreated:
-            sql.append(') with data \n  no primary index \n  on commit preserve rows;\n\n')
-        else:
-            sql.append(';\n\n')
+            # use first chunk to define data types and CREATE TABLE
+            if chunknumber==1:
+                sql = []
+                sql.append( 'CREATE MULTISET VOLATILE TABLE "%s"' %tbl)
+
+                for colname, colpytype in  dfcsv.dtypes.items():
+                    if str(colpytype)=='object':
+                        collen = dfcsv[colname].map(str).map(len).max() + 100
+                        coltype = 'VARCHAR(%i)  CHARACTER SET UNICODE ' %collen
+                        coldefs[colname]={'type':'varchar(%i)' %collen, 'len':collen, 'quote':"'", 'null':"''"}
+                    if str(colpytype)[:3]=='int':
+                        coltype='BIGINT'
+                        coldefs[colname]={'type':'bigint', 'len':0, 'quote':'', 'null':'NULL'}
+                    tmp = '"%s"' %str(colname)
+                    sql.append('%s%s%s' %(delim, tmp.ljust(30), coltype))
+                    delim=','
+                sql.append(') NO PRIMARY INDEX\nON COMMIT PRESERVE ROWS;\n')
+
+
+            # for each chunk now build INSERT STATEMENT
+            sql.append('INSERT INTO "%s"' %tbl)
+            for idx, row in df.iterrows():
+                sql.append('SELECT')
+                delim = '  '
+
+                for col, val in row.items():
+                    quote = coldefs[col]['quote']
+                    if pd.isna(val):
+                        val=coldefs[col]['null']
+                        quote=''
+                    sql.append('%scast(%s%s%s as %s)' %(delim, quote,val,quote, coldefs[col]['type']))
+                    delim=' ,'
+                union = 'UNION ALL'
+                if idx == rowend-1: union = ';\n'
+                sql.append('from (sel 1 one) i%i    %s' %(idx, union))
+
+            chunknumber +=1
+            rowstart = (chunknumber-1)*rowsperchunk
+            rowend = chunknumber * rowsperchunk
 
         self.log('sql built for', tbl)
-        rtn =  '\n'.join(sql)
-        rtn = rtn + '\n\n'
-        return rtn
+        return '\n'.join(sql)
+
+
+#    def sql_create_temp_from_csv(self, csvfilepath):
+#        tbl = os.path.basename(csvfilepath)
+#        self.log('    transcribing sql', tbl)
+#
+#        # open csv
+#        self.log('    open csv', tbl)
+#        dfcsv  = pd.read_csv(csvfilepath)
+#        self.log('    rows in file', str(len(dfcsv)))
+#
+#        maxrows=100
+#        tblcreated = False
+#        sqlclosed=False
+#
+#        # build manual transactions for now...
+#        sql = []
+#        sqlprefix = 'create multiset volatile table "%s" as (\nselect ' %tbl
+#        coltypes = {}
+#        quotes = {}
+#        for idx, row in dfcsv.iterrows():
+#            sqlclosed = False
+#            sql.append(sqlprefix)
+#            delim = ' '
+#            for col, val in row.items():
+#                colnm = re.sub('[^0-9a-zA-Z]+', '_', col)
+#                if colnm not in coltypes:
+#                    if  pd.isna(val):
+#                        collen = dfcsv[col].map(str).map(len).max()
+#                        coltypes[colnm] = 'VARCHAR(%i)' %(collen+200)
+#                        quotes[colnm]  = "'"
+#                    elif type(val) is int:
+#                        coltypes[colnm] = 'BIGINT'
+#                        quotes[colnm] = ''
+#                    elif type(val) is float:
+#                        coltypes[colnm] = 'FLOAT'
+#                        quotes[colnm]  = ''
+#                    else:
+#                        collen = dfcsv[col].map(str).map(len).max()
+#                        coltypes[colnm] = 'VARCHAR(%i)' %(collen+200)
+#                        quotes[colnm]  = "'"
+#                coltype = coltypes[colnm]
+#                quote = quotes[colnm]
+#                if pd.isna(val):
+#                    val='NULL'
+#                    quote=''
+#                val = '%s%s%s' %(quote,val,quote)
+#                sql.append('%scast(%s as %s) as %s' %(delim,val,coltype,colnm))
+#                delim = ','
+#            sql.append('from (sel 1 one) i%i' %idx)
+#            if (idx+1) % maxrows == 0:
+#                if tblcreated:
+#                    sql.append(';\n')
+#                elif not tblcreated:
+#                    sql.append(') with data \n  no primary index \n  on commit preserve rows;\n\n')
+#                    sqlclosed = True
+#                    tblcreated = True
+#                sqlprefix = 'insert into "%s" \nselect ' %tbl
+#            else:
+#                sqlprefix = 'union all \nselect '
+#
+#        if not sqlclosed and not tblcreated:
+#            sql.append(') with data \n  no primary index \n  on commit preserve rows;\n\n')
+#        else:
+#            sql.append(';\n\n')
+#
+#        self.log('sql built for', tbl)
+#        rtn =  '\n'.join(sql)
+#        rtn = rtn + '\n\n'
+#        return rtn
 
 
 
