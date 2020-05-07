@@ -203,75 +203,6 @@ class tdcoa:
         self.log('sql built for', tbl)
         return '\n'.join(sql)
 
-    #    def sql_create_temp_from_csv(self, csvfilepath):
-    #        tbl = os.path.basename(csvfilepath)
-    #        self.log('    transcribing sql', tbl)
-    #
-    #        # open csv
-    #        self.log('    open csv', tbl)
-    #        dfcsv  = pd.read_csv(csvfilepath)
-    #        self.log('    rows in file', str(len(dfcsv)))
-    #
-    #        maxrows=100
-    #        tblcreated = False
-    #        sqlclosed=False
-    #
-    #        # build manual transactions for now...
-    #        sql = []
-    #        sqlprefix = 'create multiset volatile table "%s" as (\nselect ' %tbl
-    #        coltypes = {}
-    #        quotes = {}
-    #        for idx, row in dfcsv.iterrows():
-    #            sqlclosed = False
-    #            sql.append(sqlprefix)
-    #            delim = ' '
-    #            for col, val in row.items():
-    #                colnm = re.sub('[^0-9a-zA-Z]+', '_', col)
-    #                if colnm not in coltypes:
-    #                    if  pd.isna(val):
-    #                        collen = dfcsv[col].map(str).map(len).max()
-    #                        coltypes[colnm] = 'VARCHAR(%i)' %(collen+200)
-    #                        quotes[colnm]  = "'"
-    #                    elif type(val) is int:
-    #                        coltypes[colnm] = 'BIGINT'
-    #                        quotes[colnm] = ''
-    #                    elif type(val) is float:
-    #                        coltypes[colnm] = 'FLOAT'
-    #                        quotes[colnm]  = ''
-    #                    else:
-    #                        collen = dfcsv[col].map(str).map(len).max()
-    #                        coltypes[colnm] = 'VARCHAR(%i)' %(collen+200)
-    #                        quotes[colnm]  = "'"
-    #                coltype = coltypes[colnm]
-    #                quote = quotes[colnm]
-    #                if pd.isna(val):
-    #                    val='NULL'
-    #                    quote=''
-    #                val = '%s%s%s' %(quote,val,quote)
-    #                sql.append('%scast(%s as %s) as %s' %(delim,val,coltype,colnm))
-    #                delim = ','
-    #            sql.append('from (sel 1 one) i%i' %idx)
-    #            if (idx+1) % maxrows == 0:
-    #                if tblcreated:
-    #                    sql.append(';\n')
-    #                elif not tblcreated:
-    #                    sql.append(') with data \n  no primary index \n  on commit preserve rows;\n\n')
-    #                    sqlclosed = True
-    #                    tblcreated = True
-    #                sqlprefix = 'insert into "%s" \nselect ' %tbl
-    #            else:
-    #                sqlprefix = 'union all \nselect '
-    #
-    #        if not sqlclosed and not tblcreated:
-    #            sql.append(') with data \n  no primary index \n  on commit preserve rows;\n\n')
-    #        else:
-    #            sql.append(';\n\n')
-    #
-    #        self.log('sql built for', tbl)
-    #        rtn =  '\n'.join(sql)
-    #        rtn = rtn + '\n\n'
-    #        return rtn
-
     def substitute(self, string_content='', dict_replace=None, subname='', skipkeys=None):
         if dict_replace is None:
             dict_replace = {}
@@ -1486,6 +1417,7 @@ class tdcoa:
         self.log('upload_to_transcend started', header=True)
         self.log('time', str(dt.datetime.now()))
 
+        # todo having full path in this file causes issues when switching computers and file directories
         # process 3 ways to get output path
         if _outputpath != '':  # supplied parameter
             outputpath = _outputpath
