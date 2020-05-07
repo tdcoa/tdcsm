@@ -1690,10 +1690,9 @@ class tdcoa():
                                     self.log('\n    first 10 records of what was being uploaded (dataframe):')
                                     self.log(dfcsv[0:10])
                                     self.log('')
-                                    sql = ["Select ColumnName, ColumnType, ColumnFormat, ColumnLength, ColumnId"]
-                                    sql.append("from dbc.columns ")
-                                    sql.append("where databasename = '%s' " % entry['schema'])
-                                    sql.append("  and tablename = '%s' " % entry['table'])
+                                    sql = ["Select ColumnName, ColumnType, ColumnFormat, ColumnLength, ColumnId",
+                                           "from dbc.columns ", "where databasename = '%s' " % entry['schema'],
+                                           "  and tablename = '%s' " % entry['table']]
                                     # sql.append("order by ColumnID;")
                                     sql = '\n'.join(sql)
                                     self.log(sql)
@@ -1718,7 +1717,6 @@ class tdcoa():
                                         self.log('\n\n')
                                         self.log(str(err).partition('\n')[0], error=True)
                                         exit()
-
 
                                 self.log('complete', str(dt.datetime.now()))
 
