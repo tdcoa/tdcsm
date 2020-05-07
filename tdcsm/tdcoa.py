@@ -3,14 +3,14 @@ import errno
 import json
 import os
 import re
-import requests
 import shutil
-import yaml
 
 import pandas as pd
+import requests
 import sqlalchemy
 # --  Teradata Drivers:
 import teradata  # odbc driver
+import yaml
 from sqlalchemy.exc import OperationalError
 from teradataml import DataFrame
 from teradataml.context import context as tdml_context
@@ -18,7 +18,10 @@ from teradataml.dataframe import dataframe as tdml_df
 from teradataml.dataframe.copy_to import copy_to_sql
 
 
-class tdcoa():
+# todo create docstring for all methods
+
+
+class tdcoa:
     """DESCRIPTION:
     tdcsm.tdcoa is a collection of high-level operations to fully automate
     the collection of consumption analytics of a Teradata platform.  This
@@ -80,7 +83,7 @@ class tdcoa():
     settings = {}
 
     def __init__(self, approot='.', printlog=True, config='config.yaml', secrets='secrets.yaml',
-                 filesets='filesets.yaml', make_setup_file=False):
+                 filesets='filesets.yaml'):
         self.bufferlog = True
         self.printlog = printlog
         self.approot = os.path.join('.', approot)
@@ -93,19 +96,10 @@ class tdcoa():
         self.log('secrets file', self.secretpath)
         self.log('tdcoa version', self.version)
 
+        # todo remove all references to skipgit and skipdbs?
         self.skipgit = False
         self.skipdbs = False
 
-        if make_setup_file:
-            self.pyfile_setup(filename='setup.py')
-
-        # stub in config.yaml, secrets.yaml, if missing
-        if not os.path.isfile(self.configpath):
-            self.log('missing config.yaml', 'creating %s' % self.configpath)
-            self.yaml_config(writefile=True, skipgit=self.skipgit, skipdbs=self.skipdbs)
-        if not os.path.isfile(self.secretpath):
-            self.log('missing secrets.yaml', 'creating %s' % self.secretpath)
-            self.yaml_secrets(writefile=True)
         # filesets.yaml is validated at download time
 
         self.reload_config()
@@ -138,177 +132,6 @@ class tdcoa():
             self.log('  saving file', self.filesetpath)
         return rtn
 
-    def yaml_secrets(self, writefile=False):
-        self.log('generating secrets.yaml from internal default')
-        cy = []
-        cy.append('# this file contains sensitive information that')
-        cy.append('# is typically NOT SHARED beyond one user, for')
-        cy.append('# example, passwords, some usernames, and IPs.')
-        cy.append('')
-        cy.append('secrets:')
-        cy.append('  tdpwd1:   "P@22w0rd"')
-        cy.append('')
-        cy.append('  custpwd2: "p0Pc0r4-@2020"')
-        cy.append('  custIP:   "123.234.231.100"')
-        cy.append('')
-        cy.append('  td_quicklook: "sh186014"')
-        cy.append('  td_password:  "qlikpassword"')
-        cy.append('')
-        cy.append('  custabc_username: "custUsername"')
-        cy.append('  custabc_password: "Ter@custabc_password"')
-        cy.append('')
-        cy.append('  username:   "vantagelabuser"')
-        cy.append('  password:   "vantagelabpwd"')
-        cy.append('')
-        rtn = '\n'.join(cy)
-        if writefile:
-            with open(os.path.join(self.secretpath), 'w') as fh:
-                fh.write(rtn)
-            self.log('  saving file', self.secretpath)
-        return rtn
-
-    def yaml_config(self, writefile=False, skipgit=False, skipdbs=True):
-        self.log('generating config.yaml from internal default')
-        cy = []
-        cy.append('# Substitutions can be used in both the config.yaml (below), ')
-        cy.append('#   as well as all .coa.sql files generated in later steps.')
-        cy.append('#   format is {name} --> value   (all instances)')
-        cy.append('#   Order of config substitution is: ')
-        cy.append('#      - secrets.yaml')
-        cy.append('#      - config.yaml: substitutions, folders, settings, transcend')
-        cy.append('#   Order of sql substitution is, per file set: ')
-        cy.append('#      - config.yaml: system, substitutions, filesets (in download folder)')
-        cy.append('')
-        cy.append('')
-        cy.append('substitutions:')
-        cy.append('  account:            "Demo Customer"')
-        cy.append('  startdate:          "Current_Date - 7"')
-        cy.append('  enddate:            "Current_Date - 1"')
-        cy.append('  some_value:         "Camel"')
-        cy.append('')
-        cy.append('')
-        cy.append('systems:')
-        cy.append('  Altans_VDB:')
-        cy.append('    siteid:      "tdaltanvbd01"')
-        cy.append('    active:      "True"')
-        cy.append('    host:        "tdap278t1.labs.teradata.com"')
-        cy.append('    username:    "{username}"')
-        cy.append('    password:    "{password}"')
-        cy.append('    logmech:     "" ')
-        cy.append('    use:         "test"   # prod/qa/dr/dev/etc')
-        cy.append('    some_value:  "Bear"')
-        cy.append('    filesets:')
-        cy.append('      demo:')
-        cy.append('        active:     "True"')
-        cy.append('        some_value: "Aardvark" ')
-        cy.append('')
-        cy.append('  Customer_System:')
-        cy.append('    siteid:     "custabcprod01"')
-        cy.append('    active:     "false"')
-        cy.append('    host:       "prod.custabc.com"')
-        cy.append('    username:   "{custabc_username}"')
-        cy.append('    password:   "{custabc_password}"')
-        cy.append('    logmech:    "" ')
-        cy.append('    use:        "prod"')
-        cy.append('    filesets:')
-        cy.append('      demo:')
-        cy.append('        active: "False"')
-        cy.append('      level1_how_much_1620pdcr:')
-        cy.append('        active: "False"')
-        cy.append('        startdate:  "Current_Date - 365"')
-        cy.append('        enddate:    "Current_Date - 1"')
-        cy.append('      level1_how_much_1620dbc:')
-        cy.append('        active: "False"')
-        cy.append('        startdate:  "Current_Date - 365"')
-        cy.append('        enddate:    "Current_Date - 1"')
-        cy.append('      level2_how_well_1620pdcr:')
-        cy.append('        active: "False"')
-        cy.append('        startdate:  "Current_Date - 90"')
-        cy.append('        enddate:    "Current_Date - 1"')
-        cy.append('      dbql_core_1620pdcr:')
-        cy.append('        active: "False"')
-        cy.append('        startdate:  "Current_Date - 45"')
-        cy.append('        enddate:    "Current_Date - 1"')
-        cy.append('')
-        cy.append('')
-        cy.append('transcend:')
-        cy.append('  host:       "tdprdcop3.td.teradata.com"')
-        cy.append('  username:   "{td_quicklook}"')
-        cy.append('  password:   "{td_password}"')
-        cy.append('  logmech:    "LDAP"')
-        cy.append('  db_coa:     "adlste_coa"')
-        cy.append('  db_region:  "adlste_westcomm"')
-        cy.append('')
-        cy.append('')
-        cy.append('folders:')
-        cy.append('  override:  "0_override"')
-        cy.append('  download:  "1_download"')
-        cy.append('  sql:       "2_sql_store"')
-        cy.append('  run:       "3_ready_to_run"')
-        cy.append('  output:    "4_output"')
-        cy.append('')
-        cy.append('')
-        cy.append('settings:')
-        cy.append('  githost:    "https://raw.githubusercontent.com/tdcoa/sql/master/"')
-        cy.append('  gitfileset: "filesets.yaml"')
-        cy.append('  gitmotd:    "motd.txt"')
-        cy.append('  localfilesets:   "./{download}/filesets.yaml"')
-        cy.append('  skip_git:   "%s"' % str(skipgit))
-        cy.append('  skip_dbs:   "%s"' % str(skipdbs))
-        cy.append('  run_non_fileset_folders: "True" ')
-        cy.append('  customer_connection_type:  "sqlalchemy"')
-        # cy.append('  transcend_connection_type: "teradataml"')
-        cy.append('    # valid connection types: "teradataml", "sqlalchemy", or an odbc driver name')
-
-        rtn = '\n'.join(cy)
-        if writefile:
-            with open(os.path.join(self.configpath), 'w') as fh:
-                fh.write(rtn)
-            self.log('  saving file', self.configpath)
-        return rtn
-
-    def pyfile_setup(self, filename=''):
-        if filename == '': filename = os.path.join('..', 'setup.py')
-        self.log('\ngenerating setup.py for pypi')
-        cy = []
-        cy.append('import setuptools ')
-        cy.append('')
-        cy.append('with open("README.md", "r") as fh: ')
-        cy.append('    long_description = fh.read() ')
-        cy.append('')
-        cy.append('setuptools.setup( ')
-        cy.append('    name="tdcsm", ')
-        cy.append('    version="%s", ' % self.version)
-        cy.append('    author="Stephen Hilton", ')
-        cy.append('    author_email="Stephen@FamilyHilton.com", ')
-        cy.append('    description="Teradata tools for CSMs", ')
-        cy.append('    long_description=long_description, ')
-        cy.append('    long_description_content_type="text/markdown", ')
-        cy.append('    url="https://github.com/tdcoa/tdcsm", ')
-        cy.append('    packages=setuptools.find_packages(), ')
-        cy.append('    install_requires=[ ')
-        cy.append('          "pandas", ')
-        cy.append('          "numpy", ')
-        cy.append('          "requests", ')
-        cy.append('          "pyyaml", ')
-        cy.append('          "teradatasqlalchemy", ')
-        cy.append('          "teradataml", ')
-        cy.append('          "teradata" ')
-        cy.append('      ], ')
-        cy.append('    classifiers=[ ')
-        cy.append('        "Programming Language :: Python :: 3", ')
-        cy.append('        "License :: OSI Approved :: MIT License", ')
-        cy.append('        "Operating System :: OS Independent", ')
-        cy.append('    ], ')
-        cy.append('    python_requires=">=3.6", ')
-        cy.append(') ')
-
-        rtn = '\n'.join(cy)
-        with open(filename, 'w') as fh:
-            fh.write(rtn)
-        self.log('  saving file', filename)
-        return None
-
     def sql_create_temp_from_csv(self, csvfilepath, rowsperchunk=100):
         tbl = os.path.basename(csvfilepath)
         self.log('    transcribing sql', tbl)
@@ -326,6 +149,7 @@ class tdcoa():
         self.log('    rows per chunk', str(rowsperchunk))
 
         # iterrate in chunks of records, as defined above
+        sql = []
         while rowstart <= rowcount - 1:
             df = dfcsv[rowstart:rowend]
             rowend = rowstart + len(df)
@@ -334,20 +158,23 @@ class tdcoa():
 
             # use first chunk to define data types and CREATE TABLE
             if chunknumber == 1:
-                sql = []
                 sql.append('CREATE MULTISET VOLATILE TABLE "%s"' % tbl)
 
                 for colname, colpytype in dfcsv.dtypes.items():
+                    coltype = ''
                     if str(colpytype) == 'object':
                         collen = dfcsv[colname].map(str).map(len).max() + 100
                         coltype = 'VARCHAR(%i)  CHARACTER SET UNICODE ' % collen
                         coldefs[colname] = {'type': 'varchar(%i)' % collen, 'len': collen, 'quote': "'", 'null': "''"}
+
                     if str(colpytype)[:3] == 'int':
                         coltype = 'BIGINT'
                         coldefs[colname] = {'type': 'bigint', 'len': 0, 'quote': '', 'null': 'NULL'}
+
                     tmp = '"%s"' % str(colname)
                     sql.append('%s%s%s' % (delim, tmp.ljust(30), coltype))
                     delim = ','
+
                 sql.append(') NO PRIMARY INDEX\nON COMMIT PRESERVE ROWS;\n')
 
             # for each chunk now build INSERT STATEMENT
@@ -363,8 +190,10 @@ class tdcoa():
                         quote = ''
                     sql.append('%scast(%s%s%s as %s)' % (delim, quote, val, quote, coldefs[col]['type']))
                     delim = ' ,'
+
                 union = 'UNION ALL'
-                if idx == rowend - 1: union = ';\n'
+                if idx == rowend - 1:
+                    union = ';\n'
                 sql.append('from (sel 1 one) i%i    %s' % (idx, union))
 
             chunknumber += 1
@@ -443,7 +272,12 @@ class tdcoa():
     #        rtn = rtn + '\n\n'
     #        return rtn
 
-    def substitute(self, string_content='', dict_replace={}, subname='', skipkeys=[]):
+    def substitute(self, string_content='', dict_replace=None, subname='', skipkeys=None):
+        if dict_replace is None:
+            dict_replace = {}
+        if skipkeys is None:
+            skipkeys = []
+
         rtn = str(string_content)
         self.log('    performing substitution', subname)
         for n, v in dict_replace.items():
@@ -457,12 +291,14 @@ class tdcoa():
         sql = str(sqltext).strip().split(';')[0]
         while '\n\n' in sql:
             sql = sql.replace('\n\n', '\n').strip()
+
         sql = sql.strip() + '\n;\n\n'
 
         if sql.replace(';', '').strip() == '':
             sql = ''
+
         else:
-            # replce --comments with /* comments */
+            # replace --comments with /* comments */
             newsql = []
             for line in sql.split('\n'):
                 if line.strip()[:2] != '/*':  # skip comment-starting  lines
@@ -480,28 +316,38 @@ class tdcoa():
         return sql
 
     def log(self, msgleft='', msgright='', header=False, error=False, warning=False):
-        delim = ':'
-        if msgright == '': delim = ''
+        delim = '' if msgright == '' else ':'
         msg = '%s%s' % (str(msgleft + delim).ljust(self.logspace), msgright)
 
-        if error: msg = '%s\nERROR:\n%s\n%s' % ('-=' * self.logspace, msg, '-=' * self.logspace)
-        if warning: msg = '%s\nWARNING:\n%s\n%s' % ('-' * self.logspace, msg, '-' * self.logspace)
+        if error:
+            msg = '%s\nERROR:\n%s\n%s' % ('-=' * self.logspace, msg, '-=' * self.logspace)
+        if warning:
+            msg = '%s\nWARNING:\n%s\n%s' % ('-' * self.logspace, msg, '-' * self.logspace)
+
         # prevent secrets from appearing in log:
         for nm, secret in self.secrets.items():
             if secret in msg:
                 msg = msg.replace(secret, '%s%s%s' % (secret[:1], '*' * (len(secret) - 2), secret[-1:]))
-        if header: msg = '\n\n%s\n%s\n%s' % ('=' * 40, msg.upper(), '-' * 40)
+
+        if header:
+            msg = '\n\n%s\n%s\n%s' % ('=' * 40, msg.upper(), '-' * 40)
+
         if self.bufferlogs:
             self.logs.append(msg)
-            if self.printlog: print(msg)
+            if self.printlog:
+                print(msg)
+
         else:  # no buffer
             if len(self.logs) == 0:
-                if self.printlog: print(msg)
+                if self.printlog:
+                    print(msg)
                 # self.__writelog(msg)
                 with open(self.logpath, 'a') as logfile:
                     logfile.write(msg + '\n')
+
             else:
-                if self.printlog: print(msg)
+                if self.printlog:
+                    print(msg)
                 for log in self.logs:
                     # self.__writelog(log)
                     with open(self.logpath, 'a') as logfile:
@@ -511,7 +357,13 @@ class tdcoa():
                 with open(self.logpath, 'a') as logfile:
                     logfile.write(msg + '\n')
 
-    def check_setting(self, settings_dict={}, required_item_list=[], defaults=[]):
+    def check_setting(self, settings_dict=None, required_item_list=None, defaults=None):
+        if settings_dict is None:
+            settings_dict = {}
+        if required_item_list is None:
+            required_item_list = []
+        if defaults is None:
+            defaults = []
         i = -1
         for itm in required_item_list:
             i += 1
@@ -530,12 +382,16 @@ class tdcoa():
                                                     msgsuffix)
                 self.log(msg, warning=True)
 
-    def get_special_commands(self, sql, replace_with='', keys_to_skip=[]):
+    def get_special_commands(self, sql, replace_with='', keys_to_skip=None):
+        if keys_to_skip is None:
+            keys_to_skip = []
+
         cmdstart = '/*{{'
         cmdend = '}}*/'
         cmds = {}
         sqltext = sql
-        if replace_with != '': replace_with = '/* %s */' % replace_with
+        replace_with = '/* %s */' % replace_with if replace_with != '' else replace_with
+
         self.log('  parsing for special sql commands')
 
         # first, get a unique dict of sql commands to iterate:
@@ -560,10 +416,12 @@ class tdcoa():
                 '{cmdvalue}', cmdval)
             cmds[cmdkey]['pos1'] = pos1
             cmds[cmdkey]['pos2'] = pos2
+
             if cmdkey in keys_to_skip:
-                cmds[cmdkey]['skip'] = 'True'
+                cmds[cmdkey]['skip'] = True
+
             else:
-                cmds[cmdkey]['skip'] = 'False'
+                cmds[cmdkey]['skip'] = False
                 self.log('   %s found in keys_to_skip, skipping...' % cmdkey)
 
             sqltext = sqltext.replace(cmdstr, '')
@@ -573,22 +431,30 @@ class tdcoa():
         rtn = {}
         for cmd, cmdobj in cmds.items():
 
-            if cmdobj['skip'] == 'False':
+            # add non-skipped special cmds
+            if not cmdobj['skip']:
                 rtn[cmd] = cmdobj['value']
                 finalsql = finalsql.replace(cmdobj['find'], cmdobj['replace'])
 
         rtn['sql'] = finalsql
+
         return rtn
 
-    def dict_active(self, dictTarget={}, dictName='', also_contains_key=''):
+    def dict_active(self, dictTarget=None, dictName='', also_contains_key=''):
+        if dictTarget is None:
+            dictTarget = {}
+
         if 'active' not in dictTarget:
             self.log('!! dictionary missing "active" flag, assuming "True"')
             dictTarget['active'] = 'True'
+
         if str(dictTarget['active']).lower() == 'true':
             if also_contains_key == '' or (also_contains_key != '' and also_contains_key in dictTarget):
                 self.log('  active dictionary', dictName)
                 return True
+
         self.log('  INACTIVE dictionary', dictName)
+
         return False
 
     def recursively_delete_subfolders(self, parentpath):
@@ -665,7 +531,9 @@ class tdcoa():
         self.log('connection closed', str(dt.datetime.now()))
         return True
 
-    def open_connection(self, conntype, host='', logmech='', username='', password='', system={}, skip=False):
+    def open_connection(self, conntype, host='', logmech='', username='', password='', system=None, skip=False):
+        if system is None:
+            system = {}
         self.log('OPEN_CONNECTION started', str(dt.datetime.now()))
         self.log('  connection type', conntype)
         # check all variables... use system{} as default, individual variables as overrides
@@ -673,19 +541,27 @@ class tdcoa():
         logmech = logmech.strip().lower()
         conntype = conntype.strip().lower()
 
-        if host == '': host = system['host']
-        if logmech == '': logmech = system['logmech']
-        if username == '': username = system['username']
-        if password == '': password = system['password']
+        host = system['host'] if host == '' else host
+        logmech = system['logmech'] if logmech == '' else logmech
+        username = system['username'] if username == '' else username
+        password = system['password'] if password == '' else password
 
         self.log('  host', host)
         self.log('  logmech', logmech)
         self.log('  username', username)
         self.log('  password', password)
 
-        connObject = {'type': conntype, 'skip': skip, 'connection': None, 'components': {}}
-        connObject['components'] = {'host': host, 'logmech': logmech,
-                                    'username': username, 'password': password}
+        connObject = {
+            'type': conntype,
+            'skip': skip,
+            'connection': None,
+            'components': {
+                'host': host,
+                'logmech': logmech,
+                'username': username,
+                'password': password
+            }
+        }
 
         self.log('connecting...')
 
@@ -695,16 +571,20 @@ class tdcoa():
         else:
             # ------------------------------------
             if conntype == 'teradataml':
-                if logmech == '': logmech = 'TD2'
+                logmech = 'TD2' if logmech == '' else logmech
+
                 connObject['connection'] = tdml_context.create_context(
                     host=host,
                     logmech=logmech,
                     username=username,
-                    password=password)
+                    password=password
+                )
 
             # ------------------------------------
             elif conntype == 'sqlalchemy':
-                if logmech.strip() != '': logmech = '/?logmech=%s' % logmech
+                if logmech.strip() != '':
+                    logmech = '/?logmech=%s' % logmech
+
                 connstring = 'teradatasql://%s:%s@%s%s' % (username, password, host, logmech)
                 connObject['connection'] = sqlalchemy.create_engine(connstring)
 
@@ -724,7 +604,6 @@ class tdcoa():
         return connObject
 
     def open_sql(self, connobject, sql, skip=False):
-        import pandas as pd
         conntype = connobject['type']
         conn = connobject['connection']
 
@@ -802,6 +681,7 @@ class tdcoa():
 
         if configpath == '':
             configpath = self.configpath if configpath == '' else configpath
+
         if secretpath == '':
             secretpath = self.secretpath
 
@@ -820,6 +700,7 @@ class tdcoa():
         self.log('loading config', os.path.basename(self.configpath))
         with open(configpath, 'r') as fh:
             configstr = fh.read()
+
         configyaml = yaml.load(configstr, Loader=yaml.FullLoader)
         configstr = self.substitute(configstr, self.secrets, 'secrets')
         configstr = self.substitute(configstr, configyaml['substitutions'], 'config:substitutions')
@@ -856,16 +737,17 @@ class tdcoa():
         self.settings = configyaml['settings']
         self.check_setting(self.settings,
                            required_item_list=['githost', 'gitfileset', 'gitmotd', 'localfilesets', 'skip_git',
-                                               'skip_dbs'
-                               , 'run_non_fileset_folders', 'customer_connection_type'],
-                           defaults=['https://raw.githubusercontent.com/tdcoa/sql/master/'
-                               , 'filesets.yaml'
-                               , 'motd.txt'
-                               , '{download}/filesets.yaml'
-                               , 'False'
-                               , 'False'
-                               , 'True'
-                               , 'sqlalchemy'])
+                                               'skip_dbs',
+                                               'run_non_fileset_folders', 'customer_connection_type'],
+                           defaults=['https://raw.githubusercontent.com/tdcoa/sql/master/',
+                                     'filesets.yaml',
+                                     'motd.txt',
+                                     '{download}/filesets.yaml',
+                                     'False',
+                                     'False',
+                                     'True',
+                                     'sqlalchemy']
+                           )
         self.filesetpath = self.settings['localfilesets']
 
         if 'skip_git' in self.settings and str(self.settings['skip_git']).lower() in ['true']:
@@ -911,7 +793,7 @@ class tdcoa():
         with open(self.filesetpath, 'r') as fh:
             filesetstr = fh.read()
         filesetyaml = yaml.load(filesetstr, Loader=yaml.FullLoader)
-        if filesetyaml == None:
+        if not filesetyaml:
             msg = 'filesets.yaml appears empty, please make sure it contains valid yaml configuration.\n'
             msg = msg + 'when in doubt: delete the existing filesets.yaml file from the "download" folder,\n'
             msg = msg + 'and run the process again.  When missing, it will create a default file of\n'
@@ -952,7 +834,8 @@ class tdcoa():
         self.log('download_files started', header=True)
         self.log('time', str(dt.datetime.now()))
         githost = self.settings['githost']
-        if githost[-1:] != '/': githost = githost + '/'
+        if githost[-1:] != '/':
+            githost = githost + '/'
         self.log('githost', githost)
 
         filesetcontent = ''
@@ -986,6 +869,7 @@ class tdcoa():
         filesetstr = filecontent
 
         # reload configs with newly downloaded filesets.yaml
+        # todo reload_config() is being called during class setup and here --> maybe redundant?
         self.reload_config()
 
         # delete all pre-existing download folders
@@ -1008,31 +892,37 @@ class tdcoa():
                         # cross-reference to filesets in filesets.yaml
                         if sys_setname not in self.filesets:
                             self.log(' not found in filesets.yaml', sys_setname)
+
                         else:  # found
                             setname = sys_setname
                             setobject = self.filesets[setname]
 
                             if self.dict_active(setobject, setname, also_contains_key='files'):
                                 self.log('FILE SET FOUND', setname)
-                                self.log('    file count', len(setobject['files']))
+                                self.log('    file count', str(len(setobject['files'])))
                                 savepath = os.path.join(self.approot, self.folders['download'], setname)
                                 if not os.path.exists(savepath):
                                     os.mkdir(savepath)
 
+                                # download each file in the fileset
                                 for file in setobject['files']:
                                     self.log(' downloading file', file)
                                     giturl = githost + file
                                     self.log('  %s' % giturl)
+
                                     if not self.skipgit:
                                         filecontent = requests.get(giturl).text
+
                                     else:
                                         self.log('  setting: skip_git = True', 'skipping download')
                                         self.log('  generating sql from internal default')
                                         filecontent = "select '{account}' as Account_Name, '{siteid}' as SiteID, d.* \nfrom dbc.dbcinfo as d where DATE-5 between {startdate} and {enddate};"
+
                                     savefile = os.path.join(savepath, file.split('/')[-1])
                                     self.log('  saving file to', savefile)
                                     with open(savefile, 'w') as fh:
                                         fh.write(filecontent)
+
         self.log('\ndone!')
         self.log('time', str(dt.datetime.now()))
 
@@ -1057,11 +947,13 @@ class tdcoa():
                         # define paths:
                         srcpath = os.path.join(self.approot, self.folders['download'], setname)
                         dstpath = os.path.join(self.approot, self.folders['sql'], sysname)
-                        if not os.path.exists(dstpath): os.mkdir(dstpath)
+                        if not os.path.exists(dstpath):
+                            os.mkdir(dstpath)
                         dstpath = os.path.join(dstpath, setname)
 
                         # purge existing, and copy over
-                        if overwrite: self.recursive_delete(dstpath)
+                        if overwrite:
+                            self.recursive_delete(dstpath)
                         self.recursive_copy(srcpath, dstpath)
 
         self.log('\ndone!')
@@ -1071,10 +963,12 @@ class tdcoa():
         self.log('applying file override')
 
         # apply folder default locations
-        if override_folder == '': override_folder = self.folders['override']
+        if override_folder == '':
+            override_folder = self.folders['override']
         override_folder = os.path.join(self.approot, override_folder)
 
-        if target_folder == '': target_folder = self.folders['sql']
+        if target_folder == '':
+            target_folder = self.folders['sql']
         target_folder = os.path.join(self.approot, target_folder)
 
         self.log(' override folder', override_folder)
@@ -1131,7 +1025,8 @@ class tdcoa():
             self.log(' target:  %s' % dstpath)
             shutil.copyfile(srcpath, dstpath)
 
-        if reloadconfig:  self.reload_config()
+        if reloadconfig:
+            self.reload_config()
         self.log('\napply override complete!')
 
     def prepare_sql(self, sqlfolder='', override_folder=''):
@@ -1156,10 +1051,10 @@ class tdcoa():
                 self.log('\n' + '-' * self.logspace)
                 self.log('SYSTEM FOLDER FOUND', sysfolder)
 
-                if sysfolder not in self.systems or self.dict_active(self.systems[sysfolder]) == False:
+                if sysfolder not in self.systems or self.dict_active(self.systems[sysfolder]) is False:
                     self.log('folder not defined as an active system, skipping...')
-                else:
 
+                else:
                     # iterate all fileset subfolders in system folder...
                     for setfolder in os.listdir(os.path.join(self.approot, self.folders['sql'], sysfolder)):
                         if os.path.isdir(os.path.join(self.approot, self.folders['sql'], sysfolder, setfolder)):
@@ -1173,18 +1068,22 @@ class tdcoa():
                                     self.log(
                                         '  however setting: "run_non_fileset_folders" equals "true", continuing...')
                                     _continue = True
+
                                 else:
                                     self.log('  and setting: "run_non_fileset_folders" not equal "true", skipping...')
                                     _continue = False
+
                             else:  # setfolder in self.filesets
                                 self.log('  folder MATCHES a defined fileset name', setfolder)
-                                if self.dict_active(self.systems[sysfolder]['filesets'][setfolder]) == False:
+                                if not self.dict_active(self.systems[sysfolder]['filesets'][setfolder]):
                                     self.log(
                                         "  however the system's fileset-override is marked as in-active, skipping...")
                                     _continue = False
-                                elif self.dict_active(self.filesets[setfolder]) == False:
+
+                                elif not self.dict_active(self.filesets[setfolder]):
                                     self.log('  however fileset itself is marked as in-active, skipping...')
                                     _continue = False
+
                                 else:
                                     self.log('  and fileset record is active, continuing...')
                                     _continue = True
@@ -1204,7 +1103,7 @@ class tdcoa():
 
                                 self.recursive_copy(sqlpath, runpath, replace_existing=True)
 
-                                # iterate all .sql.coa files in the fileset subfolder...
+                                # iterate all .coa.sql files in the fileset subfolder...
                                 for runfile in os.listdir(runpath):
                                     runfilepath = os.path.join(runpath, runfile)
                                     if os.path.isfile(runfilepath) and runfile[-8:] == '.coa.sql':
@@ -1285,9 +1184,9 @@ class tdcoa():
                                                             with open(os.path.join(runpath, cmdvalue), 'r') as fh:
                                                                 tempsql = fh.read()
                                                             sqls_done.append('/* BEGIN file insert: %s */ \n%s' % (
-                                                            cmdvalue, tempsql))
+                                                                cmdvalue, tempsql))
                                                             sql = sql.replace('{{replaceMe:%s}}' % cmdname,
-                                                                              'END file insert: %s' % (cmdvalue), 1)
+                                                                              'END file insert: %s' % cmdvalue, 1)
 
                                                     # --> TEMP <--: load temp file from .csv
                                                     if str(cmdname[:4]).lower() == 'temp':
@@ -1331,7 +1230,7 @@ class tdcoa():
                                                                                               str(row[col]))
                                                                 tempsql = tempsql.replace('{{replaceMe:%s}}' % cmdname,
                                                                                           ' csv row %i out of %i ' % (
-                                                                                          index + 1, len(df)))
+                                                                                              index + 1, len(df)))
                                                                 self.log('   sql generated from row data',
                                                                          'character length = %i' % len(tempsql))
                                                                 sqls_done.append(tempsql)
@@ -1394,7 +1293,8 @@ class tdcoa():
     def make_output_folder(self, name=''):
         outputpath = os.path.join(self.approot, self.folders['output'],
                                   str(dt.datetime.now())[:-7].replace(' ', '_').replace(':', ''))
-        if name.strip() != '': name = '-%s' % str(re.sub('[^0-9a-zA-Z]+', '_', name.strip()))
+        if name.strip() != '':
+            name = '-%s' % str(re.sub('[^0-9a-zA-Z]+', '_', name.strip()))
         outputpath = outputpath + name
         os.makedirs(outputpath)
         return outputpath
@@ -1403,7 +1303,7 @@ class tdcoa():
         self.log('execute_run started', header=True)
         self.log('time', str(dt.datetime.now()))
 
-        # TODO: paramterize final database lcoation (adlste_wetcomm should be {}
+        # TODO: paramterize final database location (adlste_wetcomm should be {})
         #  when building out the upload_manifest.json, so EMEA and APAC can use
 
         # at this point, we make the assumption that everything in the "run" directory is valid
@@ -1418,6 +1318,7 @@ class tdcoa():
         self.log('save location of last-run output folder to hidden file')
         self.log('last-run output', outputpath)
 
+        # loop through systems
         for sysname in os.listdir(runpath):
             sysfolder = os.path.join(runpath, sysname)
             if os.path.isdir(sysfolder):
@@ -1425,8 +1326,8 @@ class tdcoa():
                 # iterate system folders  -- must exist in config.yaml!
                 if sysname not in self.systems:
                     self.log('SYSTEM NOT FOUND IN CONFIG.YAML', sysname, warning=True)
-                else:
 
+                else:
                     # iterate file set folders -- ok to NOT exist, depending on setting
                     for setname in os.listdir(sysfolder):
                         setfolder = os.path.join(sysfolder, setname)
@@ -1438,8 +1339,8 @@ class tdcoa():
                                 self.log('WARNING!!!\nfileset does not exist', setname)
                                 self.log(' AND setting "run_non_fileset_folders" is not "True"')
                                 self.log(' Skipping folder', setname)
-                            else:
 
+                            else:
                                 self.log('SYSTEM:  %s   FILESET:  %s' % (sysname, setname), header=True)
                                 workpath = setfolder
                                 outputfo = os.path.join(outputpath, sysname, setname)
@@ -1453,14 +1354,15 @@ class tdcoa():
                                     if coafile[:1] != '.' and coafile[-8:] == '.coa.sql':
                                         self.log('found prepared sql file', coafile)
                                         coasqlfiles.append(coafile)
+
                                 coasqlfiles.sort()
 
                                 if len(coasqlfiles) == 0:
                                     self.log('no .coa.sql files found in\n  %s' % workpath, warning=True)
-                                else:
 
+                                else:
                                     self.log('all sql files alpha-sorted for exeuction consistency')
-                                    self.log('sql files found', len(coasqlfiles))
+                                    self.log('sql files found', str(len(coasqlfiles)))
 
                                     # create output folder:
                                     self.log('output folder', outputfo)
@@ -1468,7 +1370,7 @@ class tdcoa():
                                         os.makedirs(outputfo)
                                     self.outputpath = outputfo
 
-                                    # create our upload-manifest:
+                                    # create our upload-manifest, 1 manifest per fileset
                                     self.log('creating upload manifest file')
                                     with open(os.path.join(outputfo, 'upload-manifest.json'), 'w') as manifest:
                                         manifest.write('{"entries":[ ')
@@ -1480,20 +1382,21 @@ class tdcoa():
                                         skip=self.skipdbs,
                                         system=self.systems[
                                             sysname])  # <------------------------------- Connect to the database
+
                                     # loop thru all sql files:
                                     for coasqlfile in sorted(coasqlfiles):
                                         self.log('\nOPENING SQL FILE', coasqlfile)
                                         with open(os.path.join(workpath, coasqlfile), 'r') as coasqlfilehdlr:
-                                            sqls = coasqlfilehdlr.read()
+                                            sqls = coasqlfilehdlr.read()  # all sql statements in a sql file
 
                                         sqlcnt = 0
-                                        for sql in sqls.split(';'):  # loop thru the sql in the files
+                                        for sql in sqls.split(';'):  # loop thru the individual sql statements
                                             sqlcnt += 1
 
                                             if sql.strip() == '':
                                                 self.log('null statement, skipping')
-                                            else:
 
+                                            else:
                                                 self.log('\n---- SQL #%i' % sqlcnt)
 
                                                 # pull out any embedded SQLcommands:
@@ -1501,7 +1404,7 @@ class tdcoa():
                                                 sql = sqlcmd.pop('sql', '')
 
                                                 df = self.open_sql(conn, sql,
-                                                                   skip=self.skipdbs)  # <------------------------------- Run SQL
+                                                                   skip=self.skipdbs)  # <--------------------- Run SQL
 
                                                 if len(df) != 0:  # Save non-empty returns to .csv
 
@@ -1510,7 +1413,7 @@ class tdcoa():
 
                                                     if 'save' not in sqlcmd:
                                                         sqlcmd['save'] = '%s.%s--%s' % (
-                                                        sysname, setname, coasqlfile) + '%04d' % sqlcnt + '.csv'
+                                                            sysname, setname, coasqlfile) + '%04d' % sqlcnt + '.csv'
 
                                                     # once built, append output folder, SiteID on the front, iterative counter if duplicates
                                                     # csvfile = os.path.join(outputfo, sqlcmd['save'])
@@ -1529,11 +1432,13 @@ class tdcoa():
                                                     self.log('file saved!')
 
                                                     if 'load' in sqlcmd:  # add to manifest
-                                                        self.log('file marked for loading to Transcend, adding to upload-manifest.json')
+                                                        self.log(
+                                                            'file marked for loading to Transcend, adding to upload-manifest.json')
                                                         if 'call' not in sqlcmd:
                                                             sqlcmd['call'] = ''
                                                         manifest_entry = '%s{"file": "%s",  "table": "%s",  "call": "%s"}' % (
-                                                        manifestdelim, sqlcmd['save'], sqlcmd['load'], sqlcmd['call'])
+                                                            manifestdelim, sqlcmd['save'], sqlcmd['load'],
+                                                            sqlcmd['call'])
                                                         manifestdelim = '\n,'
 
                                                         with open(os.path.join(outputfo, 'upload-manifest.json'),
