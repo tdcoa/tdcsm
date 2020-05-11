@@ -8,17 +8,18 @@ import sqlalchemy
 import teradata  # odbc driver
 from teradataml.context import context as tdml_context
 from teradataml.dataframe import dataframe as tdml_df
+from tdcsm.logging import Logger
 
 
-class Utils:
+class Utils(Logger):
 
-    def __init__(self, logger, version):
-        self.logger = logger  # logger object
+    def __init__(self, version):
+        super().__init__()  # inherits Logger class
         self.version = version
 
     # todo remove and replace with default file?
     def yaml_filesets(self, filesetpath, writefile=False):
-        self.logger.log('generating filesets.yaml from internal default')
+        self.log('generating filesets.yaml from internal default')
         cy = []
         cy.append('demo:')
         cy.append('  active:          "True"')
@@ -36,24 +37,24 @@ class Utils:
         if writefile:
             with open(os.path.join(filesetpath), 'w') as fh:
                 fh.write(rtn)
-            self.logger.log('  saving file', filesetpath)
+            self.log('  saving file', filesetpath)
         return rtn
 
     def sql_create_temp_from_csv(self, csvfilepath, rowsperchunk=100):
         tbl = os.path.basename(csvfilepath)
-        self.logger.log('    transcribing sql', tbl)
+        self.log('    transcribing sql', tbl)
 
         # open csv
-        self.logger.log('    open csv', tbl)
+        self.log('    open csv', tbl)
         dfcsv = pd.read_csv(csvfilepath)
         rowcount = len(dfcsv)
-        self.logger.log('    rows in file', str(rowcount))
+        self.log('    rows in file', str(rowcount))
 
         coldefs = {}
         chunknumber = 1
         rowstart = 0
         rowend = rowsperchunk
-        self.logger.log('    rows per chunk', str(rowsperchunk))
+        self.log('    rows per chunk', str(rowsperchunk))
 
         # iterrate in chunks of records, as defined above
         sql = []
@@ -61,7 +62,7 @@ class Utils:
             df = dfcsv[rowstart:rowend]
             rowend = rowstart + len(df)
             delim = '('
-            self.logger.log('building chunk %i containing rows %i thru %i' % (chunknumber, rowstart, rowend))
+            self.log('building chunk %i containing rows %i thru %i' % (chunknumber, rowstart, rowend))
 
             # use first chunk to define data types and CREATE TABLE
             if chunknumber == 1:
@@ -107,7 +108,7 @@ class Utils:
             rowstart = (chunknumber - 1) * rowsperchunk
             rowend = chunknumber * rowsperchunk
 
-        self.logger.log('sql built for', tbl)
+        self.log('sql built for', tbl)
         return '\n'.join(sql)
 
     def substitute(self, string_content='', dict_replace=None, subname='', skipkeys=None):
@@ -117,12 +118,12 @@ class Utils:
             skipkeys = []
 
         rtn = str(string_content)
-        self.logger.log('    performing substitution', subname)
+        self.log('    performing substitution', subname)
         for n, v in dict_replace.items():
             if n not in skipkeys:
                 if str('{%s}' % n) in rtn:
                     rtn = rtn.replace('{%s}' % n, str(v))
-                    self.logger.log('     {%s}' % n, str(v))
+                    self.log('     {%s}' % n, str(v))
         return str(rtn)
 
     @staticmethod
@@ -177,7 +178,7 @@ class Utils:
                                                     '(note: names are case-sensitive)',
                                                     'Some functionality may not work until this is added and you reload_config()',
                                                     msgsuffix)
-                self.logger.log(msg, warning=True)
+                self.log(msg, warning=True)
 
     def get_special_commands(self, sql, replace_with='', keys_to_skip=None):
         if keys_to_skip is None:
@@ -189,7 +190,7 @@ class Utils:
         sqltext = sql
         replace_with = '/* %s */' % replace_with if replace_with != '' else replace_with
 
-        self.logger.log('  parsing for special sql commands')
+        self.log('  parsing for special sql commands')
 
         # first, get a unique dict of sql commands to iterate:
         while cmdstart in sqltext and cmdend in sqltext:
@@ -203,7 +204,7 @@ class Utils:
             else:
                 cmdval = ''
 
-            self.logger.log('   special command found', '%s = %s' % (cmdkey, cmdval))
+            self.log('   special command found', '%s = %s' % (cmdkey, cmdval))
 
             cmds[cmdkey] = {}
             cmds[cmdkey]['name'] = cmdkey
@@ -219,7 +220,7 @@ class Utils:
 
             else:
                 cmds[cmdkey]['skip'] = False
-                self.logger.log('   %s found in keys_to_skip, skipping...' % cmdkey)
+                self.log('   %s found in keys_to_skip, skipping...' % cmdkey)
 
             sqltext = sqltext.replace(cmdstr, '')
 
@@ -242,75 +243,75 @@ class Utils:
             dictTarget = {}
 
         if 'active' not in dictTarget:
-            self.logger.log('!! dictionary missing "active" flag, assuming "True"')
+            self.log('!! dictionary missing "active" flag, assuming "True"')
             dictTarget['active'] = 'True'
 
         if str(dictTarget['active']).lower() == 'true':
             if also_contains_key == '' or (also_contains_key != '' and also_contains_key in dictTarget):
-                self.logger.log('  active dictionary', dictName)
+                self.log('  active dictionary', dictName)
                 return True
 
-        self.logger.log('  INACTIVE dictionary', dictName)
+        self.log('  INACTIVE dictionary', dictName)
 
         return False
 
     def recursively_delete_subfolders(self, parentpath):
-        self.logger.bufferlogs = True
-        self.logger.log('purge all subfolders', parentpath)
+        self.bufferlogs = True
+        self.log('purge all subfolders', parentpath)
         for itm in os.listdir(parentpath):
             if os.path.isdir(os.path.join(parentpath, itm)):
                 self.recursive_delete(os.path.join(parentpath, itm))
-        self.logger.bufferlogs = False
+        self.bufferlogs = False
 
     def recursive_delete(self, delpath):
         if os.path.isdir(delpath):
-            self.logger.log(' recursively deleting', delpath)
+            self.log(' recursively deleting', delpath)
             shutil.rmtree(delpath)
         else:
-            self.logger.log(' path not found', delpath)
+            self.log(' path not found', delpath)
 
     def recursive_copy(self, sourcepath, destpath, replace_existing=False, skippattern=''):
-        self.logger.log(' recursive_copyfolder source', sourcepath)
+        self.log(' recursive_copyfolder source', sourcepath)
 
         if not os.path.isdir(sourcepath):
-            self.logger.log('  ERROR: source path does not exist', sourcepath)
+            self.log('  ERROR: source path does not exist', sourcepath)
         else:
             if not os.path.exists(destpath):
-                self.logger.log('    destination folder absent, creating', destpath)
+                self.log('    destination folder absent, creating', destpath)
                 os.mkdir(destpath)
             for itm in os.listdir(sourcepath):
                 srcpath = os.path.join(sourcepath, itm)
                 dstpath = os.path.join(destpath, itm)
 
                 if skippattern != '' and skippattern in itm:
-                    self.logger.log('    skip: matched skip-pattern', srcpath)
+                    self.log('    skip: matched skip-pattern', srcpath)
                 else:
                     if os.path.exists(dstpath) and not replace_existing:
-                        self.logger.log('    skip: replace_existing=False', dstpath)
+                        self.log('    skip: replace_existing=False', dstpath)
                     else:
                         if os.path.exists(dstpath) and replace_existing:
-                            self.logger.log(' replace_existing=True')
+                            self.log(' replace_existing=True')
                             self.recursive_delete(dstpath)
 
                         if os.path.isfile(srcpath):
-                            self.logger.log('    file copied', dstpath)
+                            self.log('    file copied', dstpath)
                             shutil.copyfile(srcpath, dstpath)
                         elif os.path.isdir(os.path.join(sourcepath, itm)):
-                            self.logger.log('    folder copied', dstpath)
+                            self.log('    folder copied', dstpath)
                             os.mkdir(dstpath)
                             self.recursive_copy(srcpath, dstpath, replace_existing, skippattern)
                         else:
-                            self.logger.log('    um... unknown filetype: %s' % srcpath)
+                            self.log('    um... unknown filetype: %s' % srcpath)
 
     def close_connection(self, connobject, skip=False):  # TODO
-        self.logger.log('CLOSE_CONNECTION called', str(dt.datetime.now()))
-        self.logger.log('*** THIS FUNCTION IS NOT YET IMPLEMENTED ***')
+        self.log('CLOSE_CONNECTION called', str(dt.datetime.now()))
+        self.log('*** THIS FUNCTION IS NOT YET IMPLEMENTED ***')
         conntype = connobject['type']
         conn = connobject['connection']
-        self.logger.log('  connection type', conntype)
+        self.log('  connection type', conntype)
 
         if skip:
-            self.logger.log('skip dbs setting is true, emulating closure...')
+            self.log('skip dbs setting is true, emulating closure...')
 
         else:
             # ------------------------------------
@@ -325,14 +326,14 @@ class Utils:
             else:  # assume odbc connect
                 pass
 
-        self.logger.log('connection closed', str(dt.datetime.now()))
+        self.log('connection closed', str(dt.datetime.now()))
         return True
 
     def open_connection(self, conntype, host='', logmech='', username='', password='', system=None, skip=False):
         if system is None:
             system = {}
-        self.logger.log('OPEN_CONNECTION started', str(dt.datetime.now()))
-        self.logger.log('  connection type', conntype)
+        self.log('OPEN_CONNECTION started', str(dt.datetime.now()))
+        self.log('  connection type', conntype)
         # check all variables... use system{} as default, individual variables as overrides
         host = host.strip().lower()
         logmech = logmech.strip().lower()
@@ -343,10 +344,10 @@ class Utils:
         username = system['username'] if username == '' else username
         password = system['password'] if password == '' else password
 
-        self.logger.log('  host', host)
-        self.logger.log('  logmech', logmech)
-        self.logger.log('  username', username)
-        self.logger.log('  password', password)
+        self.log('  host', host)
+        self.log('  logmech', logmech)
+        self.log('  username', username)
+        self.log('  password', password)
 
         connObject = {
             'type': conntype,
@@ -360,10 +361,10 @@ class Utils:
             }
         }
 
-        self.logger.log('connecting...')
+        self.log('connecting...')
 
         if skip:
-            self.logger.log('skip dbs setting is true, emulating connection...')
+            self.log('skip dbs setting is true, emulating connection...')
 
         else:
             # ------------------------------------
@@ -387,7 +388,7 @@ class Utils:
 
             # ------------------------------------
             else:  # assume odbc connect
-                self.logger.log('  (odbc driver)')
+                self.log('  (odbc driver)')
                 udaExec = teradata.UdaExec(appName='tdcoa',
                                            version=self.version,
                                            logConsole=False)
@@ -397,22 +398,22 @@ class Utils:
                                                            password=password,
                                                            driver=conntype)
 
-        self.logger.log('connected!', str(dt.datetime.now()))
+        self.log('connected!', str(dt.datetime.now()))
         return connObject
 
     def open_sql(self, connobject, sql, skip=False):
         conntype = connobject['type']
         conn = connobject['connection']
 
-        self.logger.log('connection type', conntype)
-        self.logger.log('sql, first 100 characters:\n  %s' % sql[:100].replace('\n', ' ').strip() + '...')
-        self.logger.log('sql submitted', str(dt.datetime.now()))
+        self.log('connection type', conntype)
+        self.log('sql, first 100 characters:\n  %s' % sql[:100].replace('\n', ' ').strip() + '...')
+        self.log('sql submitted', str(dt.datetime.now()))
 
-        if self.logger.show_full_sql:
-            self.logger.log('full sql:', '\n%s\n' % sql)
+        if self.show_full_sql:
+            self.log('full sql:', '\n%s\n' % sql)
 
         if skip:
-            self.logger.log('skip dbs setting is true, emulating execution...')
+            self.log('skip dbs setting is true, emulating execution...')
             df = pd.DataFrame(columns=list('ABCD'))
 
         else:
@@ -429,6 +430,6 @@ class Utils:
             else:  # assume odbc connect
                 df = pd.read_sql(sql, conn)
 
-        self.logger.log('sql completed', str(dt.datetime.now()))
-        self.logger.log('record count', str(len(df)))
+        self.log('sql completed', str(dt.datetime.now()))
+        self.log('record count', str(len(df)))
         return df

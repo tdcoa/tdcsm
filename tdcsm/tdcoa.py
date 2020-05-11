@@ -59,21 +59,10 @@ class tdcoa:
     # paths
     approot = '.'
     configpath = ''
-    logpath = ''
     secretpath = ''
     filesetpath = ''
     outputpath = ''
     version = "0.3.8.3.2"
-
-    # log settings
-    logs = []
-    logspace = 30
-    bufferlogs = True
-    configyaml = ''
-    printlog = True
-    show_full_sql = False
-    skipgit = False
-    skipdbs = False
 
     # dictionaries
     secrets = {}
@@ -92,15 +81,14 @@ class tdcoa:
         self.configpath = os.path.join(self.approot, config)
         self.secretpath = os.path.join(self.approot, secrets)
 
-        self.logger = Logger()
-        self.utils = Utils(self.logger, self.version)
+        self.utils = Utils(self.version)  # utilities class. inherits Logger class
 
-        self.logger.log('tdcoa started', header=True)
-        self.logger.log('time', str(dt.datetime.now()))
-        self.logger.log('app root', self.approot)
-        self.logger.log('config file', self.configpath)
-        self.logger.log('secrets file', self.secretpath)
-        self.logger.log('tdcoa version', self.version)
+        self.utils.log('tdcoa started', header=True)
+        self.utils.log('time', str(dt.datetime.now()))
+        self.utils.log('app root', self.approot)
+        self.utils.log('config file', self.configpath)
+        self.utils.log('secrets file', self.secretpath)
+        self.utils.log('tdcoa version', self.version)
 
         # todo remove all references to skipgit and skipdbs?
         self.skipgit = False
@@ -153,20 +141,20 @@ class tdcoa:
         if secretpath == '':
             secretpath = self.secretpath
 
-        self.logger.bufferlogs = True
-        self.logger.log('reload_config started', header=True)
-        self.logger.log('time', str(dt.datetime.now()))
-        self.logger.log('tdcoa version', self.version)
+        self.utils.bufferlogs = True
+        self.utils.log('reload_config started', header=True)
+        self.utils.log('time', str(dt.datetime.now()))
+        self.utils.log('tdcoa version', self.version)
 
         # load secrets
-        self.logger.log('loading secrets', os.path.basename(self.secretpath))
+        self.utils.log('loading secrets', os.path.basename(self.secretpath))
         with open(secretpath, 'r') as fh:
             secretstr = fh.read()
         self.secrets = yaml.load(secretstr, Loader=yaml.FullLoader)['secrets']
-        self.logger.secrets = self.secrets  # update secrets attribute in logger
+        self.utils.secrets = self.secrets  # update secrets attribute in logger
 
         # load config
-        self.logger.log('loading config', os.path.basename(self.configpath))
+        self.utils.log('loading config', os.path.basename(self.configpath))
         with open(configpath, 'r') as fh:
             configstr = fh.read()
 
@@ -179,11 +167,11 @@ class tdcoa:
         configyaml = yaml.load(configstr, Loader=yaml.FullLoader)
 
         # load substitutions
-        self.logger.log('loading dictionary', 'substitutions')
+        self.utils.log('loading dictionary', 'substitutions')
         self.substitutions = configyaml['substitutions']
 
         # check and set Transcend connection information
-        self.logger.log('loading dictionary', 'transcend')
+        self.utils.log('loading dictionary', 'transcend')
         self.transcend = configyaml['transcend']
         self.utils.check_setting(self.transcend,
                            required_item_list=['username', 'password', 'host', 'logmech', 'db_coa', 'db_region'],
@@ -196,13 +184,13 @@ class tdcoa:
             self.transcend['logmech'])
 
         # check and set required Folders
-        self.logger.log('loading dictionary', 'folders')
+        self.utils.log('loading dictionary', 'folders')
         self.folders = configyaml['folders']
         self.utils.check_setting(self.folders, required_item_list=['download', 'sql', 'run', 'output', 'override'],
                            defaults=['1_download', '2_sql_store', '3_ready_to_run', '4_output', '0_override'])
 
         # check and set required Settings
-        self.logger.log('loading dictionary', 'settings')
+        self.utils.log('loading dictionary', 'settings')
         self.settings = configyaml['settings']
         self.utils.check_setting(self.settings,
                            required_item_list=['githost', 'gitfileset', 'gitmotd', 'localfilesets', 'skip_git',
@@ -220,13 +208,13 @@ class tdcoa:
         self.filesetpath = self.settings['localfilesets']
 
         if 'skip_git' in self.settings and str(self.settings['skip_git']).lower() in ['true']:
-            self.logger.log('setting flag skip_git active, skipping all git pulls')
+            self.utils.log('setting flag skip_git active, skipping all git pulls')
             self.skipgit = True
         else:
             self.skipgit = False
 
         if 'skip_dbs' in self.settings and str(self.settings['skip_dbs']).lower() in ['true']:
-            self.logger.log('setting flag skip_dbs active, skipping all database pulls')
+            self.utils.log('setting flag skip_dbs active, skipping all database pulls')
             self.skipdbs = True
         else:
             self.skipdbs = False
@@ -236,14 +224,14 @@ class tdcoa:
             fopath = os.path.join(self.approot, subfo)
             # core folders
             if not os.path.exists(fopath):
-                self.logger.log('creating missing folder', fopath)
+                self.utils.log('creating missing folder', fopath)
                 os.mkdir(fopath)
 
         # unbuffer logs once we have a valid "run" folder
-        self.logger.logpath = os.path.join(self.approot, self.folders['run'], 'runlog.txt')
+        self.utils.logpath = os.path.join(self.approot, self.folders['run'], 'runlog.txt')
         # if os.path.isfile(self.logpath): os.remove(self.logpath)
-        self.logger.bufferlogs = False
-        self.logger.log('unbuffering log to "run" folder')
+        self.utils.bufferlogs = False
+        self.utils.log('unbuffering log to "run" folder')
 
         # setup filesets.yaml
         if 'localfilesets' not in self.settings:
@@ -252,13 +240,13 @@ class tdcoa:
 
         # create missing filesets.yaml (now that download folder exists)
         if not os.path.isfile(self.filesetpath):
-            self.logger.log('missing filesets.yaml', self.filesetpath)
+            self.utils.log('missing filesets.yaml', self.filesetpath)
             self.utils.yaml_filesets(self.filesetpath, writefile=True)
         else:
-            self.logger.log('found filesets.yaml', self.filesetpath)
+            self.utils.log('found filesets.yaml', self.filesetpath)
 
         # load filesets dictionary (active only)
-        self.logger.log('loading dictionary', 'filesets (active only)')
+        self.utils.log('loading dictionary', 'filesets (active only)')
         with open(self.filesetpath, 'r') as fh:
             filesetstr = fh.read()
         filesetyaml = yaml.load(filesetstr, Loader=yaml.FullLoader)
@@ -268,14 +256,14 @@ class tdcoa:
             msg = msg + 'and run the process again.  When missing, it will create a default file of\n'
             msg = msg + 'the correct format.  When executing the "download_sql" command, the program\n'
             msg = msg + 'will also re-download the latest filesets.yaml from github.'
-            self.logger.log(msg, error=True)
+            self.utils.log(msg, error=True)
             raise IOError(msg)
         for setname, setobject in filesetyaml.items():
             if str(setobject['active']).strip().lower() == 'true':
                 self.filesets.update({setname: setobject})
 
         # load systems (active only)
-        self.logger.log('loading system dictionaries (active only)')
+        self.utils.log('loading system dictionaries (active only)')
         for sysname, sysobject in configyaml['systems'].items():
             if self.utils.dict_active(sysobject, sysname):
                 self.systems.update({sysname: sysobject})
@@ -296,26 +284,26 @@ class tdcoa:
                                                                                   sysobject['host'],
                                                                                   logmech)
 
-        self.logger.log('done!')
-        self.logger.log('time', str(dt.datetime.now()))
+        self.utils.log('done!')
+        self.utils.log('time', str(dt.datetime.now()))
 
     def download_files(self):
-        self.logger.log('download_files started', header=True)
-        self.logger.log('time', str(dt.datetime.now()))
+        self.utils.log('download_files started', header=True)
+        self.utils.log('time', str(dt.datetime.now()))
         githost = self.settings['githost']
         if githost[-1:] != '/':
             githost = githost + '/'
-        self.logger.log('githost', githost)
+        self.utils.log('githost', githost)
 
         filesetcontent = ''
 
         # download any control files first (filesets.yaml, motd.txt, etc.)
         # motd
         giturl = githost + self.settings['gitmotd']
-        self.logger.log('downloading "motd.txt" from github')
-        self.logger.log('  requesting url', giturl)
+        self.utils.log('downloading "motd.txt" from github')
+        self.utils.log('  requesting url', giturl)
         if self.skipgit:
-            self.logger.log('  setting: skip_git = True', 'skipping download')
+            self.utils.log('  setting: skip_git = True', 'skipping download')
             filecontent = 'default message'
         else:
             filecontent = requests.get(giturl).text
@@ -324,15 +312,15 @@ class tdcoa:
 
         # filesets
         giturl = githost + self.settings['gitfileset']
-        self.logger.log('downloading "filesets.yaml" from github')
-        self.logger.log('  requesting url', giturl)
+        self.utils.log('downloading "filesets.yaml" from github')
+        self.utils.log('  requesting url', giturl)
         if self.skipgit:
-            self.logger.log('  setting: skip_git = True', 'skipping download')
-            filecontent = self.utils.yaml_filesets(self.fileset)
+            self.utils.log('  setting: skip_git = True', 'skipping download')
+            filecontent = self.utils.yaml_filesets(self.filesets)
         else:
             filecontent = requests.get(giturl).content.decode('utf-8')
         savepath = os.path.join(self.approot, self.settings['localfilesets'])
-        self.logger.log('saving filesets.yaml', savepath)
+        self.utils.log('saving filesets.yaml', savepath)
         with open(savepath, 'w') as fh:
             fh.write(filecontent)
         filesetstr = filecontent
@@ -350,67 +338,67 @@ class tdcoa:
         # iterate all active systems.filesets:
         for sysname, sysobject in self.systems.items():
             if self.utils.dict_active(sysobject, sysname, also_contains_key='filesets'):
-                self.logger.log('\nINTERROGATING SYSTEM', sysname)
+                self.utils.log('\nINTERROGATING SYSTEM', sysname)
 
                 # get all filesets as defined in each system:
                 for sys_setname, sys_setobject in sysobject['filesets'].items():
                     if self.utils.dict_active(sys_setobject, sys_setname):
-                        self.logger.log('  found fileset', sys_setname)
-                        self.logger.log('  cross-referencing with filesets.yaml...')
+                        self.utils.log('  found fileset', sys_setname)
+                        self.utils.log('  cross-referencing with filesets.yaml...')
 
                         # cross-reference to filesets in filesets.yaml
                         if sys_setname not in self.filesets:
-                            self.logger.log(' not found in filesets.yaml', sys_setname)
+                            self.utils.log(' not found in filesets.yaml', sys_setname)
 
                         else:  # found
                             setname = sys_setname
                             setobject = self.filesets[setname]
 
                             if self.utils.dict_active(setobject, setname, also_contains_key='files'):
-                                self.logger.log('FILE SET FOUND', setname)
-                                self.logger.log('    file count', str(len(setobject['files'])))
+                                self.utils.log('FILE SET FOUND', setname)
+                                self.utils.log('    file count', str(len(setobject['files'])))
                                 savepath = os.path.join(self.approot, self.folders['download'], setname)
                                 if not os.path.exists(savepath):
                                     os.mkdir(savepath)
 
                                 # download each file in the fileset
                                 for file in setobject['files']:
-                                    self.logger.log(' downloading file', file)
+                                    self.utils.log(' downloading file', file)
                                     giturl = githost + file
-                                    self.logger.log('  %s' % giturl)
+                                    self.utils.log('  %s' % giturl)
 
                                     if not self.skipgit:
                                         filecontent = requests.get(giturl).text
 
                                     else:
-                                        self.logger.log('  setting: skip_git = True', 'skipping download')
-                                        self.logger.log('  generating sql from internal default')
+                                        self.utils.log('  setting: skip_git = True', 'skipping download')
+                                        self.utils.log('  generating sql from internal default')
                                         filecontent = "select '{account}' as Account_Name, '{siteid}' as SiteID, d.* \nfrom dbc.dbcinfo as d where DATE-5 between {startdate} and {enddate};"
 
                                     savefile = os.path.join(savepath, file.split('/')[-1])
-                                    self.logger.log('  saving file to', savefile)
+                                    self.utils.log('  saving file to', savefile)
                                     with open(savefile, 'w') as fh:
                                         fh.write(filecontent)
 
-        self.logger.log('\ndone!')
-        self.logger.log('time', str(dt.datetime.now()))
+        self.utils.log('\ndone!')
+        self.utils.log('time', str(dt.datetime.now()))
 
         self.copy_download_to_sql()
 
     def copy_download_to_sql(self, overwrite=False):
-        self.logger.log('copy_download_to_sql started', header=True)
-        self.logger.log('copy files from download folder (by fileset) to sql folder (by system)')
-        self.logger.log('time', str(dt.datetime.now()))
+        self.utils.log('copy_download_to_sql started', header=True)
+        self.utils.log('copy files from download folder (by fileset) to sql folder (by system)')
+        self.utils.log('time', str(dt.datetime.now()))
         downloadpath = os.path.join(self.approot, self.folders['download'])
         sqlpath = os.path.join(self.approot, self.folders['sql'])
 
         self.utils.recursively_delete_subfolders(sqlpath)
 
         for sysname, sysobject in self.systems.items():
-            self.logger.log('processing system', sysname)
+            self.utils.log('processing system', sysname)
             if self.utils.dict_active(sysobject, also_contains_key='filesets'):
                 for setname, setobject in sysobject['filesets'].items():
-                    self.logger.log('processing fileset', setname)
+                    self.utils.log('processing fileset', setname)
                     if self.utils.dict_active(setobject):
 
                         # define paths:
@@ -425,11 +413,11 @@ class tdcoa:
                             self.utils.recursive_delete(dstpath)
                         self.utils.recursive_copy(srcpath, dstpath)
 
-        self.logger.log('\ndone!')
-        self.logger.log('time', str(dt.datetime.now()))
+        self.utils.log('\ndone!')
+        self.utils.log('time', str(dt.datetime.now()))
 
     def apply_override(self, override_folder='', target_folder=''):
-        self.logger.log('applying file override')
+        self.utils.log('applying file override')
 
         # apply folder default locations
         if override_folder == '':
@@ -440,8 +428,8 @@ class tdcoa:
             target_folder = self.folders['sql']
         target_folder = os.path.join(self.approot, target_folder)
 
-        self.logger.log(' override folder', override_folder)
-        self.logger.log(' target_folder', target_folder)
+        self.utils.log(' override folder', override_folder)
+        self.utils.log(' target_folder', target_folder)
 
         copyops = {}
         allfiles = []
@@ -451,22 +439,22 @@ class tdcoa:
         reloadconfig = False
         for fo, subfos, files in os.walk(override_folder):
             if fo == override_folder:
-                self.logger.log('\nprocessing files found in override root')
-                self.logger.log('these files replace any matching filename, regardless of subfolder location')
+                self.utils.log('\nprocessing files found in override root')
+                self.utils.log('these files replace any matching filename, regardless of subfolder location')
                 for file in files:
                     if file == 'config.yaml' or file == 'secrets.yaml':
                         copyops[os.path.join(self.approot, file)] = os.path.join(override_folder, file)
                         reloadconfig = True
-                        self.logger.log('  config file found, reload imminent', file)
+                        self.utils.log('  config file found, reload imminent', file)
                     elif file[:1] != '.':
                         allfiles.append(file)
-                        self.logger.log('  root file found', file)
+                        self.utils.log('  root file found', file)
             else:
                 if os.path.basename(fo)[:1] != '.':
                     if not logdone:
                         logdone = True
-                        self.logger.log('\nprocessing files found in override subfolders')
-                        self.logger.log(
+                        self.utils.log('\nprocessing files found in override subfolders')
+                        self.utils.log(
                             'these files only replace filenames found in matching subfolders (and overrides root files)')
 
                     for file in files:
@@ -476,9 +464,9 @@ class tdcoa:
                             keydestfo = os.path.dirname(keydestfile)
                             if os.path.exists(keydestfo):
                                 copyops[keydestfile] = os.path.join(override_folder, specfile)
-                                self.logger.log('  subfolder file found', specfile)
+                                self.utils.log('  subfolder file found', specfile)
                             else:
-                                self.logger.log('target folder does not exist', keydestfo, warning=True)
+                                self.utils.log('target folder does not exist', keydestfo, warning=True)
 
         # search for matching allfiles by crawling the target_folder
         for fo, subfos, files in os.walk(target_folder):
@@ -488,73 +476,73 @@ class tdcoa:
                     copyops[keydestfile] = os.path.join(override_folder, file)
 
         # perform final copy:
-        self.logger.log('\nperform override file copy:')
+        self.utils.log('\nperform override file copy:')
         for dstpath, srcpath in copyops.items():
-            self.logger.log(' source:  %s' % srcpath)
-            self.logger.log(' target:  %s' % dstpath)
+            self.utils.log(' source:  %s' % srcpath)
+            self.utils.log(' target:  %s' % dstpath)
             shutil.copyfile(srcpath, dstpath)
 
         if reloadconfig:
             self.reload_config()
-        self.logger.log('\napply override complete!')
+        self.utils.log('\napply override complete!')
 
     def prepare_sql(self, sqlfolder='', override_folder=''):
-        self.logger.log('prepare_sql started', header=True)
-        self.logger.log('time', str(dt.datetime.now()))
+        self.utils.log('prepare_sql started', header=True)
+        self.utils.log('time', str(dt.datetime.now()))
 
         if sqlfolder != '':
-            self.logger.log('sql folder', sqlfolder)
+            self.utils.log('sql folder', sqlfolder)
             self.folders['sql'] = sqlfolder
-        self.logger.log(' sql folder', self.folders['sql'])
-        self.logger.log(' run folder', self.folders['run'])
+        self.utils.log(' sql folder', self.folders['sql'])
+        self.utils.log(' run folder', self.folders['run'])
 
         self.apply_override(target_folder=sqlfolder, override_folder=override_folder)
 
         # clear pre-existing subfolders in "run" directory (file sets)
-        self.logger.log('empty run folder entirely')
+        self.utils.log('empty run folder entirely')
         self.utils.recursively_delete_subfolders(os.path.join(self.approot, self.folders['run']))
 
         # iterate all system level folders in "run" folder...
         for sysfolder in os.listdir(os.path.join(self.approot, self.folders['sql'])):
             if os.path.isdir(os.path.join(self.approot, self.folders['sql'])):
-                self.logger.log('\n' + '-' * self.logger.logspace)
-                self.logger.log('SYSTEM FOLDER FOUND', sysfolder)
+                self.utils.log('\n' + '-' * self.utils.logspace)
+                self.utils.log('SYSTEM FOLDER FOUND', sysfolder)
 
                 if sysfolder not in self.systems or self.utils.dict_active(self.systems[sysfolder]) is False:
-                    self.logger.log('folder not defined as an active system, skipping...')
+                    self.utils.log('folder not defined as an active system, skipping...')
 
                 else:
                     # iterate all fileset subfolders in system folder...
                     for setfolder in os.listdir(os.path.join(self.approot, self.folders['sql'], sysfolder)):
                         if os.path.isdir(os.path.join(self.approot, self.folders['sql'], sysfolder, setfolder)):
-                            self.logger.log('FILESET FOLDER FOUND', setfolder)
+                            self.utils.log('FILESET FOLDER FOUND', setfolder)
 
                             # what to do with non-fileset folders?  well, depends:
                             _continue = False
                             if setfolder not in self.filesets:
-                                self.logger.log('  folder does NOT MATCH a defined fileset name', setfolder)
+                                self.utils.log('  folder does NOT MATCH a defined fileset name', setfolder)
                                 if self.settings['run_non_fileset_folders'].strip().lower() == 'true':
-                                    self.logger.log(
+                                    self.utils.log(
                                         '  however setting: "run_non_fileset_folders" equals "true", continuing...')
                                     _continue = True
 
                                 else:
-                                    self.logger.log('  and setting: "run_non_fileset_folders" not equal "true", skipping...')
+                                    self.utils.log('  and setting: "run_non_fileset_folders" not equal "true", skipping...')
                                     _continue = False
 
                             else:  # setfolder in self.filesets
-                                self.logger.log('  folder MATCHES a defined fileset name', setfolder)
+                                self.utils.log('  folder MATCHES a defined fileset name', setfolder)
                                 if not self.utils.dict_active(self.systems[sysfolder]['filesets'][setfolder]):
-                                    self.logger.log(
+                                    self.utils.log(
                                         "  however the system's fileset-override is marked as in-active, skipping...")
                                     _continue = False
 
                                 elif not self.utils.dict_active(self.filesets[setfolder]):
-                                    self.logger.log('  however fileset itself is marked as in-active, skipping...')
+                                    self.utils.log('  however fileset itself is marked as in-active, skipping...')
                                     _continue = False
 
                                 else:
-                                    self.logger.log('  and fileset record is active, continuing...')
+                                    self.utils.log('  and fileset record is active, continuing...')
                                     _continue = True
 
                             if _continue:
@@ -563,11 +551,11 @@ class tdcoa:
                                 sqlpath = os.path.join(self.approot, self.folders['sql'], sysfolder, setfolder)
                                 runpath = os.path.join(self.approot, self.folders['run'], sysfolder)
                                 if not os.path.isdir(runpath):
-                                    self.logger.log('  creating system folder', runpath)
+                                    self.utils.log('  creating system folder', runpath)
                                     os.mkdir(runpath)
                                 runpath = os.path.join(self.approot, self.folders['run'], sysfolder, setfolder)
                                 if not os.path.isdir(runpath):
-                                    self.logger.log('  creating fileset folder', runpath)
+                                    self.utils.log('  creating fileset folder', runpath)
                                     os.mkdir(runpath)
 
                                 self.utils.recursive_copy(sqlpath, runpath, replace_existing=True)
@@ -578,10 +566,10 @@ class tdcoa:
                                     if os.path.isfile(runfilepath) and runfile[-8:] == '.coa.sql':
 
                                         # if .coa.sql file, read into memory
-                                        self.logger.log('\n  PROCESSING COA.SQL FILE', runfile)
+                                        self.utils.log('\n  PROCESSING COA.SQL FILE', runfile)
                                         with open(runfilepath, 'r') as fh:
                                             runfiletext = fh.read()
-                                            self.logger.log('  characters in file', str(len(runfiletext)))
+                                            self.utils.log('  characters in file', str(len(runfiletext)))
 
                                         # SUBSTITUTE values for:  system-fileset override
                                         if setfolder in self.systems[sysfolder]['filesets']:
@@ -597,7 +585,7 @@ class tdcoa:
                                                                           subname='system defaults')
 
                                         # SUBSTITUTE values for:   overall application defaults (never inactive)
-                                        self.logger.log('  always use dictionary')
+                                        self.utils.log('  always use dictionary')
                                         runfiletext = self.utils.substitute(runfiletext, self.substitutions,
                                                                       subname='overall app defaults (config.substitutions)')
 
@@ -616,7 +604,7 @@ class tdcoa:
 
                                         # split sql file into many sql statements
                                         sqls_raw = runfiletext.split(';')
-                                        self.logger.log('  sql statements in file', str(len(sqls_raw) - 1))
+                                        self.utils.log('  sql statements in file', str(len(sqls_raw) - 1))
                                         sqls_done = []
                                         i = 0
 
@@ -628,28 +616,28 @@ class tdcoa:
 
                                             if sql != '':
                                                 i += 1
-                                                self.logger.log('  SQL %i' % i, '%s...' % sql[:50].replace('\n', ' '))
+                                                self.utils.log('  SQL %i' % i, '%s...' % sql[:50].replace('\n', ' '))
 
                                                 # Get SPECIAL COMMANDS
                                                 cmds = self.utils.get_special_commands(sql, '{{replaceMe:{cmdname}}}',
                                                                                  keys_to_skip=['save', 'load', 'call'])
                                                 sql = cmds['sql']  # sql stripped of commands (now in dict)
 
-                                                self.logger.log('  processing special commands')
+                                                self.utils.log('  processing special commands')
                                                 for cmdname, cmdvalue in cmds.items():
 
                                                     # --> FILE <--: replace with local sql file
                                                     if str(cmdname[:4]).lower() == 'file':
-                                                        self.logger.log('   replace variable with a local sql file')
+                                                        self.utils.log('   replace variable with a local sql file')
 
                                                         if not os.path.isfile(os.path.join(runpath, cmdvalue)):
-                                                            self.logger.log('custom file missing',
+                                                            self.utils.log('custom file missing',
                                                                      os.path.join(runpath, cmdvalue), warning=True)
-                                                            self.logger.log(
+                                                            self.utils.log(
                                                                 '   This may be by design, consult CSM for details.')
                                                             # raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), os.path.join(runpath, cmdvalue))
                                                         else:
-                                                            self.logger.log('   specified file found', cmdvalue)
+                                                            self.utils.log('   specified file found', cmdvalue)
                                                             with open(os.path.join(runpath, cmdvalue), 'r') as fh:
                                                                 tempsql = fh.read()
                                                             sqls_done.append('/* BEGIN file insert: %s */ \n%s' % (
@@ -659,16 +647,16 @@ class tdcoa:
 
                                                     # --> TEMP <--: load temp file from .csv
                                                     if str(cmdname[:4]).lower() == 'temp':
-                                                        self.logger.log('   create temp (volatile) table from .csv')
+                                                        self.utils.log('   create temp (volatile) table from .csv')
 
                                                         if not os.path.isfile(os.path.join(runpath, cmdvalue)):
-                                                            self.logger.log('csv file missing!!!',
+                                                            self.utils.log('csv file missing!!!',
                                                                      os.path.join(runpath, cmdvalue), error=True)
                                                             raise FileNotFoundError(errno.ENOENT,
                                                                                     os.strerror(errno.ENOENT),
                                                                                     os.path.join(runpath, cmdvalue))
                                                         else:
-                                                            self.logger.log('   csv file found', cmdvalue)
+                                                            self.utils.log('   csv file found', cmdvalue)
                                                             tempsql = self.utils.sql_create_temp_from_csv(
                                                                 os.path.join(runpath, cmdvalue))
                                                             sqls_done.append(tempsql)
@@ -678,19 +666,19 @@ class tdcoa:
 
                                                     # --> LOOP <--: loop thru csv and generate one sql per csv row, with substitutions
                                                     if str(cmdname[:4]).lower() == 'loop':
-                                                        self.logger.log('   loop sql once per row in .csv, with substitutions')
+                                                        self.utils.log('   loop sql once per row in .csv, with substitutions')
 
                                                         # can we find the file?
                                                         if not os.path.isfile(os.path.join(runpath, cmdvalue)):
-                                                            self.logger.log('csv file missing!!!',
+                                                            self.utils.log('csv file missing!!!',
                                                                      os.path.join(runpath, cmdvalue), warning=True)
                                                         else:
-                                                            self.logger.log('   file found!')
+                                                            self.utils.log('   file found!')
                                                             df = pd.read_csv(os.path.join(runpath, cmdvalue))
-                                                            self.logger.log('   rows in file', str(len(df)))
+                                                            self.utils.log('   rows in file', str(len(df)))
 
                                                             # perform csv substitutions
-                                                            self.logger.log(
+                                                            self.utils.log(
                                                                 '   perform csv file substitutions (find: {column_name}, replace: row value)')
                                                             for index, row in df.iterrows():
                                                                 tempsql = sql
@@ -700,7 +688,7 @@ class tdcoa:
                                                                 tempsql = tempsql.replace('{{replaceMe:%s}}' % cmdname,
                                                                                           ' csv row %i out of %i ' % (
                                                                                               index + 1, len(df)))
-                                                                self.logger.log('   sql generated from row data',
+                                                                self.utils.log('   sql generated from row data',
                                                                          'character length = %i' % len(tempsql))
                                                                 sqls_done.append(tempsql)
                                                             sql = ''  # don't append original sql again - it is only a template
@@ -713,12 +701,12 @@ class tdcoa:
                                             sqls_done.append(sql)
 
                                         # write out new finalized file content:
-                                        self.logger.log('  writing out final sql')
+                                        self.utils.log('  writing out final sql')
                                         with open(runfilepath, 'w') as fh:
                                             fh.write('\n\n'.join(sqls_done))
 
-        self.logger.log('done!')
-        self.logger.log('time', str(dt.datetime.now()))
+        self.utils.log('done!')
+        self.utils.log('time', str(dt.datetime.now()))
 
     def archive_prepared_sql(self, name=''):
         """Manually archives (moves) all folders / files in the 'run' folder, where
@@ -746,18 +734,18 @@ class tdcoa:
         # now we should have some files worth archiving:
         coa.archive_prepared_sql ('march run for CustABC')
         """
-        self.logger.log('archive_prepared_sql started', header=True)
-        self.logger.log('time', str(dt.datetime.now()))
+        self.utils.log('archive_prepared_sql started', header=True)
+        self.utils.log('time', str(dt.datetime.now()))
         outputpath = self.make_output_folder(name)
         runpath = os.path.join(self.approot, self.folders['run'])
-        self.logger.log('created output folder', outputpath)
-        self.logger.log('moving all content from', runpath)
+        self.utils.log('created output folder', outputpath)
+        self.utils.log('moving all content from', runpath)
         self.utils.recursive_copy(runpath, outputpath)
-        self.logger.logpath = os.path.join(outputpath, 'runlog.txt')
+        self.utils.logpath = os.path.join(outputpath, 'runlog.txt')
         self.utils.recursive_delete(os.path.join(self.approot, self.folders['run']))
         os.mkdir(os.path.join(self.approot, self.folders['run']))
-        self.logger.log('done!')
-        self.logger.log('time', str(dt.datetime.now()))
+        self.utils.log('done!')
+        self.utils.log('time', str(dt.datetime.now()))
 
     def make_output_folder(self, name=''):
         outputpath = os.path.join(self.approot, self.folders['output'],
@@ -769,8 +757,8 @@ class tdcoa:
         return outputpath
 
     def execute_run(self, name=''):
-        self.logger.log('execute_run started', header=True)
-        self.logger.log('time', str(dt.datetime.now()))
+        self.utils.log('execute_run started', header=True)
+        self.utils.log('time', str(dt.datetime.now()))
 
         # TODO: paramterize final database location (adlste_wetcomm should be {})
         #  when building out the upload_manifest.json, so EMEA and APAC can use
@@ -784,8 +772,8 @@ class tdcoa:
         # create hidden file containing last run's output -- to remain in the root folder
         with open(os.path.join(self.approot, '.last_run_output_path.txt'), 'w') as lastoutput:
             lastoutput.write(outputpath)
-        self.logger.log('save location of last-run output folder to hidden file')
-        self.logger.log('last-run output', outputpath)
+        self.utils.log('save location of last-run output folder to hidden file')
+        self.utils.log('last-run output', outputpath)
 
         # loop through systems
         for sysname in os.listdir(runpath):
@@ -794,7 +782,7 @@ class tdcoa:
 
                 # iterate system folders  -- must exist in config.yaml!
                 if sysname not in self.systems:
-                    self.logger.log('SYSTEM NOT FOUND IN CONFIG.YAML', sysname, warning=True)
+                    self.utils.log('SYSTEM NOT FOUND IN CONFIG.YAML', sysname, warning=True)
 
                 else:
                     # iterate file set folders -- ok to NOT exist, depending on setting
@@ -804,43 +792,43 @@ class tdcoa:
 
                             if setname not in self.systems[sysname]['filesets'] and str(
                                     self.settings['run_non_fileset_folders']).strip().lower() != 'true':
-                                self.logger.log('-' * self.logger.logspace)
-                                self.logger.log('WARNING!!!\nfileset does not exist', setname)
-                                self.logger.log(' AND setting "run_non_fileset_folders" is not "True"')
-                                self.logger.log(' Skipping folder', setname)
+                                self.utils.log('-' * self.utils.logspace)
+                                self.utils.log('WARNING!!!\nfileset does not exist', setname)
+                                self.utils.log(' AND setting "run_non_fileset_folders" is not "True"')
+                                self.utils.log(' Skipping folder', setname)
 
                             else:
-                                self.logger.log('SYSTEM:  %s   FILESET:  %s' % (sysname, setname), header=True)
+                                self.utils.log('SYSTEM:  %s   FILESET:  %s' % (sysname, setname), header=True)
                                 workpath = setfolder
                                 outputfo = os.path.join(outputpath, sysname, setname)
 
-                                self.logger.log('work (sql) path', workpath)
-                                self.logger.log('output path', outputfo)
+                                self.utils.log('work (sql) path', workpath)
+                                self.utils.log('output path', outputfo)
 
                                 # collect all prepared sql files, place in alpha order
                                 coasqlfiles = []
                                 for coafile in os.listdir(workpath):
                                     if coafile[:1] != '.' and coafile[-8:] == '.coa.sql':
-                                        self.logger.log('found prepared sql file', coafile)
+                                        self.utils.log('found prepared sql file', coafile)
                                         coasqlfiles.append(coafile)
 
                                 coasqlfiles.sort()
 
                                 if len(coasqlfiles) == 0:
-                                    self.logger.log('no .coa.sql files found in\n  %s' % workpath, warning=True)
+                                    self.utils.log('no .coa.sql files found in\n  %s' % workpath, warning=True)
 
                                 else:
-                                    self.logger.log('all sql files alpha-sorted for exeuction consistency')
-                                    self.logger.log('sql files found', str(len(coasqlfiles)))
+                                    self.utils.log('all sql files alpha-sorted for exeuction consistency')
+                                    self.utils.log('sql files found', str(len(coasqlfiles)))
 
                                     # create output folder:
-                                    self.logger.log('output folder', outputfo)
+                                    self.utils.log('output folder', outputfo)
                                     if not os.path.exists(outputfo):
                                         os.makedirs(outputfo)
                                     self.outputpath = outputfo
 
                                     # create our upload-manifest, 1 manifest per fileset
-                                    self.logger.log('creating upload manifest file')
+                                    self.utils.log('creating upload manifest file')
                                     with open(os.path.join(outputfo, 'upload-manifest.json'), 'w') as manifest:
                                         manifest.write('{"entries":[ ')
                                     manifestdelim = '\n '
@@ -854,7 +842,7 @@ class tdcoa:
 
                                     # loop thru all sql files:
                                     for coasqlfile in sorted(coasqlfiles):
-                                        self.logger.log('\nOPENING SQL FILE', coasqlfile)
+                                        self.utils.log('\nOPENING SQL FILE', coasqlfile)
                                         with open(os.path.join(workpath, coasqlfile), 'r') as coasqlfilehdlr:
                                             sqls = coasqlfilehdlr.read()  # all sql statements in a sql file
 
@@ -863,10 +851,10 @@ class tdcoa:
                                             sqlcnt += 1
 
                                             if sql.strip() == '':
-                                                self.logger.log('null statement, skipping')
+                                                self.utils.log('null statement, skipping')
 
                                             else:
-                                                self.logger.log('\n---- SQL #%i' % sqlcnt)
+                                                self.utils.log('\n---- SQL #%i' % sqlcnt)
 
                                                 # pull out any embedded SQLcommands:
                                                 sqlcmd = self.utils.get_special_commands(sql)
@@ -878,7 +866,7 @@ class tdcoa:
                                                 if len(df) != 0:  # Save non-empty returns to .csv
 
                                                     if len(sqlcmd) == 0:
-                                                        self.logger.log('no special commands found')
+                                                        self.utils.log('no special commands found')
 
                                                     if 'save' not in sqlcmd:
                                                         sqlcmd['save'] = '%s.%s--%s' % (
@@ -894,14 +882,14 @@ class tdcoa:
                                                             csvfile = csvfile[:-4] + '.%03d' % i + csvfile[-4:]
                                                         else:
                                                             csvfile = csvfile[:-8] + '.%03d' % i + csvfile[-4:]
-                                                    self.logger.log('CSV save location', csvfile)
+                                                    self.utils.log('CSV save location', csvfile)
 
-                                                    self.logger.log('saving file...')
+                                                    self.utils.log('saving file...')
                                                     df.to_csv(csvfile)  # <---------------------- Save to .csv
-                                                    self.logger.log('file saved!')
+                                                    self.utils.log('file saved!')
 
                                                     if 'load' in sqlcmd:  # add to manifest
-                                                        self.logger.log(
+                                                        self.utils.log(
                                                             'file marked for loading to Transcend, adding to upload-manifest.json')
                                                         if 'call' not in sqlcmd:
                                                             sqlcmd['call'] = ''
@@ -913,37 +901,37 @@ class tdcoa:
                                                         with open(os.path.join(outputfo, 'upload-manifest.json'),
                                                                   'a') as manifest:
                                                             manifest.write(manifest_entry)
-                                                            self.logger.log('Manifest updated',
+                                                            self.utils.log('Manifest updated',
                                                                      str(manifest_entry).replace(',', ',\n'))
 
                                         # archive file we just processed (for re-run-ability)
-                                        self.logger.log('Moving coa.sql file to Output folder', coasqlfile)
+                                        self.utils.log('Moving coa.sql file to Output folder', coasqlfile)
                                         src = os.path.join(workpath, coasqlfile)
                                         dst = os.path.join(outputfo, coasqlfile)
                                         shutil.move(src, dst)
-                                        self.logger.log('')
+                                        self.utils.log('')
 
                                 # close JSON object
                                 with open(os.path.join(outputfo, 'upload-manifest.json'), 'a') as manifest:
                                     manifest.write("\n  ]}")
-                                    self.logger.log('closing out upload-manifest.json')
+                                    self.utils.log('closing out upload-manifest.json')
 
                                 # Move all files from run folder to output, for posterity:
-                                self.logger.log('moving all other run artifacts to output folder, for archiving')
+                                self.utils.log('moving all other run artifacts to output folder, for archiving')
                                 self.utils.recursive_copy(workpath, outputfo, replace_existing=False)
                                 self.utils.recursive_delete(workpath)
 
         # also COPY a few other operational files to output folder, for ease of use:
-        self.logger.log('-' * self.logger.logspace)
-        self.logger.log('post-processing')
+        self.utils.log('-' * self.utils.logspace)
+        self.utils.log('post-processing')
         for srcpath in [os.path.join(self.approot, '.last_run_output_path.txt'),
                         self.configpath, self.filesetpath]:
-            self.logger.log('copy to output folder root, for ease of use: \n  %s' % srcpath)
+            self.utils.log('copy to output folder root, for ease of use: \n  %s' % srcpath)
             dstpath = os.path.join(outputpath, os.path.basename(srcpath))
             shutil.copyfile(srcpath, dstpath)
 
-        self.logger.log('\ndone!')
-        self.logger.log('time', str(dt.datetime.now()))
+        self.utils.log('\ndone!')
+        self.utils.log('time', str(dt.datetime.now()))
 
         # after logging is done, move the log file too...
         runlogsrc = os.path.join(self.approot, self.folders['run'], 'runlog.txt')
@@ -951,51 +939,51 @@ class tdcoa:
         shutil.move(runlogsrc, runlogdst)
 
     def upload_to_transcend(self, _outputpath=''):
-        self.logger.bufferlogs = True
-        self.logger.log('upload_to_transcend started', header=True)
-        self.logger.log('time', str(dt.datetime.now()))
+        self.utils.bufferlogs = True
+        self.utils.log('upload_to_transcend started', header=True)
+        self.utils.log('time', str(dt.datetime.now()))
 
         # todo having full path in this file causes issues when switching computers and file directories
         # process 3 ways to get output path
         if _outputpath != '':  # supplied parameter
             outputpath = _outputpath
-            self.logger.log('output folder = manual param', outputpath)
+            self.utils.log('output folder = manual param', outputpath)
         elif os.path.isfile(os.path.join(self.approot, '.last_run_output_path.txt')):
             # .last_run_output_path.txt  in approot
             with open(os.path.join(self.approot, '.last_run_output_path.txt'), 'r') as fh:
                 outputpath = fh.read().strip().split('\n')[0]
-            self.logger.log('output folder= .last_run_output_path.txt', outputpath)
+            self.utils.log('output folder= .last_run_output_path.txt', outputpath)
         elif self.outputpath != '':
             # local variable set
             outputpath = self.outputpath
-            self.logger.log('output folder = class variable: coa.outputpath', outputpath)
+            self.utils.log('output folder = class variable: coa.outputpath', outputpath)
         else:
             outputpath = ''
-            self.logger.log('no output path defined')
+            self.utils.log('no output path defined')
 
         # now that outputfo is defined, let's make sure the dir actually exists:
         if not os.path.isdir(outputpath):
-            self.logger.log('\nERROR = invalid path', outputpath)
+            self.utils.log('\nERROR = invalid path', outputpath)
             raise NotADirectoryError('Invalid Path: %s' % outputpath)
 
         else:
             self.outputpath = outputpath
 
         # update log file to correct location
-        self.logger.log('updating runlog.txt location')
-        self.logger.logpath = os.path.join(outputpath, 'runlog.txt')
-        self.logger.bufferlogs = False
-        self.logger.log('unbuffer logs')
+        self.utils.log('updating runlog.txt location')
+        self.utils.logpath = os.path.join(outputpath, 'runlog.txt')
+        self.utils.bufferlogs = False
+        self.utils.log('unbuffer logs')
 
         # connect to Transcend using TeradataML lib, for fast bulk uploads
-        self.logger.log('connecting to transcend')
-        self.logger.log('    host', self.transcend['host'])
-        self.logger.log('    logmech', self.transcend['logmech'])
-        self.logger.log('    username', self.transcend['username'])
-        self.logger.log('    password', self.transcend['password'])
-        self.logger.log('    db_coa', self.transcend['db_coa'])
-        self.logger.log("\nNOTE:  if you happen to see a scary WARNING below, DON'T PANIC!")
-        self.logger.log("       it just means you already had an active connection that was replaced.\n")
+        self.utils.log('connecting to transcend')
+        self.utils.log('    host', self.transcend['host'])
+        self.utils.log('    logmech', self.transcend['logmech'])
+        self.utils.log('    username', self.transcend['username'])
+        self.utils.log('    password', self.transcend['password'])
+        self.utils.log('    db_coa', self.transcend['db_coa'])
+        self.utils.log("\nNOTE:  if you happen to see a scary WARNING below, DON'T PANIC!")
+        self.utils.log("       it just means you already had an active connection that was replaced.\n")
 
         transcend = self.utils.open_connection(
             'teradataml',
@@ -1004,20 +992,20 @@ class tdcoa:
 
         # Walk the directory structure looking for upload_manifest.json files
         for workpath, subfo, files in os.walk(outputpath):
-            self.logger.log('\nexamining folder', str(workpath).strip())
+            self.utils.log('\nexamining folder', str(workpath).strip())
             workname = os.path.split(workpath)[1]
             if str(workname)[:1] != '.':  # no hidden folders
                 if 'upload-manifest.json' in files:
 
-                    self.logger.log('FOUND upload-manifest.json')
+                    self.utils.log('FOUND upload-manifest.json')
                     with open(os.path.join(workpath, 'upload-manifest.json'), 'r') as fh:
                         manifestjson = fh.read()
                     manifest = json.loads(manifestjson)
-                    self.logger.log('upload count found', str(len(manifest['entries'])))
-                    self.logger.log('manifest file', '\n%s' % str(manifest))
+                    self.utils.log('upload count found', str(len(manifest['entries'])))
+                    self.utils.log('manifest file', '\n%s' % str(manifest))
 
                     if len(manifest['entries']) == 0:
-                        self.logger.log('nothing to upload, skipping', workpath)
+                        self.utils.log('nothing to upload, skipping', workpath)
                     else:
 
                         for entry in manifest['entries']:
@@ -1029,71 +1017,71 @@ class tdcoa:
                             else:
                                 entry['schema'] = 'adlste_coa_stg'
 
-                            self.logger.log('\nPROCESSING NEW ENTRY')
-                            self.logger.log('  load file', entry['file'])
-                            self.logger.log('  into table', entry['table'])
-                            self.logger.log('  of schema', entry['schema'])
-                            self.logger.log('  then call', entry['call'])
-                            self.logger.log('-' * 10)
+                            self.utils.log('\nPROCESSING NEW ENTRY')
+                            self.utils.log('  load file', entry['file'])
+                            self.utils.log('  into table', entry['table'])
+                            self.utils.log('  of schema', entry['schema'])
+                            self.utils.log('  then call', entry['call'])
+                            self.utils.log('-' * 10)
 
                             # open CSV and prepare for appending
                             csvfilepath = os.path.join(workpath, entry['file'])
-                            self.logger.log('opening csv', csvfilepath)
+                            self.utils.log('opening csv', csvfilepath)
                             dfcsv = pd.read_csv(csvfilepath)
                             dfcsv = dfcsv.where(pd.notnull(dfcsv), None)
-                            self.logger.log('records found', str(len(dfcsv)))
+                            self.utils.log('records found', str(len(dfcsv)))
 
                             # strip out any unnamed columns
                             for col in dfcsv.columns:
                                 if col[:8] == 'Unnamed:':
-                                    self.logger.log('unnamed column dropped', col)
-                                    self.logger.log('  (usually the pandas index as a column, "Unnamed: 0")')
+                                    self.utils.log('unnamed column dropped', col)
+                                    self.utils.log('  (usually the pandas index as a column, "Unnamed: 0")')
                                     dfcsv = dfcsv.drop(columns=[col])
-                            self.logger.log('final column count', str(len(dfcsv.columns)))
+                            self.utils.log('final column count', str(len(dfcsv.columns)))
 
                             # APPEND data to database, via teradataml bulk upload:
-                            self.logger.log('uploading', str(dt.datetime.now()))
+                            self.utils.log('uploading', str(dt.datetime.now()))
                             if self.skipdbs:
-                                self.logger.log('skipdbs = True', 'emulating upload')
+                                self.utils.log('skipdbs = True', 'emulating upload')
                             else:
                                 try:
                                     copy_to_sql(dfcsv, entry['table'], entry['schema'], if_exists='append')
                                 except Exception as err:
-                                    self.logger.log('\n\nERROR during UPLOAD', error=True)
-                                    self.logger.log(str(err))
-                                    self.logger.log('   (error repeated below)')
-                                    self.logger.log('\n    first 10 records of what was being uploaded (dataframe):')
-                                    self.logger.log(dfcsv[0:10])
-                                    self.logger.log('')
+                                    self.utils.log('\n\nERROR during UPLOAD', error=True)
+                                    self.utils.log(str(err))
+                                    self.utils.log('   (error repeated below)')
+                                    self.utils.log('\n    first 10 records of what was being uploaded (dataframe):')
+                                    self.utils.log(dfcsv[0:10])
+                                    self.utils.log('')
                                     sql = ["Select ColumnName, ColumnType, ColumnFormat, ColumnLength, ColumnId",
                                            "from dbc.columns ", "where databasename = '%s' " % entry['schema'],
                                            "  and tablename = '%s' " % entry['table']]
                                     # sql.append("order by ColumnID;")
                                     sql = '\n'.join(sql)
-                                    self.logger.log(sql)
+                                    self.utils.log(sql)
                                     df = DataFrame.from_query(sql)
                                     df = df.sort(['ColumnId'], ascending=[True])
-                                    self.logger.log('\n\n    structure of destination table:')
+                                    self.utils.log('\n\n    structure of destination table:')
                                     print(df)
-                                    self.logger.log('')
+                                    self.utils.log('')
                                     raise err
 
-                            self.logger.log('complete', str(dt.datetime.now()))
+                            self.utils.log('complete', str(dt.datetime.now()))
 
                             # CALL any specified SPs:
                             if str(entry['call']).strip() != "":
-                                self.logger.log('Stored Proc', str(dt.datetime.now()))
+                                self.utils.log('Stored Proc', str(dt.datetime.now()))
                                 if self.skipdbs:
-                                    self.logger.log('skipdbs = True', 'emulating call')
+                                    self.utils.log('skipdbs = True', 'emulating call')
                                 else:
                                     try:
                                         transcend['connection'].execute('call %s ;' % str(entry['call']))
                                     except OperationalError as err:  # raise exception if database execution error (e.g. permissions issue)
-                                        self.logger.log('\n\n')
-                                        self.logger.log(str(err).partition('\n')[0], error=True)
+                                        self.utils.log('\n\n')
+                                        self.utils.log(str(err).partition('\n')[0], error=True)
                                         exit()
 
-                                self.logger.log('complete', str(dt.datetime.now()))
+                                self.utils.log('complete', str(dt.datetime.now()))
 
-        self.logger.log('\ndone!')
-        self.logger.log('time', str(dt.datetime.now()))
+        self.utils.log('\ndone!')
+        self.utils.log('time', str(dt.datetime.now()))
