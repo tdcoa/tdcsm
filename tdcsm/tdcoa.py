@@ -4,21 +4,14 @@ import json
 import os
 import re
 import shutil
-
 import pandas as pd
 import requests
-import sqlalchemy
-# --  Teradata Drivers:
-import teradata  # odbc driver
 import yaml
 from sqlalchemy.exc import OperationalError
 from teradataml import DataFrame
-from teradataml.context import context as tdml_context
-from teradataml.dataframe import dataframe as tdml_df
 from teradataml.dataframe.copy_to import copy_to_sql
 
-from tdcsm.utils import Utils
-from tdcsm.logging import Logger
+from tdcsm.utils import Utils  # includes Logger class
 
 
 # todo create docstring for all methods
@@ -135,11 +128,8 @@ class tdcoa:
         self.transcend = {}
         self.settings = {}
 
-        if configpath == '':
-            configpath = self.configpath if configpath == '' else configpath
-
-        if secretpath == '':
-            secretpath = self.secretpath
+        configpath = self.configpath if configpath == '' else configpath
+        secretpath = self.secretpath if secretpath == '' else secretpath
 
         self.utils.bufferlogs = True
         self.utils.log('reload_config started', header=True)
