@@ -754,6 +754,7 @@ class tdcoa:
             name = '-%s' % str(re.sub('[^0-9a-zA-Z]+', '_', name.strip()))
         outputpath = outputpath + name
         os.makedirs(outputpath)
+
         return outputpath
 
     def execute_run(self, name=''):
@@ -771,7 +772,10 @@ class tdcoa:
 
         # create hidden file containing last run's output -- to remain in the root folder
         with open(os.path.join(self.approot, '.last_run_output_path.txt'), 'w') as lastoutput:
-            lastoutput.write(outputpath)
+
+            # convert to relative path in case of system change (i.e. switching laptops)
+            lastoutput.write(outputpath[outputpath.find(self.folders['output']):])
+
         self.utils.log('save location of last-run output folder to hidden file')
         self.utils.log('last-run output', outputpath)
 
@@ -943,16 +947,16 @@ class tdcoa:
         self.utils.log('upload_to_transcend started', header=True)
         self.utils.log('time', str(dt.datetime.now()))
 
-        # todo having full path in this file causes issues when switching computers and file directories
         # process 3 ways to get output path
-        if _outputpath != '':  # supplied parameter
+        if _outputpath != '':  # use supplied path
             outputpath = _outputpath
             self.utils.log('output folder = manual param', outputpath)
-        elif os.path.isfile(os.path.join(self.approot, '.last_run_output_path.txt')):
+        elif os.path.isfile(os.path.join(self.approot, '.last_run_output_path.txt')):  # get path from hidden .last_run_output_path.txt
             # .last_run_output_path.txt  in approot
             with open(os.path.join(self.approot, '.last_run_output_path.txt'), 'r') as fh:
                 outputpath = fh.read().strip().split('\n')[0]
-            self.utils.log('output folder= .last_run_output_path.txt', outputpath)
+            outputpath = os.path.join(self.approot, outputpath)  # create absolute path from relative path in file
+            self.utils.log('output folder', outputpath)
         elif self.outputpath != '':
             # local variable set
             outputpath = self.outputpath
