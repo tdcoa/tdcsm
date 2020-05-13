@@ -610,8 +610,9 @@ class tdcoa:
 
                                                 # Get SPECIAL COMMANDS
                                                 cmds = self.utils.get_special_commands(sql, '{{replaceMe:{cmdname}}}',
-                                                                                 keys_to_skip=['save', 'load', 'call'])
+                                                                                 keys_to_skip=['save', 'load', 'call', 'vis'])
                                                 sql = cmds['sql']  # sql stripped of commands (now in dict)
+                                                del cmds['sql']
 
                                                 self.utils.log('  processing special commands')
                                                 for cmdname, cmdvalue in cmds.items():
@@ -881,6 +882,14 @@ class tdcoa:
                                                     self.utils.log('saving file...')
                                                     df.to_csv(csvfile)  # <---------------------- Save to .csv
                                                     self.utils.log('file saved!')
+
+                                                    if 'vis' in sqlcmd:  # run visualization py file
+                                                        self.utils.log('vis cmd', 'found')
+                                                        vis_file = os.path.join(workpath, sqlcmd['vis'].replace('.csv', '.py'))
+                                                        self.utils.log('vis py file', vis_file)
+                                                        self.utils.log('running vis file..')
+                                                        os.system('python %s' % vis_file)
+                                                        self.utils.log('Vis file complete!')
 
                                                     if 'load' in sqlcmd:  # add to manifest
                                                         self.utils.log(

@@ -20,7 +20,9 @@ setuptools.setup(
           "pyyaml",
           "teradatasqlalchemy",
           "teradataml",
-          "teradata"
+          "teradata",
+          "matplotlib",
+          "seaborn"
       ],
     classifiers=[
         "Programming Language :: Python :: 3",
