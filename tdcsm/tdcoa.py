@@ -10,6 +10,7 @@ import yaml
 from sqlalchemy.exc import OperationalError
 from teradataml import DataFrame
 from teradataml.dataframe.copy_to import copy_to_sql
+from pathlib import Path
 
 from tdcsm.utils import Utils  # includes Logger class
 
@@ -138,15 +139,38 @@ class tdcoa:
 
         # load secrets
         self.utils.log('loading secrets', os.path.basename(self.secretpath))
-        with open(secretpath, 'r') as fh:
-            secretstr = fh.read()
+        if os.path.exists(secretpath):
+            with open(secretpath, 'r') as fh:
+                secretstr = fh.read()
+        else:
+            self.utils.log('file does not exist!')
+            self.utils.log('loading default secrets file')
+            default_path = os.path.join(Path(__file__).parents[1], 'secrets.yaml')
+            self.secretpath = default_path  # set new secret path
+            self.utils.log('default path', self.secretpath)
+            shutil.copyfile(self.secretpath, os.path.join(self.approot, 'secrets.yaml'))
+
+            with open(self.secretpath, 'r') as fh:
+                secretstr = fh.read()
+
         self.secrets = yaml.load(secretstr, Loader=yaml.FullLoader)['secrets']
         self.utils.secrets = self.secrets  # update secrets attribute in logger
 
         # load config
         self.utils.log('loading config', os.path.basename(self.configpath))
-        with open(configpath, 'r') as fh:
-            configstr = fh.read()
+        if os.path.exists(configpath):
+            with open(configpath, 'r') as fh:
+                configstr = fh.read()
+        else:
+            self.utils.log('file does not exist!')
+            self.utils.log('loading default config file')
+            default_path = os.path.join(Path(__file__).parents[1], 'config.yaml')
+            self.configpath = default_path  # set new secret path
+            self.utils.log('default path', self.configpath)
+            shutil.copyfile(self.configpath, os.path.join(self.approot, 'config.yaml'))
+
+            with open(self.configpath, 'r') as fh:
+                configstr = fh.read()
 
         configyaml = yaml.load(configstr, Loader=yaml.FullLoader)
         configstr = self.utils.substitute(configstr, self.secrets, 'secrets')

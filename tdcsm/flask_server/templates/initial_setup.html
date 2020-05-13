@@ -1,0 +1,270 @@
+{% extends "base.html" %}
+{% block header %}
+    <script src="{{url_for('static', filename='initial_setup.js')}}?version=1.0"></script>
+
+    <style>
+        .system-input-label {
+            width: 6vw !important;
+            text-align: right !important;
+        }
+        .system-input {
+            width: 15vw !important;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+<body>
+
+<!--STEPS-->
+<div class="ui fluid blue ordered steps">
+    <div class="active step" id="step_1">
+        <div class="content">
+            <div class="title">Folder Setup</div>
+            <div class="description">File system & path information</div>
+        </div>
+    </div>
+    <div class="step" id="step_2">
+        <div class="content">
+            <div class="title">Source System Config</div>
+            <div class="description">Setup and connect to source system(s)</div>
+        </div>
+    </div>
+    <div class="step" id="step_3">
+        <div class="content">
+            <div class="title">Target System Config</div>
+            <div class="description">Setup and connect to target system</div>
+        </div>
+    </div>
+    <div class="step" id="step_4">
+        <div class="content">
+            <div class="title">SQL Selection</div>
+            <div class="description">Select which SQL queries to run</div>
+        </div>
+    </div>
+</div>
+
+<!--1. PATH INPUT-->
+<div class="ui three column grid" id="step_1_body" style="margin-top: 20vh">
+    <div class="column"></div>
+    <div class="column center aligned">
+
+        <!--INPUT-->
+        <h3>Enter a path to the destination folder</h3>
+        <div class="ui fluid big icon input" id="file_input">
+            <input type="text" placeholder="Path.." id="folder_browser1">
+            <!--<input type="file" webkitdirectory directory multiple id="hidden_file_selector1" style="display: none">-->
+            <i class="search icon"></i>
+        </div>
+
+        <!--BUTTON-->
+        <button class="ui teal right labeled icon button" id="next_button1" onclick="folder_setup_set_path(this)" style="margin-top: 5vh; display: none;">
+            <i class="right arrow icon"></i>
+            Next
+        </button>
+    </div>
+    <div class="column"></div>
+</div>
+
+<!--2. SOURCE SYSTEM CONFIG-->
+<div class="ui three column grid" id="step_2_body" style="margin-top: 0; display: none">
+    <div class="column center aligned"></div>
+    <div class="column aligned">
+        <form class="ui form" id="source_system_1">
+            <h4 class="ui dividing header">Source System #1</h4>
+
+            <!--System Name & SiteID-->
+            <div class="two fields">
+                <!--System Name-->
+                <div class="field">
+                    <label>System Name</label>
+                    <input type="text" name="system_name" placeholder="Customer_System">
+                </div>
+                <!--SiteID-->
+                <div class="field">
+                    <label>SiteID</label>
+                    <input type="text" name="site_id" placeholder="custabcprod01">
+                </div>
+            </div>
+
+            <!--Host-->
+            <div class="field">
+                <label>Host</label>
+                <input type="text" name="host" placeholder="prod.custabc.com">
+            </div>
+
+            <!--Username & Password-->
+            <div class="two fields">
+                <!--Username-->
+                <div class="field">
+                    <label>Username</label>
+                    <input type="text" name="username" placeholder="custabc_username">
+                </div>
+                <!--Password-->
+                <div class="field">
+                    <label>Password</label>
+                    <input type="password" name="password" placeholder="custabc_pwd">
+                </div>
+            </div>
+
+            <!--Logmech & Environment-->
+            <div class="two fields">
+                <!--Logmech-->
+                <div class="field">
+                    <label>Logmech</label>
+                    <!--<select class="ui fluid dropdown">-->
+                    <!--    <option value="regular">Regular</option>-->
+                    <!--    <option value="ldap">LDAP</option>-->
+                    <!--</select>-->
+                    <div class="ui selection dropdown">
+                        <input type="hidden" name="logmech">
+                        <i class="dropdown icon"></i>
+                        <div class="default text">Logmech</div>
+                        <div class="menu">
+                            <div class="item" data-value="regular">Regular</div>
+                            <div class="item" data-value="ldap">LDAP</div>
+                        </div>
+                    </div>
+                </div>
+                <!--Environment-->
+                <div class="field">
+                    <label>Environment</label>
+                    <input type="text" name="environment" placeholder="dev">
+                </div>
+            </div>
+
+            <!--Active [Toggle]-->
+            <div class="field" style="margin-top:2.5vh; margin-bottom: 2.5vh;">
+                <div class="ui toggle checkbox">
+                    <input type="checkbox" tabindex="0" class="hidden" checked>
+                    <label>Active</label>
+                </div>
+            </div>
+
+            <!--SUCCESSFULL CONNECTION-->
+            <div class="ui success message">
+                <div class="header">Connected!</div>
+                <p>Successfully connected to source system!</p>
+            </div>
+
+            <!--FAILED CONNECTION-->
+            <div class="ui error message" id="error_msg_1">
+                <div class="header">Connection Failed!</div>
+                <p>{errror msg}</p>
+            </div>
+
+            <!--Test Connection-->
+            <button class="ui teal button" type="button" onclick="test_connection(this, 'source')">Test Connection</button>
+
+            <!--BUTTON-->
+            <button class="ui teal right labeled icon button" type="button" id="next_button2" style="display: none;">
+                <i class="right arrow icon"></i>
+                Next
+            </button>
+        </form>
+
+
+
+    </div>
+    <div class="column center aligned"></div>
+</div>
+
+<!--3. TARGET SYSTEM CONFIG-->
+<div class="ui three column grid" id="step_3_body" style="margin-top: 0; display: none">
+    <div class="column center aligned"></div>
+    <div class="column aligned">
+        <form class="ui form" id="target_system_1">
+            <h4 class="ui dividing header">Target System</h4>
+
+            <!--System Name-->
+            <div class="field">
+                <label>System Name</label>
+                <input type="text" name="system_name" placeholder="Trancend">
+            </div>
+
+            <!--Host-->
+            <div class="field">
+                <label>Host</label>
+                <input type="text" name="host" placeholder="prod.custabc.com">
+            </div>
+
+            <!--Username & Password-->
+            <div class="two fields">
+                <!--Username-->
+                <div class="field">
+                    <label>Username</label>
+                    <input type="text" name="username" placeholder="td_quicklook_id">
+                </div>
+                <!--Password-->
+                <div class="field">
+                    <label>Password</label>
+                    <input type="password" name="password" placeholder="td_password">
+                </div>
+            </div>
+
+            <!--Logmech & Environment-->
+            <div class="two fields">
+                <!--Logmech-->
+                <div class="field">
+                    <label>Logmech</label>
+                    <div class="ui selection dropdown">
+                        <input type="hidden" name="logmech">
+                        <i class="dropdown icon"></i>
+                        <div class="default text">Logmech</div>
+                        <div class="menu">
+                            <div class="item" data-value="regular">Regular</div>
+                            <div class="item" data-value="ldap">LDAP</div>
+                        </div>
+                    </div>
+                </div>
+                <!--Environment-->
+                <!--<div class="field">-->
+                <!--    <label>Environment</label>-->
+                <!--    <input type="text" name="environment" placeholder="dev">-->
+                <!--</div>-->
+            </div>
+
+            <!--DB_COA & DB_REGION-->
+            <div class="two fields">
+                <!--db_coa-->
+                <div class="field">
+                    <label>DB Coa</label>
+                    <input type="text" name="db_coa" placeholder="adlste_coa">
+                </div>
+                <!--db_region-->
+                <div class="field">
+                    <label>DB Region</label>
+                    <input type="text" name="db_region" placeholder="adlste_westcomm">
+                </div>
+            </div>
+
+            <!--SUCCESSFULL CONNECTION-->
+            <div class="ui success message">
+                <div class="header">Connected!</div>
+                <p>Successfully connected to target system!</p>
+            </div>
+
+            <!--FAILED CONNECTION-->
+            <div class="ui error message">
+                <div class="header">Connection Failed!</div>
+                <p>{errror msg}</p>
+            </div>
+
+            <!--Test Connection-->
+            <button class="ui teal button" type="button" onclick="test_connection(this, 'target')">Test Connection</button>
+
+            <!--BUTTON-->
+            <button class="ui teal right labeled icon button" type="button" id="next_button3" style="display: none;">
+                <i class="right arrow icon"></i>
+                Next
+            </button>
+        </form>
+
+
+
+    </div>
+    <div class="column center aligned"></div>
+</div>
+
+</body>
+{% endblock %}

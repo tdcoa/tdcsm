@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<!--suppress ALL -->
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Tdcoa App</title>
+    <meta name="description" content="">
+    <meta name="author" content="Nikhil Desai">
+    <!--<link rel="shortcut icon" href="">-->
+
+    <!--JQUERY-->
+    <script src="https://code.jquery.com/jquery-3.2.1.min.js"></script>
+
+    <!--SEMANTIC-->
+    <!--<link rel="stylesheet" type="text/css" href="{{url_for('static', filename='semantic/semantic.min.css')}}?version=2.3.2">-->
+    <!--<script src="{{url_for('static', filename='semantic/semantic.min.js')}}?version=2.3.11"></script>-->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.js"></script>
+
+
+    {% block header %}{% endblock %}
+
+</head>
+
+
+<div class="ui massive inverted teal secondary pointing menu" id="main_menu">
+    <a class="active item">
+        Initial Setup
+    </a>
+    <a class="item">
+        Run
+    </a>
+    <a class="item">
+        Help
+    </a>
+</div>
+
+{% block content %}{% endblock %}
+
+</html>
