@@ -9,6 +9,8 @@ import teradata  # odbc driver
 from teradataml.context import context as tdml_context
 from teradataml.dataframe import dataframe as tdml_df
 from tdcsm.logging import Logger
+from pptx import Presentation
+from pptx.util import Inches, Pt
 
 
 class Utils(Logger):
@@ -433,3 +435,29 @@ class Utils(Logger):
         self.log('sql completed', str(dt.datetime.now()))
         self.log('record count', str(len(df)))
         return df
+
+    @staticmethod
+    def insert_to_pptx(pptx_path, workpath):
+        prs = Presentation(pptx_path)
+
+        for slide in prs.slides:  # loop through all slides
+            for shape in slide.shapes:  # loop through all shape objects in a slide
+
+                # shape_type 19 = table which does not have text field
+                if shape.shape_type != 19 and '{{' in shape.text and '}}' in shape.text:  # search for special command
+
+                    # insert image
+                    if '.png' in shape.text:
+                        img_name = shape.text.replace('/*{{picture:', '').replace('}}*/', '')  # get img file name to be inserted
+                        slide.shapes.add_picture(os.path.join(workpath, img_name),
+                                                 left=shape.left,
+                                                 top=shape.top,
+                                                 height=shape.height,
+                                                 width=shape.width)  # insert with same dimensions as placeholder
+
+                        # remove placeholder shape
+                        shape_to_remove = shape._element
+                        shape_to_remove.getparent().remove(shape_to_remove)
+
+        prs.save(pptx_path)  # save updated pptx
+
