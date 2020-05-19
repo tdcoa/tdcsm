@@ -83,6 +83,8 @@ class tdcoa:
         self.utils.log('secrets file', self.secretpath)
         self.utils.log('tdcoa version', self.version)
 
+        self.unique_id = dt.datetime.now().strftime("%m%d%Y%H%M")  # unique id to append to table
+
         # todo remove all references to skipgit and skipdbs?
         self.skipgit = False
         self.skipdbs = False
@@ -356,19 +358,23 @@ class tdcoa:
                                     self.utils.log(' downloading file', file)
                                     giturl = githost + file
                                     self.utils.log('  %s' % giturl)
+                                    savefile = os.path.join(savepath, file.split('/')[-1])  # save path
 
-                                    if not self.skipgit:
-                                        filecontent = requests.get(giturl).text
+                                    # save logic for pptx and pdf files
+                                    if '.pptx' in file or '.pdf' in file:
+                                        filecontent = requests.get(giturl).content
+                                        self.utils.log('  saving file to', savefile)
 
+                                        with open(savefile, 'wb') as fh:
+                                            fh.write(filecontent)
+
+                                    # save logic for text-based files
                                     else:
-                                        self.utils.log('  setting: skip_git = True', 'skipping download')
-                                        self.utils.log('  generating sql from internal default')
-                                        filecontent = "select '{account}' as Account_Name, '{siteid}' as SiteID, d.* \nfrom dbc.dbcinfo as d where DATE-5 between {startdate} and {enddate};"
+                                        filecontent = requests.get(giturl).text
+                                        self.utils.log('  saving file to', savefile)
 
-                                    savefile = os.path.join(savepath, file.split('/')[-1])
-                                    self.utils.log('  saving file to', savefile)
-                                    with open(savefile, 'w') as fh:
-                                        fh.write(filecontent)
+                                        with open(savefile, 'w') as fh:
+                                            fh.write(filecontent)
 
         self.utils.log('\ndone!')
         self.utils.log('time', str(dt.datetime.now()))
@@ -1043,48 +1049,83 @@ class tdcoa:
                             self.utils.log('final column count', str(len(dfcsv.columns)))
 
                             # APPEND data to database, via teradataml bulk upload:
-                            self.utils.log('uploading', str(dt.datetime.now()))
-                            if self.skipdbs:
-                                self.utils.log('skipdbs = True', 'emulating upload')
-                            else:
-                                try:
-                                    copy_to_sql(dfcsv, entry['table'], entry['schema'], if_exists='append')
-                                except Exception as err:
-                                    self.utils.log('\n\nERROR during UPLOAD', error=True)
-                                    self.utils.log(str(err))
-                                    self.utils.log('   (error repeated below)')
-                                    self.utils.log('\n    first 10 records of what was being uploaded (dataframe):')
-                                    self.utils.log(dfcsv[0:10])
-                                    self.utils.log('')
-                                    sql = ["Select ColumnName, ColumnType, ColumnFormat, ColumnLength, ColumnId",
-                                           "from dbc.columns ", "where databasename = '%s' " % entry['schema'],
-                                           "  and tablename = '%s' " % entry['table']]
-                                    # sql.append("order by ColumnID;")
-                                    sql = '\n'.join(sql)
-                                    self.utils.log(sql)
-                                    df = DataFrame.from_query(sql)
-                                    df = df.sort(['ColumnId'], ascending=[True])
-                                    self.utils.log('\n\n    structure of destination table:')
-                                    print(df)
-                                    self.utils.log('')
-                                    raise err
+                            self.utils.log('\nuploading', str(dt.datetime.now()))
+                            try:
+                                # write_to_perm = True
+                                # steps:
+                                # 1. load to staging table (perm)
+                                # 2. staging data --> global temp table (GTT)
+                                # 3. call sp on GTT to merge to final table
+                                # 4. delete staging table (perm)
+                                if self.settings['write_to_perm'].lower() == 'true':
+                                    self.utils.log('write_to_perm', 'True')
+                                    self.utils.log('perm table', entry['schema'] + '.' + entry['table'] + '_%s' % self.unique_id)
 
-                            self.utils.log('complete', str(dt.datetime.now()))
+                                    # create staging table (perm) with unique id
+                                    copy_to_sql(dfcsv, entry['table'] + '_%s' % self.unique_id, entry['schema'], if_exists='replace')
+                                    self.utils.log('complete', str(dt.datetime.now()))
+
+                                    # load to GTT
+                                    self.utils.log('\nload to GTT', entry['schema'] + '.' + entry['table'])
+                                    transcend['connection'].execute("""
+                                    INSERT INTO {db}.{table} SELECT * FROM {db}.{unique_table}
+                                    """.format(db=entry['schema'],
+                                               table=entry['table'],
+                                               unique_table=entry['table'] + '_%s' % self.unique_id))
+                                    self.utils.log('complete', str(dt.datetime.now()))
+
+                                # write_to_perm = False
+                                # steps:
+                                # 1. load into pre-created GTT table
+                                # 2. (will auto-create perm table if GTT doesnt exist)
+                                # 3. call sp on GTT to merge to final table
+                                else:
+                                    self.utils.log('write_to_perm', 'False')
+                                    copy_to_sql(dfcsv, entry['table'], entry['schema'], if_exists='append')
+                                    self.utils.log('complete', str(dt.datetime.now()))
+
+                            except Exception as err:
+                                self.utils.log('\nERROR during UPLOAD', error=True)
+                                self.utils.log(str(err))
+                                self.utils.log('   (error repeated below)')
+                                self.utils.log('\n    first 10 records of what was being uploaded (dataframe):')
+                                self.utils.log(dfcsv[0:10])
+                                self.utils.log('')
+                                sql = ["Select ColumnName, ColumnType, ColumnFormat, ColumnLength, ColumnId",
+                                       "from dbc.columns ", "where databasename = '%s' " % entry['schema'],
+                                       "  and tablename = '%s' " % entry['table']]
+                                # sql.append("order by ColumnID;")
+                                sql = '\n'.join(sql)
+                                self.utils.log(sql)
+                                df = DataFrame.from_query(sql)
+                                df = df.sort(['ColumnId'], ascending=[True])
+                                self.utils.log('\n\n    structure of destination table:')
+                                print(df)
+                                self.utils.log('')
+                                exit()
 
                             # CALL any specified SPs:
                             if str(entry['call']).strip() != "":
-                                self.utils.log('Stored Proc', str(dt.datetime.now()))
-                                if self.skipdbs:
-                                    self.utils.log('skipdbs = True', 'emulating call')
-                                else:
-                                    try:
-                                        transcend['connection'].execute('call %s ;' % str(entry['call']))
-                                    except OperationalError as err:  # raise exception if database execution error (e.g. permissions issue)
-                                        self.utils.log('\n\n')
-                                        self.utils.log(str(err).partition('\n')[0], error=True)
-                                        exit()
+                                self.utils.log('\nStored Proc', str(entry['call']))
+                                try:
+                                    transcend['connection'].execute('call %s ;' % str(entry['call']))
+                                    self.utils.log('complete', str(dt.datetime.now()))
 
-                                self.utils.log('complete', str(dt.datetime.now()))
+                                    # if write_to_perm == true, drop unique perm table after successful sp call
+                                    if self.settings['write_to_perm'].lower() == 'true':
+                                        self.utils.log('\ndrop unique perm table', entry['schema'] + '.' + entry['table'] + '_%s' % self.unique_id)
+
+                                        transcend['connection'].execute("""
+                                        DROP TABLE {db}.{unique_table}
+                                        """.format(db=entry['schema'],
+                                                   unique_table=entry['table'] + '_%s' % self.unique_id))
+
+                                        self.utils.log('complete', str(dt.datetime.now()))
+
+                                except OperationalError as err:  # raise exception if database execution error (e.g. permissions issue)
+                                    self.utils.log('\n\n')
+                                    self.utils.log(str(err).partition('\n')[0], error=True)
+                                    exit()
 
         self.utils.log('\ndone!')
         self.utils.log('time', str(dt.datetime.now()))

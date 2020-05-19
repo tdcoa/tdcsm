@@ -85,4 +85,5 @@ settings:
   skip_dbs:   "False"
   run_non_fileset_folders: "True" 
   customer_connection_type:  "sqlalchemy"
+  write_to_perm: "False"
     # valid connection types: "teradataml", "sqlalchemy", or an odbc driver name
