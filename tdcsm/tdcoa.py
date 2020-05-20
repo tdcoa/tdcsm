@@ -166,9 +166,9 @@ class tdcoa:
         self.utils.log('loading dictionary', 'transcend')
         self.transcend = configyaml['transcend']
         self.utils.check_setting(self.transcend,
-                           required_item_list=['username', 'password', 'host', 'logmech', 'db_coa', 'db_region'],
+                           required_item_list=['username', 'password', 'host', 'logmech', 'db_coa', 'db_region', 'db_stg'],
                            defaults=['{td_quicklook}', '{td_password}', 'tdprdcop3.td.teradata.com', 'TD2',
-                                     'adlste_coa', 'adlste_westcomm'])
+                                     'adlste_coa', 'adlste_westcomm', 'adlste_coa_stg'])
         self.transcend['connectionstring'] = 'teradatasql://%s:%s@%s/?logmech=%s' % (
             self.transcend['username'],
             self.transcend['password'],

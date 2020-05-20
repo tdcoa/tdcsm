@@ -14,24 +14,20 @@ Select a step:
 while True:
     x = input(options)
 
-    try:
-        # 1) DOWNLOAD FILES
-        if int(x) == 1:
-            coa.download_files()
+    # 1) DOWNLOAD FILES
+    if int(x) == 1:
+        coa.download_files()
 
-        # 2) PREPARE SQL
-        elif int(x) == 2:
-            coa.prepare_sql()
+    # 2) PREPARE SQL
+    elif int(x) == 2:
+        coa.prepare_sql()
 
-        # 3) EXECUTE SQL
-        elif int(x) == 3:
-            coa.execute_run()
+    # 3) EXECUTE SQL
+    elif int(x) == 3:
+        coa.execute_run()
 
-        # 4) UPLOAD TO TRANSCEND
-        elif int(x) == 4:
-            coa.upload_to_transcend()
-            break
-
-    except ValueError:
-        pass
+    # 4) UPLOAD TO TRANSCEND
+    elif int(x) == 4:
+        coa.upload_to_transcend()
+        break
 

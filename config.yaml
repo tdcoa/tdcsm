@@ -66,6 +66,7 @@ transcend:
   logmech:    "LDAP"
   db_coa:     "adlste_coa"
   db_region:  "adlste_westcomm"
+  db_stg:     "adlste_coa_stg"
 
 
 folders:
