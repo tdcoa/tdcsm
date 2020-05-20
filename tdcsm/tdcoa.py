@@ -245,7 +245,19 @@ class tdcoa:
         # create missing filesets.yaml (now that download folder exists)
         if not os.path.isfile(self.filesetpath):
             self.utils.log('missing filesets.yaml', self.filesetpath)
-            self.utils.yaml_filesets(self.filesetpath, writefile=True)
+            githost = self.settings['githost']
+            if githost[-1:] != '/':
+                githost = githost + '/'
+            self.utils.log('githost', githost)
+            giturl = githost + self.settings['gitfileset']
+            self.utils.log('downloading "filesets.yaml" from github')
+            self.utils.log('  requesting url', giturl)
+            filecontent = requests.get(giturl).content.decode('utf-8')
+            savepath = os.path.join(self.approot, self.settings['localfilesets'])
+            self.utils.log('saving filesets.yaml', savepath)
+            with open(savepath, 'w') as fh:
+                fh.write(filecontent)
+            self.utils.log('filesets.yaml saved')
         else:
             self.utils.log('found filesets.yaml', self.filesetpath)
 
@@ -318,19 +330,14 @@ class tdcoa:
         giturl = githost + self.settings['gitfileset']
         self.utils.log('downloading "filesets.yaml" from github')
         self.utils.log('  requesting url', giturl)
-        if self.skipgit:
-            self.utils.log('  setting: skip_git = True', 'skipping download')
-            filecontent = self.utils.yaml_filesets(self.filesets)
-        else:
-            filecontent = requests.get(giturl).content.decode('utf-8')
+        filecontent = requests.get(giturl).content.decode('utf-8')
         savepath = os.path.join(self.approot, self.settings['localfilesets'])
         self.utils.log('saving filesets.yaml', savepath)
         with open(savepath, 'w') as fh:
             fh.write(filecontent)
-        filesetstr = filecontent
 
         # reload configs with newly downloaded filesets.yaml
-        # todo reload_config() is being called during class setup and here --> maybe redundant?
+        # todo reload_config() is being called during class setup and here --> redundant?
         self.reload_config()
 
         # delete all pre-existing download folders

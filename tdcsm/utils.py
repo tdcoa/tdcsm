@@ -17,29 +17,6 @@ class Utils(Logger):
         super().__init__()  # inherits Logger class
         self.version = version
 
-    # todo remove and replace with default file?
-    def yaml_filesets(self, filesetpath, writefile=False):
-        self.log('generating filesets.yaml from internal default')
-        cy = []
-        cy.append('demo:')
-        cy.append('  active:          "True"')
-        cy.append('  fileset_version: "1.0"')
-        cy.append('  startdate:       "Current_Date - 7"')
-        cy.append('  enddate:         "Current_Date - 1"')
-        cy.append('  some_value:      "Donkey"')
-        cy.append('  files: ')
-        cy.append('    - "demo/0000.dates.csv"')
-        cy.append('    - "demo/0000.dbcinfo.coa.sql"')
-        cy.append('    - "demo/example.sql"')
-        cy.append('')
-
-        rtn = '\n'.join(cy)
-        if writefile:
-            with open(os.path.join(filesetpath), 'w') as fh:
-                fh.write(rtn)
-            self.log('  saving file', filesetpath)
-        return rtn
-
     def sql_create_temp_from_csv(self, csvfilepath, rowsperchunk=100):
         tbl = os.path.basename(csvfilepath)
         self.log('    transcribing sql', tbl)
