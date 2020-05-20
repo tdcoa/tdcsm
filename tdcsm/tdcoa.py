@@ -53,6 +53,7 @@ class tdcoa:
     approot = '.'
     configpath = ''
     secretpath = ''
+    systemspath = ''
     filesetpath = ''
     outputpath = ''
     version = "0.3.8.3.2"
@@ -67,12 +68,13 @@ class tdcoa:
     transcend = {}
     settings = {}
 
-    def __init__(self, approot='.', printlog=True, config='config.yaml', secrets='secrets.yaml', filesets='filesets.yaml'):
+    def __init__(self, approot='.', printlog=True, config='config.yaml', secrets='secrets.yaml', filesets='filesets.yaml', systems='source_systems.yaml'):
         self.bufferlog = True
         self.printlog = printlog
         self.approot = os.path.join('.', approot)
         self.configpath = os.path.join(self.approot, config)
         self.secretpath = os.path.join(self.approot, secrets)
+        self.systemspath = os.path.join(self.approot, systems)
 
         self.utils = Utils(self.version)  # utilities class. inherits Logger class
 
@@ -93,7 +95,7 @@ class tdcoa:
 
         self.reload_config()
 
-    def reload_config(self, configpath='', secretpath=''):
+    def reload_config(self, configpath='', secretpath='', systemspath=''):
         """Reloads configuration YAML files (config & secrets) used as
         process driver.  This will also perform any local environment checks,
         such as creating missing folders (download|sql|run|output), change
@@ -132,6 +134,7 @@ class tdcoa:
 
         configpath = self.configpath if configpath == '' else configpath
         secretpath = self.secretpath if secretpath == '' else secretpath
+        systemspath = self.systemspath if systemspath == '' else systemspath
 
         self.utils.bufferlogs = True
         self.utils.log('reload_config started', header=True)
@@ -161,6 +164,15 @@ class tdcoa:
         # load substitutions
         self.utils.log('loading dictionary', 'substitutions')
         self.substitutions = configyaml['substitutions']
+
+        # load source systems
+        self.utils.log('loading source systems', os.path.basename(self.systemspath))
+        with open(systemspath, 'r') as fh:
+            systemsstr = fh.read()
+
+        systemsstr = self.utils.substitute(systemsstr, self.secrets, 'secrets')
+        systemsstr = self.utils.substitute(systemsstr, self.substitutions, 'systems:substitutions')
+        systemsyaml = yaml.load(systemsstr, Loader=yaml.FullLoader)
 
         # check and set Transcend connection information
         self.utils.log('loading dictionary', 'transcend')
@@ -256,7 +268,7 @@ class tdcoa:
 
         # load systems (active only)
         self.utils.log('loading system dictionaries (active only)')
-        for sysname, sysobject in configyaml['systems'].items():
+        for sysname, sysobject in systemsyaml['systems'].items():
             if self.utils.dict_active(sysobject, sysname):
                 self.systems.update({sysname: sysobject})
 
