@@ -680,8 +680,9 @@ class tdcoa:
                                                             for index, row in df.iterrows():
                                                                 tempsql = sql
                                                                 for col in df.columns:
+                                                                    col = col.strip()
                                                                     tempsql = tempsql.replace(str('{%s}' % col),
-                                                                                              str(row[col]))
+                                                                                              str(row[col]).strip())
                                                                 tempsql = tempsql.replace('{{replaceMe:%s}}' % cmdname,
                                                                                           ' csv row %i out of %i ' % (
                                                                                               index + 1, len(df)))
@@ -1018,6 +1019,7 @@ class tdcoa:
                     else:
 
                         for entry in manifest['entries']:
+                            successful_load = False  # flag to track if sp should be called after load attempt
 
                             # define database and table names
                             if '.' in entry['table']:
@@ -1054,7 +1056,7 @@ class tdcoa:
                                 # write_to_perm = True
                                 # steps:
                                 # 1. load to staging table (perm)
-                                # 2. staging data --> global temp table (GTT)
+                                # 2. load staging data --> global temp table (GTT)
                                 # 3. call sp on GTT to merge to final table
                                 # 4. delete staging table (perm)
                                 if self.settings['write_to_perm'].lower() == 'true':
@@ -1073,16 +1075,18 @@ class tdcoa:
                                                table=entry['table'],
                                                unique_table=entry['table'] + '_%s' % self.unique_id))
                                     self.utils.log('complete', str(dt.datetime.now()))
+                                    successful_load = True
 
                                 # write_to_perm = False
                                 # steps:
                                 # 1. load into pre-created GTT table
-                                # 2. (will auto-create perm table if GTT doesnt exist)
-                                # 3. call sp on GTT to merge to final table
+                                #    1a. (will auto-create perm table if GTT doesnt exist)
+                                # 2. call sp on GTT to merge to final table
                                 else:
                                     self.utils.log('write_to_perm', 'False')
                                     copy_to_sql(dfcsv, entry['table'], entry['schema'], if_exists='append')
                                     self.utils.log('complete', str(dt.datetime.now()))
+                                    successful_load = True
 
                             except Exception as err:
                                 self.utils.log('\nERROR during UPLOAD', error=True)
@@ -1101,11 +1105,11 @@ class tdcoa:
                                 df = df.sort(['ColumnId'], ascending=[True])
                                 self.utils.log('\n\n    structure of destination table:')
                                 print(df)
-                                self.utils.log('')
-                                exit()
+                                self.utils.log('\n')
+                                exit()  # todo possibly remove so that whole process doesnt stop on error?
 
-                            # CALL any specified SPs:
-                            if str(entry['call']).strip() != "":
+                            # CALL any specified SPs only if data loaded successfully:
+                            if str(entry['call']).strip() != "" and successful_load:
                                 self.utils.log('\nStored Proc', str(entry['call']))
                                 try:
                                     transcend['connection'].execute('call %s ;' % str(entry['call']))
