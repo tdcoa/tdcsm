@@ -12,7 +12,13 @@ Select a step:
 """
 
 while True:
-    x = input(options)
+
+    x = 0
+    while x < 1 or x > 5:
+        try:
+            x = int(input(options))
+        except ValueError as e:
+            print('\nInput needs to be a number between 1 and 4')
 
     # 1) DOWNLOAD FILES
     if int(x) == 1:

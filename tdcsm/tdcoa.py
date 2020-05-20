@@ -379,20 +379,18 @@ class tdcoa:
                                     self.utils.log('  %s' % giturl)
                                     savefile = os.path.join(savepath, file.split('/')[-1])  # save path
 
-                                    # save logic for pptx and pdf files
-                                    if '.pptx' in file or '.pdf' in file:
-                                        filecontent = requests.get(giturl).content
-                                        self.utils.log('  saving file to', savefile)
-
-                                        with open(savefile, 'wb') as fh:
-                                            fh.write(filecontent)
-
-                                    # save logic for text-based files
-                                    else:
+                                    # save logic for non binary write files
+                                    if any(x in file for x in self.settings['text_format_extensions']):
                                         filecontent = requests.get(giturl).text
                                         self.utils.log('  saving file to', savefile)
-
                                         with open(savefile, 'w') as fh:
+                                            fh.write(filecontent)
+
+                                    # save logic for binary write files
+                                    else:
+                                        filecontent = requests.get(giturl).content
+                                        self.utils.log('  saving file to', savefile)
+                                        with open(savefile, 'wb') as fh:
                                             fh.write(filecontent)
 
         self.utils.log('\ndone!')
