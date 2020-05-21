@@ -43,5 +43,5 @@ settings:
   text_format_extensions: ['.sql', '.yaml', '.txt', '.csv', '.py']
   run_non_fileset_folders: "True" 
   customer_connection_type:  "sqlalchemy"
-  write_to_perm: "False"
+  write_to_perm: "True"
     # valid connection types: "teradataml", "sqlalchemy", or an odbc driver name

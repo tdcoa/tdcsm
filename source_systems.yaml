@@ -1,11 +1,11 @@
 systems:
-  Altans_VDB:
-    siteid:      "tdaltanvbd01"
+  Transcend_Source:
+    siteid:      "trancend_source_01"
     active:      "True"
-    host:        "tdap278t1.labs.teradata.com"
-    username:    "{username}"
-    password:    "{password}"
-    logmech:     ""
+    host:        "tdprdcop3.td.teradata.com"
+    username:    "{td_quicklook}"
+    password:    "{td_password}"
+    logmech:     "ldap"
     use:         "test"   # prod/qa/dr/dev/etc
     some_value:  "Bear"
     filesets:
@@ -13,7 +13,7 @@ systems:
         active:     "True"
         some_value: "Aardvark"
 
-  Customer_System:
+  Customer_System_Example:
     siteid:     "custabcprod01"
     active:     "false"
     host:       "prod.custabc.com"
