@@ -11,6 +11,8 @@ from sqlalchemy.exc import OperationalError
 from teradataml import DataFrame
 from teradataml.dataframe.copy_to import copy_to_sql
 
+import tdcsm
+from pathlib import Path
 from tdcsm.utils import Utils  # includes Logger class
 
 
@@ -68,13 +70,14 @@ class tdcoa:
     transcend = {}
     settings = {}
 
-    def __init__(self, approot='.', printlog=True, config='config.yaml', secrets='secrets.yaml', filesets='filesets.yaml', systems='source_systems.yaml'):
+    def __init__(self, approot='.', printlog=True, config='config.yaml', secrets='secrets.yaml', filesets='filesets.yaml', systems='source_systems.yaml', refresh_defaults=False):
         self.bufferlog = True
         self.printlog = printlog
         self.approot = os.path.join('.', approot)
         self.configpath = os.path.join(self.approot, config)
         self.secretpath = os.path.join(self.approot, secrets)
         self.systemspath = os.path.join(self.approot, systems)
+        self.refresh_defaults = refresh_defaults
 
         self.utils = Utils(self.version)  # utilities class. inherits Logger class
 
@@ -82,6 +85,7 @@ class tdcoa:
         self.utils.log('time', str(dt.datetime.now()))
         self.utils.log('app root', self.approot)
         self.utils.log('config file', self.configpath)
+        self.utils.log('source systems file', self.systemspath)
         self.utils.log('secrets file', self.secretpath)
         self.utils.log('tdcoa version', self.version)
 
@@ -141,15 +145,48 @@ class tdcoa:
         self.utils.log('time', str(dt.datetime.now()))
         self.utils.log('tdcoa version', self.version)
 
-        # load secrets
+        # remove 2 default files -> config, source_systems
+        # todo NOTE: currently not removing secrets file because it shouldnt require format updates
+        if self.refresh_defaults:
+            self.utils.log('\nRefresh defaults = True     **Note: secrets.yaml will not be changed**')
+            if os.path.isfile(self.configpath):
+                os.remove(self.configpath)
+                self.utils.log('old config.yaml found and removed')
+            if os.path.isfile(self.systemspath):
+                os.remove(self.systemspath)
+                self.utils.log('old source_systems.yaml found and removed')
+            # if os.path.isfile(self.secretpath):
+            #     os.remove(self.secretpath)
+            self.utils.log('')
+
+        # load secrets. create default if missing
         self.utils.log('loading secrets', os.path.basename(self.secretpath))
+        if not os.path.isfile(self.secretpath):
+            self.utils.log('creating default secrets', self.secretpath)
+            with open(os.path.join(os.path.dirname(tdcsm.__file__), 'secrets.yaml')) as f:
+                with open(secretpath, 'w') as f2:
+                    f2.write(f.read())
+        else:
+            self.utils.log('found secrets.yaml', self.secretpath)
+
         with open(secretpath, 'r') as fh:
             secretstr = fh.read()
         self.secrets = yaml.load(secretstr, Loader=yaml.FullLoader)['secrets']
         self.utils.secrets = self.secrets  # update secrets attribute in logger
 
-        # load config
-        self.utils.log('loading config', os.path.basename(self.configpath))
+        # load config. create default if missing
+        if self.refresh_defaults:
+            self.utils.log('loading config', os.path.basename(self.configpath) + ' [FORCED REFRESH]')
+        else:
+            self.utils.log('loading config', os.path.basename(self.configpath))
+        if not os.path.isfile(self.configpath) or self.refresh_defaults:
+            self.utils.log('creating default config', self.configpath)
+            with open(os.path.join(os.path.dirname(tdcsm.__file__), 'config.yaml')) as f:
+                with open(configpath, 'w') as f2:
+                    f2.write(f.read())
+        else:
+            self.utils.log('found config.yaml', self.configpath)
+
         with open(configpath, 'r') as fh:
             configstr = fh.read()
 
@@ -165,8 +202,19 @@ class tdcoa:
         self.utils.log('loading dictionary', 'substitutions')
         self.substitutions = configyaml['substitutions']
 
-        # load source systems
-        self.utils.log('loading source systems', os.path.basename(self.systemspath))
+        # load source systems. create default if missing
+        if self.refresh_defaults:
+            self.utils.log('loading source systems', os.path.basename(self.systemspath) + ' [FORCED REFRESH]')
+        else:
+            self.utils.log('loading source systems', os.path.basename(self.systemspath))
+        if not os.path.isfile(self.systemspath) or self.refresh_defaults:
+            self.utils.log('creating default source_systems', self.systemspath)
+            with open(os.path.join(os.path.dirname(tdcsm.__file__), 'source_systems.yaml')) as f:
+                with open(systemspath, 'w') as f2:
+                    f2.write(f.read())
+        else:
+            self.utils.log('found source_systems.yaml', self.systemspath)
+
         with open(systemspath, 'r') as fh:
             systemsstr = fh.read()
 

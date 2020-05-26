@@ -10,6 +10,7 @@ from teradataml.context import context as tdml_context
 from teradataml.dataframe import dataframe as tdml_df
 from tdcsm.logging import Logger
 
+import textwrap
 
 class Utils(Logger):
 
