@@ -2,6 +2,7 @@ import datetime as dt
 import errno
 import json
 import os
+import ntpath
 import re
 import shutil
 import pandas as pd
@@ -290,9 +291,13 @@ class tdcoa:
             self.settings['localfilesets'] = os.path.join(self.folders['download'], 'filesets.yaml')
         self.filesetpath = os.path.join(self.approot, self.settings['localfilesets'])
 
-        # create missing filesets.yaml (now that download folder exists)
-        if not os.path.isfile(self.filesetpath):
-            self.utils.log('missing filesets.yaml', self.filesetpath)
+        # download filesets.yaml every instantiation (now that download folder exists)
+        if os.path.isfile(self.filesetpath):
+            try:
+                os.remove(self.filesetpath)
+            except FileNotFoundError as e:
+                pass
+
             githost = self.settings['githost']
             if githost[-1:] != '/':
                 githost = githost + '/'
@@ -306,8 +311,6 @@ class tdcoa:
             with open(savepath, 'w') as fh:
                 fh.write(filecontent)
             self.utils.log('filesets.yaml saved')
-        else:
-            self.utils.log('found filesets.yaml', self.filesetpath)
 
         # load filesets dictionary (active only)
         self.utils.log('loading dictionary', 'filesets (active only)')
@@ -332,6 +335,7 @@ class tdcoa:
             if self.utils.dict_active(sysobject, sysname):
                 self.systems.update({sysname: sysobject})
 
+                # todo add default dbsversion and collection
                 self.utils.check_setting(self.systems[sysname],
                                    required_item_list=['active', 'siteid', 'use', 'host', 'username', 'password',
                                                        'logmech'],
@@ -374,20 +378,6 @@ class tdcoa:
         with open(os.path.join(self.approot, 'motd.txt'), 'w') as fh:
             fh.write(filecontent)
 
-        # filesets
-        giturl = githost + self.settings['gitfileset']
-        self.utils.log('downloading "filesets.yaml" from github')
-        self.utils.log('  requesting url', giturl)
-        filecontent = requests.get(giturl).content.decode('utf-8')
-        savepath = os.path.join(self.approot, self.settings['localfilesets'])
-        self.utils.log('saving filesets.yaml', savepath)
-        with open(savepath, 'w') as fh:
-            fh.write(filecontent)
-
-        # reload configs with newly downloaded filesets.yaml
-        # todo reload_config() is being called during class setup and here --> redundant?
-        self.reload_config()
-
         # delete all pre-existing download folders
         self.utils.recursively_delete_subfolders(os.path.join(self.approot, self.folders['download']))
 
@@ -406,40 +396,65 @@ class tdcoa:
                         self.utils.log('  cross-referencing with filesets.yaml...')
 
                         # cross-reference to filesets in filesets.yaml
-                        if sys_setname not in self.filesets:
-                            self.utils.log(' not found in filesets.yaml', sys_setname)
-
-                        else:  # found
+                        if sys_setname in self.filesets:
                             setname = sys_setname
                             setobject = self.filesets[setname]
 
                             if self.utils.dict_active(setobject, setname, also_contains_key='files'):
-                                self.utils.log('FILE SET FOUND', setname)
-                                self.utils.log('    file count', str(len(setobject['files'])))
+                                self.utils.log('  FILE SET FOUND', setname + ' [' + str(len(setobject['files'])) + ']')
                                 savepath = os.path.join(self.approot, self.folders['download'], setname)
                                 if not os.path.exists(savepath):
                                     os.mkdir(savepath)
 
                                 # download each file in the fileset
-                                for file in setobject['files']:
-                                    self.utils.log(' downloading file', file)
-                                    giturl = githost + file
-                                    self.utils.log('  %s' % giturl)
-                                    savefile = os.path.join(savepath, file.split('/')[-1])  # save path
+                                for file_key, file_dict in setobject['files'].items():
+                                    self.utils.log('   ' + ('-' * 50))
+                                    self.utils.log('   ' + file_key)
 
-                                    # save logic for non binary write files
-                                    if any(x in file for x in self.settings['text_format_extensions']):
-                                        filecontent = requests.get(giturl).text
-                                        self.utils.log('  saving file to', savefile)
-                                        with open(savefile, 'w') as fh:
-                                            fh.write(filecontent)
+                                    # check for matching dbversion
+                                    dbversion_match = True
+                                    if 'dbsversion' in file_dict.keys():
+                                        if sysobject['dbsversion'] in file_dict['dbsversion']:
+                                            dbversion_match = True
+                                        else:
+                                            dbversion_match = False
 
-                                    # save logic for binary write files
+                                    # check for matching collection
+                                    collection_match = True
+                                    if 'collection' in file_dict.keys():
+                                        if sysobject['collection'] in file_dict['collection']:
+                                            collection_match = True
+                                        else:
+                                            collection_match = False
+
+                                    # only download file if dbsversion and collection match
+                                    if dbversion_match and collection_match:
+                                        self.utils.log('   downloading file', file_dict['gitfile'])
+                                        giturl = githost + file_dict['gitfile']
+                                        self.utils.log('    %s' % giturl)
+                                        savefile = os.path.join(savepath, file_dict['gitfile'].split('/')[-1])  # save path
+
+                                        # save logic for non binary write files
+                                        if any(x in file_dict['gitfile'] for x in self.settings['text_format_extensions']):
+                                            filecontent = requests.get(giturl).text
+                                            self.utils.log('    saving file to', savefile)
+                                            with open(savefile, 'w') as fh:
+                                                fh.write(filecontent)
+
+                                        # save logic for binary write files
+                                        else:
+                                            filecontent = requests.get(giturl).content
+                                            self.utils.log('    saving file to', savefile)
+                                            with open(savefile, 'wb') as fh:
+                                                fh.write(filecontent)
+
                                     else:
-                                        filecontent = requests.get(giturl).content
-                                        self.utils.log('  saving file to', savefile)
-                                        with open(savefile, 'wb') as fh:
-                                            fh.write(filecontent)
+                                        self.utils.log('   diff dbsversion or collection, skipping')
+
+                                self.utils.log('   ' + ('-' * 50) + '\n')
+
+                        else:  # not found
+                            self.utils.log(' not found in filesets.yaml', sys_setname)
 
         self.utils.log('\ndone!')
         self.utils.log('time', str(dt.datetime.now()))
@@ -632,20 +647,20 @@ class tdcoa:
                                             runfiletext = fh.read()
                                             self.utils.log('  characters in file', str(len(runfiletext)))
 
-                                        # SUBSTITUTE values for:  system-fileset override
+                                        # SUBSTITUTE values for:  system-fileset override [source_systems.yaml --> filesets]
                                         if setfolder in self.systems[sysfolder]['filesets']:
                                             sub_dict = self.systems[sysfolder]['filesets'][setfolder]
                                             if self.utils.dict_active(sub_dict, 'system-fileset overrides'):
                                                 runfiletext = self.utils.substitute(runfiletext, sub_dict,
                                                                               subname='system-fileset overrides (highest priority)')
 
-                                        # SUBSTITUTE values for:  system-defaults
+                                        # SUBSTITUTE values for: system-defaults [source_systems.yaml]
                                         sub_dict = self.systems[sysfolder]
                                         if self.utils.dict_active(sub_dict, 'system defaults'):
                                             runfiletext = self.utils.substitute(runfiletext, sub_dict, skipkeys=['filesets'],
                                                                           subname='system defaults')
 
-                                        # SUBSTITUTE values for:   overall application defaults (never inactive)
+                                        # SUBSTITUTE values for: overall application defaults (never inactive) [config.yaml substitutions]
                                         self.utils.log('  always use dictionary')
                                         runfiletext = self.utils.substitute(runfiletext, self.substitutions,
                                                                       subname='overall app defaults (config.substitutions)')
@@ -656,12 +671,25 @@ class tdcoa:
                                                                       skipkeys=['host', 'username', 'password',
                                                                                 'logmech'])
 
-                                        # SUBSTITUTE values for:   fileset defaults
+                                        # SUBSTITUTE values for: fileset defaults [fileset.yaml substitutions]
                                         if setfolder in self.filesets:
                                             sub_dict = self.filesets[setfolder]
                                             if self.utils.dict_active(sub_dict, 'fileset defaults'):
                                                 runfiletext = self.utils.substitute(runfiletext, sub_dict, skipkeys=['files'],
-                                                                              subname='fileset defaults (lowest priority)')
+                                                                              subname='fileset defaults')
+
+                                        # SUBSTITUTE values for: individual file subs [fileset.yaml --> files]
+                                        if setfolder in self.filesets:
+                                            sub_dict = {}
+                                            for file_key, file_dict in self.filesets[setfolder]['files'].items():
+                                                if ntpath.basename(file_dict['gitfile']) == runfile:
+                                                    sub_dict = file_dict
+                                                    break
+
+                                            if sub_dict:
+                                                runfiletext = self.utils.substitute(runfiletext, sub_dict,
+                                                                                skipkeys=['collection', 'dbsversion', 'gitfile'],
+                                                                                subname='file substitutions (lowest priority)')
 
                                         # split sql file into many sql statements
                                         sqls_raw = runfiletext.split(';')

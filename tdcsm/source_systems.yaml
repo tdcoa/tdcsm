@@ -8,6 +8,8 @@ systems:
     logmech:     "ldap"
     use:         "test"   # prod/qa/dr/dev/etc
     some_value:  "Bear"
+    dbsversion:  "16.20"
+    collection:  "dbc"
     filesets:
       demo:
         active:     "True"
