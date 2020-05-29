@@ -671,13 +671,6 @@ class tdcoa:
                                                                       skipkeys=['host', 'username', 'password',
                                                                                 'logmech'])
 
-                                        # SUBSTITUTE values for: fileset defaults [fileset.yaml substitutions]
-                                        if setfolder in self.filesets:
-                                            sub_dict = self.filesets[setfolder]
-                                            if self.utils.dict_active(sub_dict, 'fileset defaults'):
-                                                runfiletext = self.utils.substitute(runfiletext, sub_dict, skipkeys=['files'],
-                                                                              subname='fileset defaults')
-
                                         # SUBSTITUTE values for: individual file subs [fileset.yaml --> files]
                                         if setfolder in self.filesets:
                                             sub_dict = {}
@@ -688,8 +681,16 @@ class tdcoa:
 
                                             if sub_dict:
                                                 runfiletext = self.utils.substitute(runfiletext, sub_dict,
-                                                                                skipkeys=['collection', 'dbsversion', 'gitfile'],
-                                                                                subname='file substitutions (lowest priority)')
+                                                                                    skipkeys=['collection',
+                                                                                              'dbsversion', 'gitfile'],
+                                                                                    subname='file substitutions')
+
+                                        # SUBSTITUTE values for: fileset defaults [fileset.yaml substitutions]
+                                        if setfolder in self.filesets:
+                                            sub_dict = self.filesets[setfolder]
+                                            if self.utils.dict_active(sub_dict, 'fileset defaults'):
+                                                runfiletext = self.utils.substitute(runfiletext, sub_dict, skipkeys=['files'],
+                                                                              subname='fileset defaults (lowest priority)')
 
                                         # split sql file into many sql statements
                                         sqls_raw = runfiletext.split(';')
