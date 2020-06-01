@@ -298,19 +298,19 @@ class tdcoa:
             except FileNotFoundError as e:
                 pass
 
-            githost = self.settings['githost']
-            if githost[-1:] != '/':
-                githost = githost + '/'
-            self.utils.log('githost', githost)
-            giturl = githost + self.settings['gitfileset']
-            self.utils.log('downloading "filesets.yaml" from github')
-            self.utils.log('  requesting url', giturl)
-            filecontent = requests.get(giturl).content.decode('utf-8')
-            savepath = os.path.join(self.approot, self.settings['localfilesets'])
-            self.utils.log('saving filesets.yaml', savepath)
-            with open(savepath, 'w') as fh:
-                fh.write(filecontent)
-            self.utils.log('filesets.yaml saved')
+        githost = self.settings['githost']
+        if githost[-1:] != '/':
+            githost = githost + '/'
+        self.utils.log('githost', githost)
+        giturl = githost + self.settings['gitfileset']
+        self.utils.log('downloading "filesets.yaml" from github')
+        self.utils.log('  requesting url', giturl)
+        filecontent = requests.get(giturl).content.decode('utf-8')
+        savepath = os.path.join(self.approot, self.settings['localfilesets'])
+        self.utils.log('saving filesets.yaml', savepath)
+        with open(savepath, 'w') as fh:
+            fh.write(filecontent)
+        self.utils.log('filesets.yaml saved')
 
         # load filesets dictionary (active only)
         self.utils.log('loading dictionary', 'filesets (active only)')
@@ -434,19 +434,27 @@ class tdcoa:
                                         self.utils.log('    %s' % giturl)
                                         savefile = os.path.join(savepath, file_dict['gitfile'].split('/')[-1])  # save path
 
-                                        # save logic for non binary write files
-                                        if any(x in file_dict['gitfile'] for x in self.settings['text_format_extensions']):
-                                            filecontent = requests.get(giturl).text
-                                            self.utils.log('    saving file to', savefile)
-                                            with open(savefile, 'w') as fh:
-                                                fh.write(filecontent)
+                                        response = requests.get(giturl)
+                                        if response.status_code == 200:
 
-                                        # save logic for binary write files
+                                            # save logic for non binary write files
+                                            if any(x in file_dict['gitfile'] for x in self.settings['text_format_extensions']):
+                                                filecontent = response.text
+                                                self.utils.log('    saving file to', savefile)
+                                                with open(savefile, 'w') as fh:
+                                                    fh.write(filecontent)
+
+                                            # save logic for binary write files
+                                            else:
+                                                filecontent = response.content
+                                                self.utils.log('    saving file to', savefile)
+                                                with open(savefile, 'wb') as fh:
+                                                    fh.write(filecontent)
+
                                         else:
-                                            filecontent = requests.get(giturl).content
-                                            self.utils.log('    saving file to', savefile)
-                                            with open(savefile, 'wb') as fh:
-                                                fh.write(filecontent)
+                                            self.utils.log('Status Code: ' + str(
+                                                response.status_code) + '\nText: ' + response.text, error=True)
+                                            exit()
 
                                     else:
                                         self.utils.log('   diff dbsversion or collection, skipping')
