@@ -35,11 +35,9 @@ folders:
 
 settings:
   githost:    "https://raw.githubusercontent.com/tdcoa/sql/master/"
-  gitfileset: "filesets/filesets.yaml"
-  gitmotd:    "motd.txt"
+  gitfileset: "filesets.yaml"
+  gitmotd:    "motd.html"
   localfilesets:   "./{download}/filesets.yaml"
-  secrets:    "secrets.yaml"
-  systems:    "source_systems.yaml"
   skip_git:   "False"
   skip_dbs:   "False"
   text_format_extensions: ['.sql', '.yaml', '.txt', '.csv', '.py']

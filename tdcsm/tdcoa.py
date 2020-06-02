@@ -2,7 +2,6 @@ import datetime as dt
 import errno
 import json
 import os
-import ntpath
 import re
 import shutil
 import pandas as pd
@@ -11,7 +10,7 @@ import yaml
 from sqlalchemy.exc import OperationalError
 from teradataml import DataFrame
 from teradataml.dataframe.copy_to import copy_to_sql
-from pptx import Presentation
+import webbrowser
 
 import tdcsm
 from pathlib import Path
@@ -292,26 +291,24 @@ class tdcoa:
             self.settings['localfilesets'] = os.path.join(self.folders['download'], 'filesets.yaml')
         self.filesetpath = os.path.join(self.approot, self.settings['localfilesets'])
 
-        # download filesets.yaml every instantiation (now that download folder exists)
-        if os.path.isfile(self.filesetpath):
-            try:
-                os.remove(self.filesetpath)
-            except FileNotFoundError as e:
-                pass
-
-        githost = self.settings['githost']
-        if githost[-1:] != '/':
-            githost = githost + '/'
-        self.utils.log('githost', githost)
-        giturl = githost + self.settings['gitfileset']
-        self.utils.log('downloading "filesets.yaml" from github')
-        self.utils.log('  requesting url', giturl)
-        filecontent = requests.get(giturl).content.decode('utf-8')
-        savepath = os.path.join(self.approot, self.settings['localfilesets'])
-        self.utils.log('saving filesets.yaml', savepath)
-        with open(savepath, 'w') as fh:
-            fh.write(filecontent)
-        self.utils.log('filesets.yaml saved')
+        # create missing filesets.yaml (now that download folder exists)
+        if not os.path.isfile(self.filesetpath):
+            self.utils.log('missing filesets.yaml', self.filesetpath)
+            githost = self.settings['githost']
+            if githost[-1:] != '/':
+                githost = githost + '/'
+            self.utils.log('githost', githost)
+            giturl = githost + self.settings['gitfileset']
+            self.utils.log('downloading "filesets.yaml" from github')
+            self.utils.log('  requesting url', giturl)
+            filecontent = requests.get(giturl).content.decode('utf-8')
+            savepath = os.path.join(self.approot, self.settings['localfilesets'])
+            self.utils.log('saving filesets.yaml', savepath)
+            with open(savepath, 'w') as fh:
+                fh.write(filecontent)
+            self.utils.log('filesets.yaml saved')
+        else:
+            self.utils.log('found filesets.yaml', self.filesetpath)
 
         # load filesets dictionary (active only)
         self.utils.log('loading dictionary', 'filesets (active only)')
@@ -336,7 +333,6 @@ class tdcoa:
             if self.utils.dict_active(sysobject, sysname):
                 self.systems.update({sysname: sysobject})
 
-                # todo add default dbsversion and collection
                 self.utils.check_setting(self.systems[sysname],
                                    required_item_list=['active', 'siteid', 'use', 'host', 'username', 'password',
                                                        'logmech'],
@@ -369,15 +365,32 @@ class tdcoa:
         # download any control files first (filesets.yaml, motd.txt, etc.)
         # motd
         giturl = githost + self.settings['gitmotd']
-        self.utils.log('downloading "motd.txt" from github')
+        self.utils.log('downloading "motd.html" from github')
         self.utils.log('  requesting url', giturl)
         if self.skipgit:
             self.utils.log('  setting: skip_git = True', 'skipping download')
             filecontent = 'default message'
         else:
             filecontent = requests.get(giturl).text
-        with open(os.path.join(self.approot, 'motd.txt'), 'w') as fh:
+        with open(os.path.join(self.approot, 'motd.html'), 'w') as fh:
             fh.write(filecontent)
+
+        file_url = 'file://' + os.path.join(self.approot, 'motd.html')
+        webbrowser.open(file_url)
+
+        # filesets
+        giturl = githost + self.settings['gitfileset']
+        self.utils.log('downloading "filesets.yaml" from github')
+        self.utils.log('  requesting url', giturl)
+        filecontent = requests.get(giturl).content.decode('utf-8')
+        savepath = os.path.join(self.approot, self.settings['localfilesets'])
+        self.utils.log('saving filesets.yaml', savepath)
+        with open(savepath, 'w') as fh:
+            fh.write(filecontent)
+
+        # reload configs with newly downloaded filesets.yaml
+        # todo reload_config() is being called during class setup and here --> redundant?
+        self.reload_config()
 
         # delete all pre-existing download folders
         self.utils.recursively_delete_subfolders(os.path.join(self.approot, self.folders['download']))
@@ -397,73 +410,40 @@ class tdcoa:
                         self.utils.log('  cross-referencing with filesets.yaml...')
 
                         # cross-reference to filesets in filesets.yaml
-                        if sys_setname in self.filesets:
+                        if sys_setname not in self.filesets:
+                            self.utils.log(' not found in filesets.yaml', sys_setname)
+
+                        else:  # found
                             setname = sys_setname
                             setobject = self.filesets[setname]
 
                             if self.utils.dict_active(setobject, setname, also_contains_key='files'):
-                                self.utils.log('  FILE SET FOUND', setname + ' [' + str(len(setobject['files'])) + ']')
+                                self.utils.log('FILE SET FOUND', setname)
+                                self.utils.log('    file count', str(len(setobject['files'])))
                                 savepath = os.path.join(self.approot, self.folders['download'], setname)
                                 if not os.path.exists(savepath):
                                     os.mkdir(savepath)
 
                                 # download each file in the fileset
-                                for file_key, file_dict in setobject['files'].items():
-                                    self.utils.log('   ' + ('-' * 50))
-                                    self.utils.log('   ' + file_key)
+                                for file in setobject['files']:
+                                    self.utils.log(' downloading file', file)
+                                    giturl = githost + file
+                                    self.utils.log('  %s' % giturl)
+                                    savefile = os.path.join(savepath, file.split('/')[-1])  # save path
 
-                                    # check for matching dbversion
-                                    dbversion_match = True
-                                    if 'dbsversion' in file_dict.keys():
-                                        if sysobject['dbsversion'] in file_dict['dbsversion']:
-                                            dbversion_match = True
-                                        else:
-                                            dbversion_match = False
+                                    # save logic for non binary write files
+                                    if any(x in file for x in self.settings['text_format_extensions']):
+                                        filecontent = requests.get(giturl).text
+                                        self.utils.log('  saving file to', savefile)
+                                        with open(savefile, 'w') as fh:
+                                            fh.write(filecontent)
 
-                                    # check for matching collection
-                                    collection_match = True
-                                    if 'collection' in file_dict.keys():
-                                        if sysobject['collection'] in file_dict['collection']:
-                                            collection_match = True
-                                        else:
-                                            collection_match = False
-
-                                    # only download file if dbsversion and collection match
-                                    if dbversion_match and collection_match:
-                                        self.utils.log('   downloading file', file_dict['gitfile'])
-                                        giturl = githost + file_dict['gitfile']
-                                        self.utils.log('    %s' % giturl)
-                                        savefile = os.path.join(savepath, file_dict['gitfile'].split('/')[-1])  # save path
-
-                                        response = requests.get(giturl)
-                                        if response.status_code == 200:
-
-                                            # save logic for non binary write files
-                                            if any(x in file_dict['gitfile'] for x in self.settings['text_format_extensions']):
-                                                filecontent = response.text
-                                                self.utils.log('    saving file to', savefile)
-                                                with open(savefile, 'w') as fh:
-                                                    fh.write(filecontent)
-
-                                            # save logic for binary write files
-                                            else:
-                                                filecontent = response.content
-                                                self.utils.log('    saving file to', savefile)
-                                                with open(savefile, 'wb') as fh:
-                                                    fh.write(filecontent)
-
-                                        else:
-                                            self.utils.log('Status Code: ' + str(
-                                                response.status_code) + '\nText: ' + response.text, error=True)
-                                            exit()
-
+                                    # save logic for binary write files
                                     else:
-                                        self.utils.log('   diff dbsversion or collection, skipping')
-
-                                self.utils.log('   ' + ('-' * 50) + '\n')
-
-                        else:  # not found
-                            self.utils.log(' not found in filesets.yaml', sys_setname)
+                                        filecontent = requests.get(giturl).content
+                                        self.utils.log('  saving file to', savefile)
+                                        with open(savefile, 'wb') as fh:
+                                            fh.write(filecontent)
 
         self.utils.log('\ndone!')
         self.utils.log('time', str(dt.datetime.now()))
@@ -656,20 +636,20 @@ class tdcoa:
                                             runfiletext = fh.read()
                                             self.utils.log('  characters in file', str(len(runfiletext)))
 
-                                        # SUBSTITUTE values for:  system-fileset override [source_systems.yaml --> filesets]
+                                        # SUBSTITUTE values for:  system-fileset override
                                         if setfolder in self.systems[sysfolder]['filesets']:
                                             sub_dict = self.systems[sysfolder]['filesets'][setfolder]
                                             if self.utils.dict_active(sub_dict, 'system-fileset overrides'):
                                                 runfiletext = self.utils.substitute(runfiletext, sub_dict,
                                                                               subname='system-fileset overrides (highest priority)')
 
-                                        # SUBSTITUTE values for: system-defaults [source_systems.yaml]
+                                        # SUBSTITUTE values for:  system-defaults
                                         sub_dict = self.systems[sysfolder]
                                         if self.utils.dict_active(sub_dict, 'system defaults'):
                                             runfiletext = self.utils.substitute(runfiletext, sub_dict, skipkeys=['filesets'],
                                                                           subname='system defaults')
 
-                                        # SUBSTITUTE values for: overall application defaults (never inactive) [config.yaml substitutions]
+                                        # SUBSTITUTE values for:   overall application defaults (never inactive)
                                         self.utils.log('  always use dictionary')
                                         runfiletext = self.utils.substitute(runfiletext, self.substitutions,
                                                                       subname='overall app defaults (config.substitutions)')
@@ -680,21 +660,7 @@ class tdcoa:
                                                                       skipkeys=['host', 'username', 'password',
                                                                                 'logmech'])
 
-                                        # SUBSTITUTE values for: individual file subs [fileset.yaml --> files]
-                                        if setfolder in self.filesets:
-                                            sub_dict = {}
-                                            for file_key, file_dict in self.filesets[setfolder]['files'].items():
-                                                if ntpath.basename(file_dict['gitfile']) == runfile:
-                                                    sub_dict = file_dict
-                                                    break
-
-                                            if sub_dict:
-                                                runfiletext = self.utils.substitute(runfiletext, sub_dict,
-                                                                                    skipkeys=['collection',
-                                                                                              'dbsversion', 'gitfile'],
-                                                                                    subname='file substitutions')
-
-                                        # SUBSTITUTE values for: fileset defaults [fileset.yaml substitutions]
+                                        # SUBSTITUTE values for:   fileset defaults
                                         if setfolder in self.filesets:
                                             sub_dict = self.filesets[setfolder]
                                             if self.utils.dict_active(sub_dict, 'fileset defaults'):
@@ -719,7 +685,7 @@ class tdcoa:
 
                                                 # Get SPECIAL COMMANDS
                                                 cmds = self.utils.get_special_commands(sql, '{{replaceMe:{cmdname}}}',
-                                                                                 keys_to_skip=['save', 'load', 'call', 'vis', 'pptx'])
+                                                                                 keys_to_skip=['save', 'load', 'call', 'vis'])
                                                 sql = cmds['sql']  # sql stripped of commands (now in dict)
                                                 del cmds['sql']
 
@@ -994,20 +960,12 @@ class tdcoa:
                                                     self.utils.log('file saved!')
 
                                                     if 'vis' in sqlcmd:  # run visualization py file
-                                                        self.utils.log('\nvis cmd', 'found')
+                                                        self.utils.log('vis cmd', 'found')
                                                         vis_file = os.path.join(workpath, sqlcmd['vis'].replace('.csv', '.py'))
                                                         self.utils.log('vis py file', vis_file)
                                                         self.utils.log('running vis file..')
                                                         os.system('python %s' % vis_file)
                                                         self.utils.log('Vis file complete!')
-
-                                                    if 'pptx' in sqlcmd:  # insert to pptx file
-                                                        self.utils.log('\npptx cmd', 'found')
-                                                        pptx_file = os.path.join(workpath, sqlcmd['pptx'])
-                                                        self.utils.log('pptx file', pptx_file)
-                                                        self.utils.log('inserting to pptx file..')
-                                                        self.utils.insert_to_pptx(pptx_file, workpath)
-                                                        self.utils.log('pptx file complete!')
 
                                                     if 'load' in sqlcmd:  # add to manifest
                                                         self.utils.log(
