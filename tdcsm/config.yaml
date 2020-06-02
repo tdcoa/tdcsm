@@ -35,7 +35,7 @@ folders:
 
 settings:
   githost:    "https://raw.githubusercontent.com/tdcoa/sql/master/"
-  gitfileset: "filesets.yaml"
+  gitfileset: "filesets/filesets.yaml"
   gitmotd:    "motd.txt"
   localfilesets:   "./{download}/filesets.yaml"
   secrets:    "secrets.yaml"
