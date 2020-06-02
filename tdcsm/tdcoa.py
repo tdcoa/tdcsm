@@ -11,6 +11,7 @@ import yaml
 from sqlalchemy.exc import OperationalError
 from teradataml import DataFrame
 from teradataml.dataframe.copy_to import copy_to_sql
+from pptx import Presentation
 
 import tdcsm
 from pathlib import Path
@@ -378,6 +379,25 @@ class tdcoa:
         with open(os.path.join(self.approot, 'motd.txt'), 'w') as fh:
             fh.write(filecontent)
 
+        # filesets
+        giturl = githost + self.settings['gitfileset']
+        self.utils.log('downloading "filesets.yaml" from github')
+        self.utils.log('  requesting url', giturl)
+        if self.skipgit:
+            self.utils.log('  setting: skip_git = True', 'skipping download')
+            filecontent = self.utils.yaml_filesets(self.filesets)
+        else:
+            filecontent = requests.get(giturl).content.decode('utf-8')
+        savepath = os.path.join(self.approot, self.settings['localfilesets'])
+        self.utils.log('saving filesets.yaml', savepath)
+        with open(savepath, 'w') as fh:
+            fh.write(filecontent)
+        filesetstr = filecontent
+
+        # reload configs with newly downloaded filesets.yaml
+        # todo reload_config() is being called during class setup and here --> maybe redundant?
+        self.reload_config()
+
         # delete all pre-existing download folders
         self.utils.recursively_delete_subfolders(os.path.join(self.approot, self.folders['download']))
 
@@ -718,7 +738,7 @@ class tdcoa:
 
                                                 # Get SPECIAL COMMANDS
                                                 cmds = self.utils.get_special_commands(sql, '{{replaceMe:{cmdname}}}',
-                                                                                 keys_to_skip=['save', 'load', 'call', 'vis'])
+                                                                                 keys_to_skip=['save', 'load', 'call', 'vis', 'pptx'])
                                                 sql = cmds['sql']  # sql stripped of commands (now in dict)
                                                 del cmds['sql']
 
@@ -993,12 +1013,20 @@ class tdcoa:
                                                     self.utils.log('file saved!')
 
                                                     if 'vis' in sqlcmd:  # run visualization py file
-                                                        self.utils.log('vis cmd', 'found')
+                                                        self.utils.log('\nvis cmd', 'found')
                                                         vis_file = os.path.join(workpath, sqlcmd['vis'].replace('.csv', '.py'))
                                                         self.utils.log('vis py file', vis_file)
                                                         self.utils.log('running vis file..')
                                                         os.system('python %s' % vis_file)
                                                         self.utils.log('Vis file complete!')
+
+                                                    if 'pptx' in sqlcmd:  # insert to pptx file
+                                                        self.utils.log('\npptx cmd', 'found')
+                                                        pptx_file = os.path.join(workpath, sqlcmd['pptx'])
+                                                        self.utils.log('pptx file', pptx_file)
+                                                        self.utils.log('inserting to pptx file..')
+                                                        self.utils.insert_to_pptx(pptx_file, workpath)
+                                                        self.utils.log('pptx file complete!')
 
                                                     if 'load' in sqlcmd:  # add to manifest
                                                         self.utils.log(
