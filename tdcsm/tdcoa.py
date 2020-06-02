@@ -10,6 +10,7 @@ import yaml
 from sqlalchemy.exc import OperationalError
 from teradataml import DataFrame
 from teradataml.dataframe.copy_to import copy_to_sql
+from pptx import Presentation
 
 import tdcsm
 from pathlib import Path
@@ -427,6 +428,11 @@ class tdcoa:
                                     self.utils.log('  %s' % giturl)
                                     savefile = os.path.join(savepath, file.split('/')[-1])  # save path
 
+                                    # save logic for pptx and pdf files
+                                    if '.pptx' in file or '.pdf' in file:
+                                        filecontent = requests.get(giturl).content
+                                        self.utils.log('  saving file to', savefile)
+
                                     # save logic for non binary write files
                                     if any(x in file for x in self.settings['text_format_extensions']):
                                         filecontent = requests.get(giturl).text
@@ -681,7 +687,7 @@ class tdcoa:
 
                                                 # Get SPECIAL COMMANDS
                                                 cmds = self.utils.get_special_commands(sql, '{{replaceMe:{cmdname}}}',
-                                                                                 keys_to_skip=['save', 'load', 'call', 'vis'])
+                                                                                 keys_to_skip=['save', 'load', 'call', 'vis', 'pptx'])
                                                 sql = cmds['sql']  # sql stripped of commands (now in dict)
                                                 del cmds['sql']
 
@@ -956,12 +962,20 @@ class tdcoa:
                                                     self.utils.log('file saved!')
 
                                                     if 'vis' in sqlcmd:  # run visualization py file
-                                                        self.utils.log('vis cmd', 'found')
+                                                        self.utils.log('\nvis cmd', 'found')
                                                         vis_file = os.path.join(workpath, sqlcmd['vis'].replace('.csv', '.py'))
                                                         self.utils.log('vis py file', vis_file)
                                                         self.utils.log('running vis file..')
                                                         os.system('python %s' % vis_file)
                                                         self.utils.log('Vis file complete!')
+
+                                                    if 'pptx' in sqlcmd:  # insert to pptx file
+                                                        self.utils.log('\npptx cmd', 'found')
+                                                        pptx_file = os.path.join(workpath, sqlcmd['pptx'])
+                                                        self.utils.log('pptx file', pptx_file)
+                                                        self.utils.log('inserting to pptx file..')
+                                                        self.utils.insert_to_pptx(pptx_file, workpath)
+                                                        self.utils.log('pptx file complete!')
 
                                                     if 'load' in sqlcmd:  # add to manifest
                                                         self.utils.log(
