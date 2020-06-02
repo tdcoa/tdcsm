@@ -61,7 +61,7 @@ class tdcoa:
     systemspath = ''
     filesetpath = ''
     outputpath = ''
-    version = "0.3.9.4.1"
+    version = "0.3.9.4.2"
 
     # dictionaries
     secrets = {}
@@ -380,14 +380,15 @@ class tdcoa:
         with open(os.path.join(self.approot, 'motd.html'), 'w') as fh:
             fh.write(filecontent)
 
-        file_url = 'file://' + os.path.join(self.approot, 'motd.html')
+        # open motd.html in browser
+        file_url = 'file://' + os.path.abspath(os.path.join(self.approot, 'motd.html'))
         webbrowser.open(file_url)
 
         # delete all pre-existing download folders
         self.utils.recursively_delete_subfolders(os.path.join(self.approot, self.folders['download']))
 
         # set proper githost for filesets
-        githost = githost + 'sets/'
+        githost = githost + 'filesets/'
 
         # iterate all active systems.filesets:
         for sysname, sysobject in self.systems.items():
