@@ -59,7 +59,7 @@ class tdcoa:
     systemspath = ''
     filesetpath = ''
     outputpath = ''
-    version = "0.3.9.3.0"
+    version = "0.3.9.4.0"
 
     # dictionaries
     secrets = {}
