@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="tdcsm",
-    version = "0.3.9.4.3",
+    version = "0.3.9.4.4",
     author="Stephen Hilton",
     author_email="Stephen@FamilyHilton.com",
     description="Teradata tools for CSMs",
@@ -23,7 +23,7 @@ setuptools.setup(
           "teradata",
           "matplotlib",
           "seaborn",
-          "pptx"
+          "python-pptx"
       ],
     classifiers=[
         "Programming Language :: Python :: 3",
