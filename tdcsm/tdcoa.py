@@ -11,7 +11,8 @@ import yaml
 from sqlalchemy.exc import OperationalError
 from teradataml import DataFrame
 from teradataml.dataframe.copy_to import copy_to_sql
-from pptx import Presentation
+import webbrowser
+
 
 import tdcsm
 from pathlib import Path
@@ -60,7 +61,7 @@ class tdcoa:
     systemspath = ''
     filesetpath = ''
     outputpath = ''
-    version = "0.3.9.3.0"
+    version = "0.3.9.4.1"
 
     # dictionaries
     secrets = {}
@@ -369,34 +370,18 @@ class tdcoa:
         # download any control files first (filesets.yaml, motd.txt, etc.)
         # motd
         giturl = githost + self.settings['gitmotd']
-        self.utils.log('downloading "motd.txt" from github')
+        self.utils.log('downloading "motd.html" from github')
         self.utils.log('  requesting url', giturl)
         if self.skipgit:
             self.utils.log('  setting: skip_git = True', 'skipping download')
             filecontent = 'default message'
         else:
             filecontent = requests.get(giturl).text
-        with open(os.path.join(self.approot, 'motd.txt'), 'w') as fh:
+        with open(os.path.join(self.approot, 'motd.html'), 'w') as fh:
             fh.write(filecontent)
 
-        # filesets
-        giturl = githost + self.settings['gitfileset']
-        self.utils.log('downloading "filesets.yaml" from github')
-        self.utils.log('  requesting url', giturl)
-        if self.skipgit:
-            self.utils.log('  setting: skip_git = True', 'skipping download')
-            filecontent = self.utils.yaml_filesets(self.filesets)
-        else:
-            filecontent = requests.get(giturl).content.decode('utf-8')
-        savepath = os.path.join(self.approot, self.settings['localfilesets'])
-        self.utils.log('saving filesets.yaml', savepath)
-        with open(savepath, 'w') as fh:
-            fh.write(filecontent)
-        filesetstr = filecontent
-
-        # reload configs with newly downloaded filesets.yaml
-        # todo reload_config() is being called during class setup and here --> maybe redundant?
-        self.reload_config()
+        file_url = 'file://' + os.path.join(self.approot, 'motd.html')
+        webbrowser.open(file_url)
 
         # delete all pre-existing download folders
         self.utils.recursively_delete_subfolders(os.path.join(self.approot, self.folders['download']))
