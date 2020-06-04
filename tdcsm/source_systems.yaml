@@ -1,0 +1,44 @@
+systems:
+  Transcend_Source:
+    siteid:      "trancend_source_01"
+    active:      "True"
+    host:        "tdprdcop3.td.teradata.com"
+    username:    "{td_quicklook}"
+    password:    "{td_password}"
+    logmech:     "ldap"
+    use:         "test"   # prod/qa/dr/dev/etc
+    some_value:  "Bear"
+    dbsversion:  "16.20"
+    collection:  "dbc"
+    filesets:
+      demo:
+        active:     "True"
+        some_value: "Aardvark"
+
+  Customer_System_Example:
+    siteid:     "custabcprod01"
+    active:     "false"
+    host:       "prod.custabc.com"
+    username:   "{custabc_username}"
+    password:   "{custabc_password}"
+    logmech:    ""
+    use:        "prod"
+    filesets:
+      demo:
+        active: "False"
+      level1_how_much_1620pdcr:
+        active: "False"
+        startdate:  "Current_Date - 365"
+        enddate:    "Current_Date - 1"
+      level1_how_much_1620dbc:
+        active: "False"
+        startdate:  "Current_Date - 365"
+        enddate:    "Current_Date - 1"
+      level2_how_well_1620pdcr:
+        active: "False"
+        startdate:  "Current_Date - 90"
+        enddate:    "Current_Date - 1"
+      dbql_core_1620pdcr:
+        active: "False"
+        startdate:  "Current_Date - 45"
+        enddate:    "Current_Date - 1"

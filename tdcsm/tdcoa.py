@@ -2,6 +2,7 @@ import datetime as dt
 import errno
 import json
 import os
+import ntpath
 import re
 import shutil
 import pandas as pd
@@ -10,8 +11,11 @@ import yaml
 from sqlalchemy.exc import OperationalError
 from teradataml import DataFrame
 from teradataml.dataframe.copy_to import copy_to_sql
-from pptx import Presentation
+import webbrowser
 
+
+import tdcsm
+from pathlib import Path
 from tdcsm.utils import Utils  # includes Logger class
 
 
@@ -54,9 +58,10 @@ class tdcoa:
     approot = '.'
     configpath = ''
     secretpath = ''
+    systemspath = ''
     filesetpath = ''
     outputpath = ''
-    version = "0.3.8.3.2"
+    version = "0.3.9.4.4"
 
     # dictionaries
     secrets = {}
@@ -68,12 +73,14 @@ class tdcoa:
     transcend = {}
     settings = {}
 
-    def __init__(self, approot='.', printlog=True, config='config.yaml', secrets='secrets.yaml', filesets='filesets.yaml'):
+    def __init__(self, approot='.', printlog=True, config='config.yaml', secrets='secrets.yaml', filesets='filesets.yaml', systems='source_systems.yaml', refresh_defaults=False):
         self.bufferlog = True
         self.printlog = printlog
         self.approot = os.path.join('.', approot)
         self.configpath = os.path.join(self.approot, config)
         self.secretpath = os.path.join(self.approot, secrets)
+        self.systemspath = os.path.join(self.approot, systems)
+        self.refresh_defaults = refresh_defaults
 
         self.utils = Utils(self.version)  # utilities class. inherits Logger class
 
@@ -81,8 +88,11 @@ class tdcoa:
         self.utils.log('time', str(dt.datetime.now()))
         self.utils.log('app root', self.approot)
         self.utils.log('config file', self.configpath)
+        self.utils.log('source systems file', self.systemspath)
         self.utils.log('secrets file', self.secretpath)
         self.utils.log('tdcoa version', self.version)
+
+        self.unique_id = dt.datetime.now().strftime("%m%d%Y%H%M")  # unique id to append to table
 
         # todo remove all references to skipgit and skipdbs?
         self.skipgit = False
@@ -92,7 +102,7 @@ class tdcoa:
 
         self.reload_config()
 
-    def reload_config(self, configpath='', secretpath=''):
+    def reload_config(self, configpath='', secretpath='', systemspath=''):
         """Reloads configuration YAML files (config & secrets) used as
         process driver.  This will also perform any local environment checks,
         such as creating missing folders (download|sql|run|output), change
@@ -131,21 +141,55 @@ class tdcoa:
 
         configpath = self.configpath if configpath == '' else configpath
         secretpath = self.secretpath if secretpath == '' else secretpath
+        systemspath = self.systemspath if systemspath == '' else systemspath
 
         self.utils.bufferlogs = True
         self.utils.log('reload_config started', header=True)
         self.utils.log('time', str(dt.datetime.now()))
         self.utils.log('tdcoa version', self.version)
 
-        # load secrets
+        # remove 2 default files -> config, source_systems
+        # todo NOTE: currently not removing secrets file because it shouldnt require format updates
+        if self.refresh_defaults:
+            self.utils.log('\nRefresh defaults = True     **Note: secrets.yaml will not be changed**')
+            if os.path.isfile(self.configpath):
+                os.remove(self.configpath)
+                self.utils.log('old config.yaml found and removed')
+            if os.path.isfile(self.systemspath):
+                os.remove(self.systemspath)
+                self.utils.log('old source_systems.yaml found and removed')
+            # if os.path.isfile(self.secretpath):
+            #     os.remove(self.secretpath)
+            self.utils.log('')
+
+        # load secrets. create default if missing
         self.utils.log('loading secrets', os.path.basename(self.secretpath))
+        if not os.path.isfile(self.secretpath):
+            self.utils.log('creating default secrets', self.secretpath)
+            with open(os.path.join(os.path.dirname(tdcsm.__file__), 'secrets.yaml')) as f:
+                with open(secretpath, 'w') as f2:
+                    f2.write(f.read())
+        else:
+            self.utils.log('found secrets.yaml', self.secretpath)
+
         with open(secretpath, 'r') as fh:
             secretstr = fh.read()
         self.secrets = yaml.load(secretstr, Loader=yaml.FullLoader)['secrets']
         self.utils.secrets = self.secrets  # update secrets attribute in logger
 
-        # load config
-        self.utils.log('loading config', os.path.basename(self.configpath))
+        # load config. create default if missing
+        if self.refresh_defaults:
+            self.utils.log('loading config', os.path.basename(self.configpath) + ' [FORCED REFRESH]')
+        else:
+            self.utils.log('loading config', os.path.basename(self.configpath))
+        if not os.path.isfile(self.configpath) or self.refresh_defaults:
+            self.utils.log('creating default config', self.configpath)
+            with open(os.path.join(os.path.dirname(tdcsm.__file__), 'config.yaml')) as f:
+                with open(configpath, 'w') as f2:
+                    f2.write(f.read())
+        else:
+            self.utils.log('found config.yaml', self.configpath)
+
         with open(configpath, 'r') as fh:
             configstr = fh.read()
 
@@ -161,13 +205,33 @@ class tdcoa:
         self.utils.log('loading dictionary', 'substitutions')
         self.substitutions = configyaml['substitutions']
 
+        # load source systems. create default if missing
+        if self.refresh_defaults:
+            self.utils.log('loading source systems', os.path.basename(self.systemspath) + ' [FORCED REFRESH]')
+        else:
+            self.utils.log('loading source systems', os.path.basename(self.systemspath))
+        if not os.path.isfile(self.systemspath) or self.refresh_defaults:
+            self.utils.log('creating default source_systems', self.systemspath)
+            with open(os.path.join(os.path.dirname(tdcsm.__file__), 'source_systems.yaml')) as f:
+                with open(systemspath, 'w') as f2:
+                    f2.write(f.read())
+        else:
+            self.utils.log('found source_systems.yaml', self.systemspath)
+
+        with open(systemspath, 'r') as fh:
+            systemsstr = fh.read()
+
+        systemsstr = self.utils.substitute(systemsstr, self.secrets, 'secrets')
+        systemsstr = self.utils.substitute(systemsstr, self.substitutions, 'systems:substitutions')
+        systemsyaml = yaml.load(systemsstr, Loader=yaml.FullLoader)
+
         # check and set Transcend connection information
         self.utils.log('loading dictionary', 'transcend')
         self.transcend = configyaml['transcend']
         self.utils.check_setting(self.transcend,
-                           required_item_list=['username', 'password', 'host', 'logmech', 'db_coa', 'db_region'],
+                           required_item_list=['username', 'password', 'host', 'logmech', 'db_coa', 'db_region', 'db_stg'],
                            defaults=['{td_quicklook}', '{td_password}', 'tdprdcop3.td.teradata.com', 'TD2',
-                                     'adlste_coa', 'adlste_westcomm'])
+                                     'adlste_coa', 'adlste_westcomm', 'adlste_coa_stg'])
         self.transcend['connectionstring'] = 'teradatasql://%s:%s@%s/?logmech=%s' % (
             self.transcend['username'],
             self.transcend['password'],
@@ -229,12 +293,26 @@ class tdcoa:
             self.settings['localfilesets'] = os.path.join(self.folders['download'], 'filesets.yaml')
         self.filesetpath = os.path.join(self.approot, self.settings['localfilesets'])
 
-        # create missing filesets.yaml (now that download folder exists)
-        if not os.path.isfile(self.filesetpath):
-            self.utils.log('missing filesets.yaml', self.filesetpath)
-            self.utils.yaml_filesets(self.filesetpath, writefile=True)
-        else:
-            self.utils.log('found filesets.yaml', self.filesetpath)
+        # download filesets.yaml every instantiation (now that download folder exists)
+        if os.path.isfile(self.filesetpath):
+            try:
+                os.remove(self.filesetpath)
+            except FileNotFoundError as e:
+                pass
+
+        githost = self.settings['githost']
+        if githost[-1:] != '/':
+            githost = githost + '/'
+        self.utils.log('githost', githost)
+        giturl = githost + self.settings['gitfileset']
+        self.utils.log('downloading "filesets.yaml" from github')
+        self.utils.log('  requesting url', giturl)
+        filecontent = requests.get(giturl).content.decode('utf-8')
+        savepath = os.path.join(self.approot, self.settings['localfilesets'])
+        self.utils.log('saving filesets.yaml', savepath)
+        with open(savepath, 'w') as fh:
+            fh.write(filecontent)
+        self.utils.log('filesets.yaml saved')
 
         # load filesets dictionary (active only)
         self.utils.log('loading dictionary', 'filesets (active only)')
@@ -255,10 +333,11 @@ class tdcoa:
 
         # load systems (active only)
         self.utils.log('loading system dictionaries (active only)')
-        for sysname, sysobject in configyaml['systems'].items():
+        for sysname, sysobject in systemsyaml['systems'].items():
             if self.utils.dict_active(sysobject, sysname):
                 self.systems.update({sysname: sysobject})
 
+                # todo add default dbsversion and collection
                 self.utils.check_setting(self.systems[sysname],
                                    required_item_list=['active', 'siteid', 'use', 'host', 'username', 'password',
                                                        'logmech'],
@@ -291,40 +370,25 @@ class tdcoa:
         # download any control files first (filesets.yaml, motd.txt, etc.)
         # motd
         giturl = githost + self.settings['gitmotd']
-        self.utils.log('downloading "motd.txt" from github')
+        self.utils.log('downloading "motd.html" from github')
         self.utils.log('  requesting url', giturl)
         if self.skipgit:
             self.utils.log('  setting: skip_git = True', 'skipping download')
             filecontent = 'default message'
         else:
             filecontent = requests.get(giturl).text
-        with open(os.path.join(self.approot, 'motd.txt'), 'w') as fh:
+        with open(os.path.join(self.approot, 'motd.html'), 'w') as fh:
             fh.write(filecontent)
 
-        # filesets
-        giturl = githost + self.settings['gitfileset']
-        self.utils.log('downloading "filesets.yaml" from github')
-        self.utils.log('  requesting url', giturl)
-        if self.skipgit:
-            self.utils.log('  setting: skip_git = True', 'skipping download')
-            filecontent = self.utils.yaml_filesets(self.filesets)
-        else:
-            filecontent = requests.get(giturl).content.decode('utf-8')
-        savepath = os.path.join(self.approot, self.settings['localfilesets'])
-        self.utils.log('saving filesets.yaml', savepath)
-        with open(savepath, 'w') as fh:
-            fh.write(filecontent)
-        filesetstr = filecontent
-
-        # reload configs with newly downloaded filesets.yaml
-        # todo reload_config() is being called during class setup and here --> maybe redundant?
-        self.reload_config()
+        # open motd.html in browser
+        file_url = 'file://' + os.path.abspath(os.path.join(self.approot, 'motd.html'))
+        webbrowser.open(file_url)
 
         # delete all pre-existing download folders
         self.utils.recursively_delete_subfolders(os.path.join(self.approot, self.folders['download']))
 
         # set proper githost for filesets
-        githost = githost + 'sets/'
+        githost = githost + 'filesets/'
 
         # iterate all active systems.filesets:
         for sysname, sysobject in self.systems.items():
@@ -338,42 +402,73 @@ class tdcoa:
                         self.utils.log('  cross-referencing with filesets.yaml...')
 
                         # cross-reference to filesets in filesets.yaml
-                        if sys_setname not in self.filesets:
-                            self.utils.log(' not found in filesets.yaml', sys_setname)
-
-                        else:  # found
+                        if sys_setname in self.filesets:
                             setname = sys_setname
                             setobject = self.filesets[setname]
 
                             if self.utils.dict_active(setobject, setname, also_contains_key='files'):
-                                self.utils.log('FILE SET FOUND', setname)
-                                self.utils.log('    file count', str(len(setobject['files'])))
+                                self.utils.log('  FILE SET FOUND', setname + ' [' + str(len(setobject['files'])) + ']')
                                 savepath = os.path.join(self.approot, self.folders['download'], setname)
                                 if not os.path.exists(savepath):
                                     os.mkdir(savepath)
 
                                 # download each file in the fileset
-                                for file in setobject['files']:
-                                    self.utils.log(' downloading file', file)
-                                    giturl = githost + file
-                                    self.utils.log('  %s' % giturl)
-                                    savefile = os.path.join(savepath, file.split('/')[-1])  # save path
+                                for file_key, file_dict in setobject['files'].items():
+                                    self.utils.log('   ' + ('-' * 50))
+                                    self.utils.log('   ' + file_key)
 
-                                    # save logic for pptx and pdf files
-                                    if '.pptx' in file or '.pdf' in file:
-                                        filecontent = requests.get(giturl).content
-                                        self.utils.log('  saving file to', savefile)
+                                    # check for matching dbversion
+                                    dbversion_match = True
+                                    if 'dbsversion' in file_dict.keys():
+                                        if sysobject['dbsversion'] in file_dict['dbsversion']:
+                                            dbversion_match = True
+                                        else:
+                                            dbversion_match = False
 
-                                        with open(savefile, 'wb') as fh:
-                                            fh.write(filecontent)
+                                    # check for matching collection
+                                    collection_match = True
+                                    if 'collection' in file_dict.keys():
+                                        if sysobject['collection'] in file_dict['collection']:
+                                            collection_match = True
+                                        else:
+                                            collection_match = False
 
-                                    # save logic for text-based files
+                                    # only download file if dbsversion and collection match
+                                    if dbversion_match and collection_match:
+                                        self.utils.log('   downloading file', file_dict['gitfile'])
+                                        giturl = githost + file_dict['gitfile']
+                                        self.utils.log('    %s' % giturl)
+                                        savefile = os.path.join(savepath, file_dict['gitfile'].split('/')[-1])  # save path
+
+                                        response = requests.get(giturl)
+                                        if response.status_code == 200:
+
+                                            # save logic for non binary write files
+                                            if any(x in file_dict['gitfile'] for x in self.settings['text_format_extensions']):
+                                                filecontent = response.text
+                                                self.utils.log('    saving file to', savefile)
+                                                with open(savefile, 'w') as fh:
+                                                    fh.write(filecontent)
+
+                                            # save logic for binary write files
+                                            else:
+                                                filecontent = response.content
+                                                self.utils.log('    saving file to', savefile)
+                                                with open(savefile, 'wb') as fh:
+                                                    fh.write(filecontent)
+
+                                        else:
+                                            self.utils.log('Status Code: ' + str(
+                                                response.status_code) + '\nText: ' + response.text, error=True)
+                                            exit()
+
                                     else:
-                                        filecontent = requests.get(giturl).text
-                                        self.utils.log('  saving file to', savefile)
+                                        self.utils.log('   diff dbsversion or collection, skipping')
 
-                                        with open(savefile, 'w') as fh:
-                                            fh.write(filecontent)
+                                self.utils.log('   ' + ('-' * 50) + '\n')
+
+                        else:  # not found
+                            self.utils.log(' not found in filesets.yaml', sys_setname)
 
         self.utils.log('\ndone!')
         self.utils.log('time', str(dt.datetime.now()))
@@ -566,20 +661,20 @@ class tdcoa:
                                             runfiletext = fh.read()
                                             self.utils.log('  characters in file', str(len(runfiletext)))
 
-                                        # SUBSTITUTE values for:  system-fileset override
+                                        # SUBSTITUTE values for:  system-fileset override [source_systems.yaml --> filesets]
                                         if setfolder in self.systems[sysfolder]['filesets']:
                                             sub_dict = self.systems[sysfolder]['filesets'][setfolder]
                                             if self.utils.dict_active(sub_dict, 'system-fileset overrides'):
                                                 runfiletext = self.utils.substitute(runfiletext, sub_dict,
                                                                               subname='system-fileset overrides (highest priority)')
 
-                                        # SUBSTITUTE values for:  system-defaults
+                                        # SUBSTITUTE values for: system-defaults [source_systems.yaml]
                                         sub_dict = self.systems[sysfolder]
                                         if self.utils.dict_active(sub_dict, 'system defaults'):
                                             runfiletext = self.utils.substitute(runfiletext, sub_dict, skipkeys=['filesets'],
                                                                           subname='system defaults')
 
-                                        # SUBSTITUTE values for:   overall application defaults (never inactive)
+                                        # SUBSTITUTE values for: overall application defaults (never inactive) [config.yaml substitutions]
                                         self.utils.log('  always use dictionary')
                                         runfiletext = self.utils.substitute(runfiletext, self.substitutions,
                                                                       subname='overall app defaults (config.substitutions)')
@@ -590,7 +685,21 @@ class tdcoa:
                                                                       skipkeys=['host', 'username', 'password',
                                                                                 'logmech'])
 
-                                        # SUBSTITUTE values for:   fileset defaults
+                                        # SUBSTITUTE values for: individual file subs [fileset.yaml --> files]
+                                        if setfolder in self.filesets:
+                                            sub_dict = {}
+                                            for file_key, file_dict in self.filesets[setfolder]['files'].items():
+                                                if ntpath.basename(file_dict['gitfile']) == runfile:
+                                                    sub_dict = file_dict
+                                                    break
+
+                                            if sub_dict:
+                                                runfiletext = self.utils.substitute(runfiletext, sub_dict,
+                                                                                    skipkeys=['collection',
+                                                                                              'dbsversion', 'gitfile'],
+                                                                                    subname='file substitutions')
+
+                                        # SUBSTITUTE values for: fileset defaults [fileset.yaml substitutions]
                                         if setfolder in self.filesets:
                                             sub_dict = self.filesets[setfolder]
                                             if self.utils.dict_active(sub_dict, 'fileset defaults'):
@@ -679,8 +788,9 @@ class tdcoa:
                                                             for index, row in df.iterrows():
                                                                 tempsql = sql
                                                                 for col in df.columns:
+                                                                    col = col.strip()
                                                                     tempsql = tempsql.replace(str('{%s}' % col),
-                                                                                              str(row[col]))
+                                                                                              str(row[col]).strip())
                                                                 tempsql = tempsql.replace('{{replaceMe:%s}}' % cmdname,
                                                                                           ' csv row %i out of %i ' % (
                                                                                               index + 1, len(df)))
@@ -1025,6 +1135,7 @@ class tdcoa:
                     else:
 
                         for entry in manifest['entries']:
+                            successful_load = False  # flag to track if sp should be called after load attempt
 
                             # define database and table names
                             if '.' in entry['table']:
@@ -1056,48 +1167,85 @@ class tdcoa:
                             self.utils.log('final column count', str(len(dfcsv.columns)))
 
                             # APPEND data to database, via teradataml bulk upload:
-                            self.utils.log('uploading', str(dt.datetime.now()))
-                            if self.skipdbs:
-                                self.utils.log('skipdbs = True', 'emulating upload')
-                            else:
-                                try:
-                                    copy_to_sql(dfcsv, entry['table'], entry['schema'], if_exists='append')
-                                except Exception as err:
-                                    self.utils.log('\n\nERROR during UPLOAD', error=True)
-                                    self.utils.log(str(err))
-                                    self.utils.log('   (error repeated below)')
-                                    self.utils.log('\n    first 10 records of what was being uploaded (dataframe):')
-                                    self.utils.log(dfcsv[0:10])
-                                    self.utils.log('')
-                                    sql = ["Select ColumnName, ColumnType, ColumnFormat, ColumnLength, ColumnId",
-                                           "from dbc.columns ", "where databasename = '%s' " % entry['schema'],
-                                           "  and tablename = '%s' " % entry['table']]
-                                    # sql.append("order by ColumnID;")
-                                    sql = '\n'.join(sql)
-                                    self.utils.log(sql)
-                                    df = DataFrame.from_query(sql)
-                                    df = df.sort(['ColumnId'], ascending=[True])
-                                    self.utils.log('\n\n    structure of destination table:')
-                                    print(df)
-                                    self.utils.log('')
-                                    raise err
+                            self.utils.log('\nuploading', str(dt.datetime.now()))
+                            try:
+                                # write_to_perm = True
+                                # steps:
+                                # 1. load to staging table (perm)
+                                # 2. load staging data --> global temp table (GTT)
+                                # 3. call sp on GTT to merge to final table
+                                # 4. delete staging table (perm)
+                                if self.settings['write_to_perm'].lower() == 'true':
+                                    self.utils.log('write_to_perm', 'True')
+                                    self.utils.log('perm table', entry['schema'] + '.' + entry['table'] + '_%s' % self.unique_id)
 
-                            self.utils.log('complete', str(dt.datetime.now()))
+                                    # create staging table (perm) with unique id
+                                    copy_to_sql(dfcsv, entry['table'] + '_%s' % self.unique_id, entry['schema'], if_exists='replace')
+                                    self.utils.log('complete', str(dt.datetime.now()))
 
-                            # CALL any specified SPs:
-                            if str(entry['call']).strip() != "":
-                                self.utils.log('Stored Proc', str(dt.datetime.now()))
-                                if self.skipdbs:
-                                    self.utils.log('skipdbs = True', 'emulating call')
+                                    # load to GTT
+                                    self.utils.log('\nload to GTT', entry['schema'] + '.' + entry['table'])
+                                    transcend['connection'].execute("""
+                                    INSERT INTO {db}.{table} SELECT * FROM {db}.{unique_table}
+                                    """.format(db=entry['schema'],
+                                               table=entry['table'],
+                                               unique_table=entry['table'] + '_%s' % self.unique_id))
+                                    self.utils.log('complete', str(dt.datetime.now()))
+                                    successful_load = True
+
+                                # write_to_perm = False
+                                # steps:
+                                # 1. load into pre-created GTT table
+                                #    1a. (will auto-create perm table if GTT doesnt exist)
+                                # 2. call sp on GTT to merge to final table
                                 else:
-                                    try:
-                                        transcend['connection'].execute('call %s ;' % str(entry['call']))
-                                    except OperationalError as err:  # raise exception if database execution error (e.g. permissions issue)
-                                        self.utils.log('\n\n')
-                                        self.utils.log(str(err).partition('\n')[0], error=True)
-                                        exit()
+                                    self.utils.log('write_to_perm', 'False')
+                                    copy_to_sql(dfcsv, entry['table'], entry['schema'], if_exists='append')
+                                    self.utils.log('complete', str(dt.datetime.now()))
+                                    successful_load = True
 
-                                self.utils.log('complete', str(dt.datetime.now()))
+                            except Exception as err:
+                                self.utils.log('\nERROR during UPLOAD', error=True)
+                                self.utils.log(str(err))
+                                self.utils.log('   (error repeated below)')
+                                self.utils.log('\n    first 10 records of what was being uploaded (dataframe):')
+                                self.utils.log(dfcsv[0:10])
+                                self.utils.log('')
+                                sql = ["Select ColumnName, ColumnType, ColumnFormat, ColumnLength, ColumnId",
+                                       "from dbc.columns ", "where databasename = '%s' " % entry['schema'],
+                                       "  and tablename = '%s' " % entry['table']]
+                                # sql.append("order by ColumnID;")
+                                sql = '\n'.join(sql)
+                                self.utils.log(sql)
+                                df = DataFrame.from_query(sql)
+                                df = df.sort(['ColumnId'], ascending=[True])
+                                self.utils.log('\n\n    structure of destination table:')
+                                print(df)
+                                self.utils.log('\n')
+                                exit()  # todo possibly remove so that whole process doesnt stop on error?
+
+                            # CALL any specified SPs only if data loaded successfully:
+                            if str(entry['call']).strip() != "" and successful_load:
+                                self.utils.log('\nStored Proc', str(entry['call']))
+                                try:
+                                    transcend['connection'].execute('call %s ;' % str(entry['call']))
+                                    self.utils.log('complete', str(dt.datetime.now()))
+
+                                    # if write_to_perm == true, drop unique perm table after successful sp call
+                                    if self.settings['write_to_perm'].lower() == 'true':
+                                        self.utils.log('\ndrop unique perm table', entry['schema'] + '.' + entry['table'] + '_%s' % self.unique_id)
+
+                                        transcend['connection'].execute("""
+                                        DROP TABLE {db}.{unique_table}
+                                        """.format(db=entry['schema'],
+                                                   unique_table=entry['table'] + '_%s' % self.unique_id))
+
+                                        self.utils.log('complete', str(dt.datetime.now()))
+
+                                except OperationalError as err:  # raise exception if database execution error (e.g. permissions issue)
+                                    self.utils.log('\n\n')
+                                    self.utils.log(str(err).partition('\n')[0], error=True)
+                                    exit()
 
         self.utils.log('\ndone!')
         self.utils.log('time', str(dt.datetime.now()))
