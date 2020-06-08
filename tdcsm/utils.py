@@ -12,8 +12,8 @@ from teradataml.dataframe import dataframe as tdml_df
 from tdcsm.logging import Logger
 from pptx import Presentation
 from pptx.util import Inches, Pt
-
 import textwrap
+
 
 class Utils(Logger):
 
