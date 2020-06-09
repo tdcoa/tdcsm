@@ -998,37 +998,37 @@ class tdcoa:
                                                     df.to_csv(csvfile)  # <---------------------- Save to .csv
                                                     self.utils.log('file saved!')
 
-                                                    if 'vis' in sqlcmd:  # run visualization py file
-                                                        self.utils.log('\nvis cmd', 'found')
-                                                        vis_file = os.path.join(workpath, sqlcmd['vis'].replace('.csv', '.py'))
-                                                        self.utils.log('vis py file', vis_file)
-                                                        self.utils.log('running vis file..')
-                                                        os.system('python %s' % vis_file)
-                                                        self.utils.log('Vis file complete!')
+                                                if 'vis' in sqlcmd:  # run visualization py file
+                                                    self.utils.log('\nvis cmd', 'found')
+                                                    vis_file = os.path.join(workpath, sqlcmd['vis'].replace('.csv', '.py'))
+                                                    self.utils.log('vis py file', vis_file)
+                                                    self.utils.log('running vis file..')
+                                                    os.system('python %s' % vis_file)
+                                                    self.utils.log('Vis file complete!')
 
-                                                    if 'pptx' in sqlcmd:  # insert to pptx file
-                                                        self.utils.log('\npptx cmd', 'found')
-                                                        pptx_file = os.path.join(workpath, sqlcmd['pptx'])
-                                                        self.utils.log('pptx file', pptx_file)
-                                                        self.utils.log('inserting to pptx file..')
-                                                        self.utils.insert_to_pptx(pptx_file, workpath)
-                                                        self.utils.log('pptx file complete!')
+                                                if 'pptx' in sqlcmd:  # insert to pptx file
+                                                    self.utils.log('\npptx cmd', 'found')
+                                                    pptx_file = os.path.join(workpath, sqlcmd['pptx'])
+                                                    self.utils.log('pptx file', pptx_file)
+                                                    self.utils.log('inserting to pptx file..')
+                                                    self.utils.insert_to_pptx(pptx_file, workpath)
+                                                    self.utils.log('pptx file complete!')
 
-                                                    if 'load' in sqlcmd:  # add to manifest
-                                                        self.utils.log(
-                                                            'file marked for loading to Transcend, adding to upload-manifest.json')
-                                                        if 'call' not in sqlcmd:
-                                                            sqlcmd['call'] = ''
-                                                        manifest_entry = '%s{"file": "%s",  "table": "%s",  "call": "%s"}' % (
-                                                            manifestdelim, sqlcmd['save'], sqlcmd['load'],
-                                                            sqlcmd['call'])
-                                                        manifestdelim = '\n,'
+                                                if 'load' in sqlcmd:  # add to manifest
+                                                    self.utils.log(
+                                                        'file marked for loading to Transcend, adding to upload-manifest.json')
+                                                    if 'call' not in sqlcmd:
+                                                        sqlcmd['call'] = ''
+                                                    manifest_entry = '%s{"file": "%s",  "table": "%s",  "call": "%s"}' % (
+                                                        manifestdelim, sqlcmd['save'], sqlcmd['load'],
+                                                        sqlcmd['call'])
+                                                    manifestdelim = '\n,'
 
-                                                        with open(os.path.join(outputfo, 'upload-manifest.json'),
-                                                                  'a') as manifest:
-                                                            manifest.write(manifest_entry)
-                                                            self.utils.log('Manifest updated',
-                                                                     str(manifest_entry).replace(',', ',\n'))
+                                                    with open(os.path.join(outputfo, 'upload-manifest.json'),
+                                                              'a') as manifest:
+                                                        manifest.write(manifest_entry)
+                                                        self.utils.log('Manifest updated',
+                                                                 str(manifest_entry).replace(',', ',\n'))
 
                                         # archive file we just processed (for re-run-ability)
                                         self.utils.log('Moving coa.sql file to Output folder', coasqlfile)

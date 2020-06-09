@@ -491,7 +491,7 @@ class Utils(Logger):
                             df_cell = df_name_cell[1]
                             df_csv = pd.read_csv(os.path.join(workpath, df_name + '.csv'))
                             # df_value = df_csv[df_cell[1]:df_cell[3]]
-                            df_value = df_csv.iloc[int(df_cell[1]) - 1, int(df_cell[3])]
+                            df_value = df_csv.iloc[int(df_cell[1]) - 1, int(df_cell[3]) - 1]
                             csv_name_value.append(df_value)
 
                         text_2 = ''
