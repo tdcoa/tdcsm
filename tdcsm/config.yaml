@@ -43,7 +43,5 @@ settings:
   skip_git:   "False"
   skip_dbs:   "False"
   text_format_extensions: ['.sql', '.yaml', '.txt', '.csv', '.py']
-  run_non_fileset_folders: "True" 
-  customer_connection_type:  "sqlalchemy"
+  run_non_fileset_folders: "True"
   write_to_perm: "True"
-    # valid connection types: "teradataml", "sqlalchemy", or an odbc driver name

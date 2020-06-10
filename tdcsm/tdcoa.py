@@ -61,7 +61,7 @@ class tdcoa:
     systemspath = ''
     filesetpath = ''
     outputpath = ''
-    version = "0.3.9.4.4"
+    version = "0.3.9.5.0"
 
     # dictionaries
     secrets = {}
@@ -340,9 +340,9 @@ class tdcoa:
                 # todo add default dbsversion and collection
                 self.utils.check_setting(self.systems[sysname],
                                    required_item_list=['active', 'siteid', 'use', 'host', 'username', 'password',
-                                                       'logmech'],
+                                                       'logmech', 'driver', 'encryption'],
                                    defaults=['True', 'siteid123', 'unknown', 'customer.host.missing.com',
-                                             'username_missing', 'password_missing', ''])
+                                             'username_missing', 'password_missing', '', 'sqlalchemy', ''])
 
                 if 'connectionstring' not in sysobject:
                     if sysobject['logmech'].strip() == '':
@@ -945,10 +945,10 @@ class tdcoa:
 
                                     # connect to customer system:
                                     conn = self.utils.open_connection(
-                                        conntype=self.settings['customer_connection_type'],
+                                        conntype=self.systems[sysname]['driver'],
+                                        encryption=self.systems[sysname]['encryption'],
                                         skip=self.skipdbs,
-                                        system=self.systems[
-                                            sysname])  # <------------------------------- Connect to the database
+                                        system=self.systems[sysname])  # <------------------------------- Connect to the database
 
                                     # loop thru all sql files:
                                     for coasqlfile in sorted(coasqlfiles):
@@ -982,6 +982,15 @@ class tdcoa:
                                                         sqlcmd['save'] = '%s.%s--%s' % (
                                                             sysname, setname, coasqlfile) + '%04d' % sqlcnt + '.csv'
 
+                                                    # ODBC CONNECTION ONLY:
+                                                    # df.read_sql() does not work properly for odbc connections.
+                                                    # Can directly execute using odbc connection but then there are no column names
+                                                    # This code block retrieves the column names before saving the csv file
+                                                    # Col names will be merged upon save
+                                                    col_names = []
+                                                    if conn['type'] not in ('sqlalchemy', 'teradataml'):
+                                                        col_names = self.utils.open_sql(conn, sql, skip=self.skipdbs, columns=True)
+
                                                     # once built, append output folder, SiteID on the front, iterative counter if duplicates
                                                     # csvfile = os.path.join(outputfo, sqlcmd['save'])
                                                     csvfile = os.path.join(workpath, sqlcmd['save'])
@@ -995,7 +1004,10 @@ class tdcoa:
                                                     self.utils.log('CSV save location', csvfile)
 
                                                     self.utils.log('saving file...')
-                                                    df.to_csv(csvfile)  # <---------------------- Save to .csv
+                                                    if conn['type'] in ('sqlalchemy', 'teradataml'):
+                                                        df.to_csv(csvfile)  # <---------------------- Save to .csv
+                                                    else:  # if odbc conn type, merge in column names
+                                                        df.to_csv(csvfile, header=col_names)  # <---------------------- Save to .csv
                                                     self.utils.log('file saved!')
 
                                                 if 'vis' in sqlcmd:  # run visualization py file

@@ -6,6 +6,8 @@ systems:
     username:    "{td_quicklook}"
     password:    "{td_password}"
     logmech:     "ldap"
+    driver:      "sqlalchemy" # valid values: "sqlalchemy", "teradataml", or an odbc driver name
+    encryption:  "false"
     use:         "test"   # prod/qa/dr/dev/etc
     some_value:  "Bear"
     dbsversion:  "16.20"
@@ -16,29 +18,29 @@ systems:
         some_value: "Aardvark"
 
   Customer_System_Example:
-    siteid:     "custabcprod01"
-    active:     "false"
-    host:       "prod.custabc.com"
-    username:   "{custabc_username}"
-    password:   "{custabc_password}"
-    logmech:    ""
-    use:        "prod"
+    siteid:      "custabcprod01"
+    active:      "false"
+    host:        "prod.custabc.com"
+    username:    "{custabc_username}"
+    password:    "{custabc_password}"
+    logmech:     ""
+    driver:      "sqlalchemy" # valid values: "sqlalchemy", "teradataml", or an odbc driver name
+    encryption:  "false"
+    use:         "prod"
+    dbsversion:  "16.20"
+    collection:  "dbc"
     filesets:
       demo:
         active: "False"
-      level1_how_much_1620pdcr:
+      level1_how_much:
         active: "False"
         startdate:  "Current_Date - 365"
         enddate:    "Current_Date - 1"
-      level1_how_much_1620dbc:
-        active: "False"
-        startdate:  "Current_Date - 365"
-        enddate:    "Current_Date - 1"
-      level2_how_well_1620pdcr:
+      level2_how_well:
         active: "False"
         startdate:  "Current_Date - 90"
         enddate:    "Current_Date - 1"
-      dbql_core_1620pdcr:
+      dbql_core:
         active: "False"
         startdate:  "Current_Date - 45"
         enddate:    "Current_Date - 1"
