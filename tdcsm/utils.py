@@ -442,7 +442,7 @@ class Utils(Logger):
             for shape in slide.shapes:  # loop through all shape objects in a slide
 
                 # shape_type 19 = table which does not have text field
-                if shape.shape_type != 19 and '{{' in shape.text and '}}' in shape.text:  # search for special command
+                if shape.shape_type not in (13, 19) and '{{' in shape.text and '}}' in shape.text:  # search for special command
 
                     # insert image
                     if '.png' in shape.text:
@@ -491,7 +491,7 @@ class Utils(Logger):
                             df_cell = df_name_cell[1]
                             df_csv = pd.read_csv(os.path.join(workpath, df_name + '.csv'))
                             # df_value = df_csv[df_cell[1]:df_cell[3]]
-                            df_value = df_csv.iloc[int(df_cell[1]) - 1, int(df_cell[3]) - 1]
+                            df_value = df_csv.iloc[int(df_cell[1]) - 2, int(df_cell[3]) - 1]
                             csv_name_value.append(df_value)
 
                         text_2 = ''
