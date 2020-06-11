@@ -12,26 +12,28 @@ Select a step:
 """
 
 while True:
-    x = input(options)
 
-    try:
-        # 1) DOWNLOAD FILES
-        if int(x) == 1:
-            coa.download_files()
+    x = 0
+    while x < 1 or x > 5:
+        try:
+            x = int(input(options))
+        except ValueError as e:
+            print('\nInput needs to be a number between 1 and 4')
 
-        # 2) PREPARE SQL
-        elif int(x) == 2:
-            coa.prepare_sql()
+    # 1) DOWNLOAD FILES
+    if int(x) == 1:
+        coa.download_files()
 
-        # 3) EXECUTE SQL
-        elif int(x) == 3:
-            coa.execute_run()
+    # 2) PREPARE SQL
+    elif int(x) == 2:
+        coa.prepare_sql()
 
-        # 4) UPLOAD TO TRANSCEND
-        elif int(x) == 4:
-            coa.upload_to_transcend()
-            break
+    # 3) EXECUTE SQL
+    elif int(x) == 3:
+        coa.execute_run()
 
-    except ValueError:
-        pass
+    # 4) UPLOAD TO TRANSCEND
+    elif int(x) == 4:
+        coa.upload_to_transcend()
+        break
 

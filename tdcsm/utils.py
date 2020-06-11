@@ -12,8 +12,8 @@ from teradataml.dataframe import dataframe as tdml_df
 from tdcsm.logging import Logger
 from pptx import Presentation
 from pptx.util import Inches, Pt
-
 import textwrap
+
 
 class Utils(Logger):
 
@@ -311,7 +311,7 @@ class Utils(Logger):
         self.log('connection closed', str(dt.datetime.now()))
         return True
 
-    def open_connection(self, conntype, host='', logmech='', username='', password='', system=None, skip=False):
+    def open_connection(self, conntype, host='', logmech='', encryption='', username='', password='', system=None, skip=False):
         if system is None:
             system = {}
         self.log('OPEN_CONNECTION started', str(dt.datetime.now()))
@@ -319,7 +319,10 @@ class Utils(Logger):
         # check all variables... use system{} as default, individual variables as overrides
         host = host.strip().lower()
         logmech = logmech.strip().lower()
-        conntype = conntype.strip().lower()
+        encryption = encryption.strip().lower()
+        conntype = conntype.strip()
+        if conntype.lower() in ('sqlalchemy', 'teradataml'):
+            conntype = conntype.lower().strip()
 
         host = system['host'] if host == '' else host
         logmech = system['logmech'] if logmech == '' else logmech
@@ -339,7 +342,8 @@ class Utils(Logger):
                 'host': host,
                 'logmech': logmech,
                 'username': username,
-                'password': password
+                'password': password,
+                'encryption': encryption
             }
         }
 
@@ -365,7 +369,13 @@ class Utils(Logger):
                 if logmech.strip() != '':
                     logmech = '/?logmech=%s' % logmech
 
-                connstring = 'teradatasql://%s:%s@%s%s' % (username, password, host, logmech)
+                if encryption.strip() != '':
+                    if logmech.strip() == '':
+                        encryption = '/?encryption=%s' % encryption
+                    else:
+                        encryption = '?encryption=%s' % encryption
+
+                connstring = 'teradatasql://%s:%s@%s%s%s' % (username, password, host, logmech, encryption)
                 connObject['connection'] = sqlalchemy.create_engine(connstring)
 
             # ------------------------------------
@@ -378,12 +388,15 @@ class Utils(Logger):
                                                            system=host,
                                                            username=username,
                                                            password=password,
-                                                           driver=conntype)
+                                                           driver=conntype,
+                                                           authentication=logmech,
+                                                           encryptdata=encryption,
+                                                           column_name='true')
 
         self.log('connected!', str(dt.datetime.now()))
         return connObject
 
-    def open_sql(self, connobject, sql, skip=False):
+    def open_sql(self, connobject, sql, skip=False, columns=False):
         conntype = connobject['type']
         conn = connobject['connection']
 
@@ -410,7 +423,25 @@ class Utils(Logger):
 
             # ------------------------------------
             else:  # assume odbc connect
-                df = pd.read_sql(sql, conn)
+
+                if not columns:
+                    try:
+                        df = pd.DataFrame(conn.execute(sql))
+                    except Exception as e:
+                        df = []
+
+                # get column names
+                # df.read_sql does not work properly for odbc connections.
+                # Can directly execute using odbc connection but then there are no column names
+                # This code block retrieves the column names before saving the csv file
+                # Col names will be merged upon save
+                else:
+                    try:
+                        df = []
+                        for row in conn.execute(sql).description:
+                            df.append(row[0])
+                    except Exception as e:
+                        df = []
 
         self.log('sql completed', str(dt.datetime.now()))
         self.log('record count', str(len(df)))
@@ -442,7 +473,7 @@ class Utils(Logger):
             for shape in slide.shapes:  # loop through all shape objects in a slide
 
                 # shape_type 19 = table which does not have text field
-                if shape.shape_type != 19 and '{{' in shape.text and '}}' in shape.text:  # search for special command
+                if shape.shape_type not in (13, 19) and '{{' in shape.text and '}}' in shape.text:  # search for special command
 
                     # insert image
                     if '.png' in shape.text:
@@ -491,7 +522,7 @@ class Utils(Logger):
                             df_cell = df_name_cell[1]
                             df_csv = pd.read_csv(os.path.join(workpath, df_name + '.csv'))
                             # df_value = df_csv[df_cell[1]:df_cell[3]]
-                            df_value = df_csv.iloc[int(df_cell[1]) - 1, int(df_cell[3])]
+                            df_value = df_csv.iloc[int(df_cell[1]) - 2, int(df_cell[3]) - 1]
                             csv_name_value.append(df_value)
 
                         text_2 = ''
@@ -648,7 +679,9 @@ class Utils(Logger):
                                             ':')
                                         print('cell_text_index:', cell_text_index)
 
-                                        cell_value = df.iloc[int(cell_text_index[1]) - 1, int(cell_text_index[0]) -1]
+                                        # cell_value = df.iloc[int(cell_text_index[1]) - 2, int(cell_text_index[0]) -1]
+                                        cell_value = df.iloc[int(cell_text_index[0]) - 2, int(cell_text_index[1]) -1]
+
                                     else:
                                         cell_value = cell_text
 
@@ -708,7 +741,8 @@ class Utils(Logger):
                     #                 df_test = pd.DataFrame(list(zip(lst1, lst2, lst3)),
                     #                 columns=['lst1_title','lst2_title', 'lst3_title'])
 
-                    if len(columns_list[0][0]) > 0:
+                    # if len(columns_list[0][0]) > 0:
+                    if len(columns_list) > 0:
                         df_new = pd.DataFrame(columns_list, index=None)
                         df_new = df_new.transpose()
                         print(df_new)
@@ -756,8 +790,8 @@ class Utils(Logger):
                             c = 0
                             while c < cols:
                                 #                                 table.cell(r, c).text = df_new.iloc[r, c]
-                                print('r: ', r)
-                                print('c: ', c)
+                                # print('r: ', r)
+                                # print('c: ', c)
                                 cell_value = df_new.iloc[r, c]
 
                                 try:
