@@ -375,7 +375,11 @@ class Utils(Logger):
                     else:
                         encryption = '?encryption=%s' % encryption
 
-                connstring = 'teradatasql://%s:%s@%s%s%s' % (username, password, host, logmech, encryption)
+                    connstring = 'teradatasql://%s:%s@%s%s%s' % (username, password, host, logmech, encryption)
+
+                else:
+                    connstring = 'teradatasql://%s:%s@%s%s' % (username, password, host, logmech)
+
                 connObject['connection'] = sqlalchemy.create_engine(connstring)
 
             # ------------------------------------
