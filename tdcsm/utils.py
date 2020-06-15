@@ -628,7 +628,8 @@ class Utils(Logger):
 
                                     df_name = cell_text[cell_text.find('{{col:') + 6: cell_text.find('.csv') + 4]
                                     print('df_name: ', df_name)
-                                    df = pd.read_csv(workpath + '\\' + df_name)
+                                    # df = pd.read_csv(workpath + '\\' + df_name)
+                                    df = pd.read_csv(os.path.join(workpath, df_name))
 
                                     df_columns = df.columns
                                     print('df_columns:', df_columns)
@@ -676,14 +677,17 @@ class Utils(Logger):
                                     #                             if df_name == '':
                                     df_name = cell_text[cell_text.find('{{val:') + 6: cell_text.find('.csv') + 4]
                                     print('df_name: ', df_name)
-                                    df = pd.read_csv(workpath + '\\' + df_name)
+                                    # df = pd.read_csv(workpath + '\\' + df_name)
+                                    df = pd.read_csv(os.path.join(workpath, df_name))
 
                                     if ':' in cell_text:
                                         cell_text_index = cell_text[cell_text.find('[') + 1:cell_text.find(']')].split(
                                             ':')
                                         print('cell_text_index:', cell_text_index)
 
-                                        cell_value = df.iloc[int(cell_text_index[1]) - 1, int(cell_text_index[0]) -1]
+                                        # cell_value = df.iloc[int(cell_text_index[1]) - 2, int(cell_text_index[0]) -1]
+                                        cell_value = df.iloc[int(cell_text_index[0]) - 2, int(cell_text_index[1]) -1]
+
                                     else:
                                         cell_value = cell_text
 
@@ -743,7 +747,8 @@ class Utils(Logger):
                     #                 df_test = pd.DataFrame(list(zip(lst1, lst2, lst3)),
                     #                 columns=['lst1_title','lst2_title', 'lst3_title'])
 
-                    if len(columns_list[0][0]) > 0:
+                    # if len(columns_list[0][0]) > 0:
+                    if len(columns_list) > 0:
                         df_new = pd.DataFrame(columns_list, index=None)
                         df_new = df_new.transpose()
                         print(df_new)
