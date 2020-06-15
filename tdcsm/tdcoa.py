@@ -94,10 +94,6 @@ class tdcoa:
 
         self.unique_id = dt.datetime.now().strftime("%m%d%Y%H%M")  # unique id to append to table
 
-        # todo remove all references to skipgit and skipdbs?
-        self.skipgit = False
-        self.skipdbs = False
-
         # filesets.yaml is validated at download time
 
         self.reload_config()
@@ -248,31 +244,16 @@ class tdcoa:
         self.utils.log('loading dictionary', 'settings')
         self.settings = configyaml['settings']
         self.utils.check_setting(self.settings,
-                           required_item_list=['githost', 'gitfileset', 'gitmotd', 'localfilesets', 'skip_git',
-                                               'skip_dbs',
+                           required_item_list=['githost', 'gitfileset', 'gitmotd', 'localfilesets',
                                                'run_non_fileset_folders', 'customer_connection_type'],
                            defaults=['https://raw.githubusercontent.com/tdcoa/sql/master/',
                                      'filesets.yaml',
                                      'motd.txt',
                                      '{download}/filesets.yaml',
-                                     'False',
-                                     'False',
                                      'True',
                                      'sqlalchemy']
                            )
         self.filesetpath = self.settings['localfilesets']
-
-        if 'skip_git' in self.settings and str(self.settings['skip_git']).lower() in ['true']:
-            self.utils.log('setting flag skip_git active, skipping all git pulls')
-            self.skipgit = True
-        else:
-            self.skipgit = False
-
-        if 'skip_dbs' in self.settings and str(self.settings['skip_dbs']).lower() in ['true']:
-            self.utils.log('setting flag skip_dbs active, skipping all database pulls')
-            self.skipdbs = True
-        else:
-            self.skipdbs = False
 
         # create missing folders
         for nm, subfo in self.folders.items():
@@ -372,11 +353,7 @@ class tdcoa:
         giturl = githost + self.settings['gitmotd']
         self.utils.log('downloading "motd.html" from github')
         self.utils.log('  requesting url', giturl)
-        if self.skipgit:
-            self.utils.log('  setting: skip_git = True', 'skipping download')
-            filecontent = 'default message'
-        else:
-            filecontent = requests.get(giturl).text
+        filecontent = requests.get(giturl).text
         with open(os.path.join(self.approot, 'motd.html'), 'w') as fh:
             fh.write(filecontent)
 
@@ -434,6 +411,7 @@ class tdcoa:
                                             collection_match = False
 
                                     # only download file if dbsversion and collection match
+                                    # todo dont download if file alrady exists
                                     if dbversion_match and collection_match:
                                         self.utils.log('   downloading file', file_dict['gitfile'])
                                         giturl = githost + file_dict['gitfile']
@@ -523,6 +501,7 @@ class tdcoa:
                                     break
 
                             # only copy if dbsversion and collection match (if given)
+                            # todo add logging regarding which files are being skipped / copied
                             if dbsversion_match and collection_match:
                                 shutil.copyfile(os.path.join(srcpath, downloaded_file), os.path.join(dstpath, downloaded_file))
 
@@ -979,7 +958,6 @@ class tdcoa:
                                     conn = self.utils.open_connection(
                                         conntype=self.systems[sysname]['driver'],
                                         encryption=self.systems[sysname]['encryption'],
-                                        skip=self.skipdbs,
                                         system=self.systems[sysname])  # <------------------------------- Connect to the database
 
                                     # loop thru all sql files:
@@ -1002,8 +980,7 @@ class tdcoa:
                                                 sqlcmd = self.utils.get_special_commands(sql)
                                                 sql = sqlcmd.pop('sql', '')
 
-                                                df = self.utils.open_sql(conn, sql,
-                                                                   skip=self.skipdbs)  # <--------------------- Run SQL
+                                                df = self.utils.open_sql(conn, sql)  # <--------------------- Run SQL
 
                                                 if len(df) != 0:  # Save non-empty returns to .csv
 
@@ -1021,7 +998,7 @@ class tdcoa:
                                                     # Col names will be merged upon save
                                                     col_names = []
                                                     if conn['type'] not in ('sqlalchemy', 'teradataml'):
-                                                        col_names = self.utils.open_sql(conn, sql, skip=self.skipdbs, columns=True)
+                                                        col_names = self.utils.open_sql(conn, sql, columns=True)
 
                                                     # once built, append output folder, SiteID on the front, iterative counter if duplicates
                                                     # csvfile = os.path.join(outputfo, sqlcmd['save'])
@@ -1157,8 +1134,7 @@ class tdcoa:
 
         transcend = self.utils.open_connection(
             'teradataml',
-            system=self.transcend,
-            skip=self.skipdbs)  # <--------------------------------- Connect
+            system=self.transcend)  # <--------------------------------- Connect
 
         # Walk the directory structure looking for upload_manifest.json files
         for workpath, subfo, files in os.walk(outputpath):
