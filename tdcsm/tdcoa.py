@@ -494,14 +494,46 @@ class tdcoa:
                         # define paths:
                         srcpath = os.path.join(self.approot, self.folders['download'], setname)
                         dstpath = os.path.join(self.approot, self.folders['sql'], sysname)
-                        if not os.path.exists(dstpath):
-                            os.mkdir(dstpath)
                         dstpath = os.path.join(dstpath, setname)
+                        if not os.path.exists(dstpath):
+                            os.makedirs(dstpath)
 
                         # purge existing, and copy over
                         if overwrite:
                             self.utils.recursive_delete(dstpath)
-                        self.utils.recursive_copy(srcpath, dstpath)
+
+                        # loop through downloaded files and copy them to sql_store folder
+                        # only copy if dbsversion and collection match
+                        for downloaded_file in os.listdir(srcpath):
+                            dbsversion_match = True
+                            collection_match = True
+
+                            # match downloaded file to fileset object so that we can compare collection & dbsversion
+                            # note: fileset may not always have dbsversion or collection listed. always copy if thats true
+                            for file_object, file_values in self.filesets['feature_usage']['files'].items():
+                                if downloaded_file == file_values['gitfile'].split('/')[-1]:
+                                    if 'dbsversion' in file_values:
+                                        if sysobject['dbsversion'] not in file_values['dbsversion']:
+                                            dbsversion_match = False  # non-matching dbsversion: dont copy
+
+                                    if 'collection' in file_values:
+                                        if sysobject['collection'] not in file_values['collection']:
+                                            collection_match = False  # non-matching collection: dont copy
+
+                                    break
+
+                            # only copy if dbsversion and collection match (if given)
+                            if dbsversion_match and collection_match:
+                                shutil.copyfile(os.path.join(srcpath, downloaded_file), os.path.join(dstpath, downloaded_file))
+
+
+
+
+
+
+
+
+
 
         self.utils.log('\ndone!')
         self.utils.log('time', str(dt.datetime.now()))
