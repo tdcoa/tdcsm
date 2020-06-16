@@ -348,7 +348,7 @@ class tdcoa:
 
         filesetcontent = ''
 
-        # download any control files first (filesets.yaml, motd.txt, etc.)
+        # download any control files first (motd.html, etc.)
         # motd
         giturl = githost + self.settings['gitmotd']
         self.utils.log('downloading "motd.html" from github')
@@ -411,7 +411,7 @@ class tdcoa:
                                             collection_match = False
 
                                     # only download file if dbsversion and collection match
-                                    # todo dont download if file alrady exists
+                                    # todo dont download if file already exists
                                     if dbversion_match and collection_match:
                                         self.utils.log('   downloading file', file_dict['gitfile'])
                                         giturl = githost + file_dict['gitfile']
@@ -651,6 +651,8 @@ class tdcoa:
                                 # define paths
                                 sqlpath = os.path.join(self.approot, self.folders['sql'], sysfolder, setfolder)
                                 runpath = os.path.join(self.approot, self.folders['run'], sysfolder)
+
+                                # todo combine into single makedirs statement instead of 2 mkdir
                                 if not os.path.isdir(runpath):
                                     self.utils.log('  creating system folder', runpath)
                                     os.mkdir(runpath)
