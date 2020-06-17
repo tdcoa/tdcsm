@@ -369,6 +369,7 @@ class Utils(Logger):
                 if logmech.strip() != '':
                     logmech = '/?logmech=%s' % logmech
 
+                # todo investigate why this fails when 'false'
                 if encryption.strip().lower() == 'true':
                     if logmech.strip() == '':
                         encryption = '/?encryption=%s' % encryption
