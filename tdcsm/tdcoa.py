@@ -144,6 +144,14 @@ class tdcoa:
         self.utils.log('time', str(dt.datetime.now()))
         self.utils.log('tdcoa version', self.version)
 
+        # for GUI - make sure coa.py is present in approot folder:
+        startguifile_src = os.path.join(os.path.dirname(tdcsm.__file__), 'coa.py')
+        startguifile_dst = os.path.join(self.approot, 'coa.py')
+        if not os.path.isfile(startguifile_dst) and os.path.isfile(startguifile_src):
+            with open(startguifile_src) as f1:
+                with open(startguifile_dst, 'w') as f2:
+                    f2.write(f1.read())
+
         # remove 2 default files -> config, source_systems
         # todo NOTE: currently not removing secrets file because it shouldnt require format updates
         if self.refresh_defaults:
