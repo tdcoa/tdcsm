@@ -362,6 +362,7 @@ class tdcoa:
         webbrowser.open(file_url)
 
         # delete all pre-existing download folders
+        # Commented the below code, in order to make the script download only if the files doesn't exist
         self.utils.recursively_delete_subfolders(os.path.join(self.approot, self.folders['download']))
 
         # set proper githost for filesets
@@ -411,13 +412,18 @@ class tdcoa:
                                             collection_match = False
 
                                     # only download file if dbsversion and collection match
-                                    # todo dont download if file already exists
+
+                                    savefile = os.path.join(savepath, file_dict['gitfile'].split('/')[-1])  # save path
+                                    # Skip download if file already exists
+                                    file_exists = os.path.exists(savefile)
+                                    print(str(savefile))
+                                    if file_exists == True:
+                                        self.utils.log('  File %s already exists in the download folder, so skipping download' % str(file_dict['gitfile'].split('/')[-1]))
+                                        continue
                                     if dbversion_match and collection_match:
                                         self.utils.log('   downloading file', file_dict['gitfile'])
                                         giturl = githost + file_dict['gitfile']
                                         self.utils.log('    %s' % giturl)
-                                        savefile = os.path.join(savepath, file_dict['gitfile'].split('/')[-1])  # save path
-
                                         response = requests.get(giturl)
                                         if response.status_code == 200:
 

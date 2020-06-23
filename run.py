@@ -1,6 +1,6 @@
 from tdcsm.tdcoa import tdcoa
 
-coa = tdcoa(approot=r'C:\Users\nd186026\Documents\tdcsm_demo')
+coa = tdcoa(approot=r'C:\Deepan\Data_Science\tdcsm\tdcoa_demo')
 
 options = """
 Select a step:
