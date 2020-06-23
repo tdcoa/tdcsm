@@ -1,8 +1,11 @@
 systems:
+  # this is actual information for running on Transcend
+  # as if it were a customer system
+  # (the information for uploading to Transcend is in config.yaml)
   Transcend_Source:
-    siteid:      "trancend_source_01"
+    siteid:      "TDCLOUD14TD03"  # this is the actual SiteID for Transcend Prod (on-prem)
     active:      "True"
-    host:        "tdprdcop3.td.teradata.com"
+    host:        "tdprdcop11.td.teradata.com"
     username:    "{td_quicklook}"
     password:    "{td_password}"
     logmech:     "ldap"
@@ -17,6 +20,7 @@ systems:
         active:     "True"
         some_value: "Aardvark"
 
+  # this is intended as a mock-up, to alter for your customer:
   Customer_System_Example:
     siteid:      "custabcprod01"
     active:      "false"
