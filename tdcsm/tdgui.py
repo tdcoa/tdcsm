@@ -263,7 +263,7 @@ class coa():
         ttk.Label(mainframe, text='Last Output Folder:').grid(column=1, row=irow, sticky=tk.E)
         ttk.Label(mainframe, text='4_output%s' %(self.pathdelim)).grid(column=2, row=irow, sticky=tk.W)
         output_entry = ttk.Entry(mainframe, width=int(col2_width-10), textvariable=self.output_var).grid(column=2, row=irow, sticky=tk.E)
-        outputpath = os.path.join(self.approot_var.get(), '4_output', self.output_var.get())
+        outputpath = os.path.join(self.approot_var.get(), self.output_var.get())
         ttk.Button(mainframe, text="open", command=lambda:self.__open_file_explorer(outputpath), width=5).grid(column=3, row=irow, sticky=tk.W)
 
         #row: upload_to_transcend
