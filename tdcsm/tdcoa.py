@@ -1347,7 +1347,7 @@ class tdcoa:
         tmp.append('  Transcend_Source:')
         tmp.append('    siteid:      "TDCLOUD14TD03"  ')
         tmp.append('    active:      "True"')
-        tmp.append('    host:        "tdprdcop11.td.teradata.com"')
+        tmp.append('    host:        "tdprdcop3.td.teradata.com"')
         tmp.append('    username:    "{td_quicklook}"')
         tmp.append('    password:    "{td_password}"')
         tmp.append('    logmech:     "ldap"')

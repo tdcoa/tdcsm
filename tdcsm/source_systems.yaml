@@ -5,7 +5,7 @@ systems:
   Transcend_Source:
     siteid:      "TDCLOUD14TD03"  # this is the actual SiteID for Transcend Prod (on-prem)
     active:      "True"
-    host:        "tdprdcop11.td.teradata.com"
+    host:        "tdprdcop3.td.teradata.com"
     username:    "{td_quicklook}"
     password:    "{td_password}"
     logmech:     "ldap"

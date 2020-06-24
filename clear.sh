@@ -9,3 +9,4 @@ rm coa.py
 rm config.yaml
 rm secrets.yaml
 rm source_systems.yaml
+rm motd.html
