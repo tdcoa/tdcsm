@@ -284,15 +284,6 @@ class coa():
         irow +=1
         ttk.Button(mainframe, text="Close", command=lambda:self.close(), width=10).grid(column=3, row=irow, sticky=tk.E)
 
-        #row: prepare_sql
-        irow +=1
-        subframe01 = ttk.Frame(mainframe).grid(column=0, row=irow, sticky=tk.W)
-        ttk.Button(subframe01, text="Prepare_SQL", command=lambda:self.__run_coa('p'), width=col2_width).grid(column=2, row=irow, sticky=tk.W)
-        self.chk_prepare_sql = ttk.Checkbutton(subframe01, text=" ", variable=self.chk_prepare_sql_var).grid(column=1, row=irow, sticky=tk.E)
-        ttk.Label(subframe01, text='Public').grid(column=3, row=irow, sticky=tk.W)
-
-
-
         for child in mainframe.winfo_children(): child.grid_configure(padx=5, pady=5)
 
         root.bind('<Escape>', self.close)
