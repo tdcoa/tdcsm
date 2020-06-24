@@ -159,13 +159,15 @@ class tdcoa:
                 if os.path.isfile(startfile_src):
                     with open(startfile_src) as f1:
                         startfilecontent = f1.read()
+                        self.utils.log('  template file pulled from package')
                 else:  # this is just-in-case, until I can be sure above logic is working.
                     if startfile == 'coa.py': startfilecontent = 'from tdcsm.tdgui import coa\nc=coa()'
                     if startfile == 'secrets.yaml': startfilecontent = 'secrets:\n  td_quicklook: "qlikuserid"\n  td_password:  "qlikpassword"'
                     if startfile == 'config.yaml': startfilecontent = self.yaml_config()
                     if startfile == 'source_systems.yaml': startfilecontent = self.yaml_systems()
+                    self.utils.log('  template file generated from backup')
                 with open(startfile_dst, 'w') as f2:
-                    f2.write(f1.read())
+                    f2.write(startfilecontent)
 
 
 
