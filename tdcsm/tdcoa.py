@@ -155,7 +155,7 @@ class tdcoa:
             if self.refresh_defaults and os.path.isfile(startfile_dst) and startfiles != 'secrets.yaml':
                 os.remove(startfile_dst)
             if not os.path.isfile(startfile_dst):
-                self.utils.log(' MISSING FILE, REPLACING WITH TEMPLATE', startfile)
+                self.utils.log(' MISSING FILE, REPLACING WITH TEMPLATE ', startfile)
                 if os.path.isfile(startfile_src):
                     with open(startfile_src) as f1:
                         startfilecontent = f1.read()
