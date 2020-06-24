@@ -138,7 +138,7 @@ class coa():
                 self.output_var.set(self.__get_lastrun_folder())
             if 'u' in steps:
                 # coa.upload_to_transcend() # <-- and again  >:^(
-                outputpath = os.path.join(self.approot_var.get(), '4_output', self.output_var.get())
+                outputpath = os.path.join(self.approot_var.get(), self.output_var.get())
                 cmd = "from tdcsm.tdcoa import tdcoa; c=tdcoa(approot='%s', config='%s', systems='%s', secrets='%s'); c.upload_to_transcend('%s')" %(self.approot_var.get(), self.config_var.get(), self.systems_var.get(), self.secrets_var.get(), outputpath)
                 os.system('python -c "%s"' %cmd)
         # update last output folder
@@ -261,7 +261,6 @@ class coa():
         #row: Output
         irow +=1
         ttk.Label(mainframe, text='Last Output Folder:').grid(column=1, row=irow, sticky=tk.E)
-        ttk.Label(mainframe, text='4_output%s' %(self.pathdelim)).grid(column=2, row=irow, sticky=tk.W)
         output_entry = ttk.Entry(mainframe, width=int(col2_width-10), textvariable=self.output_var).grid(column=2, row=irow, sticky=tk.E)
         outputpath = os.path.join(self.approot_var.get(), self.output_var.get())
         ttk.Button(mainframe, text="open", command=lambda:self.__open_file_explorer(outputpath), width=5).grid(column=3, row=irow, sticky=tk.W)
