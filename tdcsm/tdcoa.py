@@ -98,7 +98,7 @@ class tdcoa:
 
         self.reload_config()
 
-    def reload_config(self, configpath='', secretpath='', systemspath=''):
+    def reload_config(self, configpath='', secretpath='', systemspath='', refresh_defaults=False):
         """Reloads configuration YAML files (config & secrets) used as
         process driver.  This will also perform any local environment checks,
         such as creating missing folders (download|sql|run|output), change
@@ -138,43 +138,62 @@ class tdcoa:
         configpath = self.configpath if configpath == '' else configpath
         secretpath = self.secretpath if secretpath == '' else secretpath
         systemspath = self.systemspath if systemspath == '' else systemspath
+        self.refresh_defaults = refresh_defaults
 
         self.utils.bufferlogs = True
         self.utils.log('reload_config started', header=True)
         self.utils.log('time', str(dt.datetime.now()))
         self.utils.log('tdcoa version', self.version)
 
-        # for GUI - make sure coa.py is present in approot folder:
-        startguifile_src = os.path.join(os.path.dirname(tdcsm.__file__), 'coa.py')
-        startguifile_dst = os.path.join(self.approot, 'coa.py')
-        if not os.path.isfile(startguifile_dst) and os.path.isfile(startguifile_src):
-            with open(startguifile_src) as f1:
-                with open(startguifile_dst, 'w') as f2:
-                    f2.write(f1.read())
+        # ensure all required configuration files are present:
+        self.utils.log('checking core config files')
+        startfiles = ['coa.py','secrets.yaml','config.yaml','source_systems.yaml']
+        startfilecontent = ''
+        for startfile in startfiles:
+            startfile_src = os.path.join(os.path.dirname(tdcsm.__file__), startfile)
+            startfile_dst = os.path.join(self.approot, startfile)
+            if self.refresh_defaults and os.path.isfile(startfile_dst) and startfiles != 'secrets.yaml':
+                os.remove(startfile_dst)
+            if not os.path.isfile(startfile_dst):
+                self.utils.log(' MISSING FILE, REPLACING WITH TEMPLATE ', startfile)
+                if os.path.isfile(startfile_src):
+                    with open(startfile_src) as f1:
+                        startfilecontent = f1.read()
+                        self.utils.log('  template file pulled from package')
+                else:  # this is just-in-case, until I can be sure above logic is working.
+                    if startfile == 'coa.py': startfilecontent = 'from tdcsm.tdgui import coa\nc=coa()'
+                    if startfile == 'secrets.yaml': startfilecontent = 'secrets:\n  td_quicklook: "qlikuserid"\n  td_password:  "qlikpassword"'
+                    if startfile == 'config.yaml': startfilecontent = self.yaml_config()
+                    if startfile == 'source_systems.yaml': startfilecontent = self.yaml_systems()
+                    self.utils.log('  template file generated from backup')
+                with open(startfile_dst, 'w') as f2:
+                    f2.write(startfilecontent)
+
+
 
         # remove 2 default files -> config, source_systems
         # todo NOTE: currently not removing secrets file because it shouldnt require format updates
-        if self.refresh_defaults:
-            self.utils.log('\nRefresh defaults = True     **Note: secrets.yaml will not be changed**')
-            if os.path.isfile(self.configpath):
-                os.remove(self.configpath)
-                self.utils.log('old config.yaml found and removed')
-            if os.path.isfile(self.systemspath):
-                os.remove(self.systemspath)
-                self.utils.log('old source_systems.yaml found and removed')
-            # if os.path.isfile(self.secretpath):
-            #     os.remove(self.secretpath)
-            self.utils.log('')
+        #if self.refresh_defaults:
+        #    self.utils.log('\nRefresh defaults = True     **Note: secrets.yaml will not be changed**')
+        #    if os.path.isfile(self.configpath):
+        #        os.remove(self.configpath)
+        #        self.utils.log('old config.yaml found and removed')
+        #    if os.path.isfile(self.systemspath):
+        #        os.remove(self.systemspath)
+        #        self.utils.log('old source_systems.yaml found and removed')
+        #    # if os.path.isfile(self.secretpath):
+        #    #     os.remove(self.secretpath)
+        #    self.utils.log('')
 
         # load secrets. create default if missing
-        self.utils.log('loading secrets', os.path.basename(self.secretpath))
-        if not os.path.isfile(self.secretpath):
-            self.utils.log('creating default secrets', self.secretpath)
-            with open(os.path.join(os.path.dirname(tdcsm.__file__), 'secrets.yaml')) as f:
-                with open(secretpath, 'w') as f2:
-                    f2.write(f.read())
-        else:
-            self.utils.log('found secrets.yaml', self.secretpath)
+        #self.utils.log('loading secrets', os.path.basename(self.secretpath))
+        #if not os.path.isfile(self.secretpath):
+        #    self.utils.log('creating default secrets', self.secretpath)
+        #    with open(os.path.join(os.path.dirname(tdcsm.__file__), 'secrets.yaml')) as f:
+        #        with open(secretpath, 'w') as f2:
+        #            f2.write(f.read())
+        #else:
+        #    self.utils.log('found secrets.yaml', self.secretpath)
 
         with open(secretpath, 'r') as fh:
             secretstr = fh.read()
@@ -182,17 +201,17 @@ class tdcoa:
         self.utils.secrets = self.secrets  # update secrets attribute in logger
 
         # load config. create default if missing
-        if self.refresh_defaults:
-            self.utils.log('loading config', os.path.basename(self.configpath) + ' [FORCED REFRESH]')
-        else:
-            self.utils.log('loading config', os.path.basename(self.configpath))
-        if not os.path.isfile(self.configpath) or self.refresh_defaults:
-            self.utils.log('creating default config', self.configpath)
-            with open(os.path.join(os.path.dirname(tdcsm.__file__), 'config.yaml')) as f:
-                with open(configpath, 'w') as f2:
-                    f2.write(f.read())
-        else:
-            self.utils.log('found config.yaml', self.configpath)
+        #if self.refresh_defaults:
+        #    self.utils.log('loading config', os.path.basename(self.configpath) + ' [FORCED REFRESH]')
+        #else:
+        #    self.utils.log('loading config', os.path.basename(self.configpath))
+        #if not os.path.isfile(self.configpath) or self.refresh_defaults:
+        #    self.utils.log('creating default config', self.configpath)
+        #    with open(os.path.join(os.path.dirname(tdcsm.__file__), 'config.yaml')) as f:
+        #        with open(configpath, 'w') as f2:
+        #            f2.write(f.read())
+        #else:
+        #    self.utils.log('found config.yaml', self.configpath)
 
         with open(configpath, 'r') as fh:
             configstr = fh.read()
@@ -210,17 +229,17 @@ class tdcoa:
         self.substitutions = configyaml['substitutions']
 
         # load source systems. create default if missing
-        if self.refresh_defaults:
-            self.utils.log('loading source systems', os.path.basename(self.systemspath) + ' [FORCED REFRESH]')
-        else:
-            self.utils.log('loading source systems', os.path.basename(self.systemspath))
-        if not os.path.isfile(self.systemspath) or self.refresh_defaults:
-            self.utils.log('creating default source_systems', self.systemspath)
-            with open(os.path.join(os.path.dirname(tdcsm.__file__), 'source_systems.yaml')) as f:
-                with open(systemspath, 'w') as f2:
-                    f2.write(f.read())
-        else:
-            self.utils.log('found source_systems.yaml', self.systemspath)
+        #if self.refresh_defaults:
+        #    self.utils.log('loading source systems', os.path.basename(self.systemspath) + ' [FORCED REFRESH]')
+        #else:
+        #    self.utils.log('loading source systems', os.path.basename(self.systemspath))
+        #if not os.path.isfile(self.systemspath) or self.refresh_defaults:
+        #    self.utils.log('creating default source_systems', self.systemspath)
+        #    with open(os.path.join(os.path.dirname(tdcsm.__file__), 'source_systems.yaml')) as f:
+        #        with open(systemspath, 'w') as f2:
+        #            f2.write(f.read())
+        #else:
+        #    self.utils.log('found source_systems.yaml', self.systemspath)
 
         with open(systemspath, 'r') as fh:
             systemsstr = fh.read()
@@ -253,13 +272,12 @@ class tdcoa:
         self.settings = configyaml['settings']
         self.utils.check_setting(self.settings,
                            required_item_list=['githost', 'gitfileset', 'gitmotd', 'localfilesets',
-                                               'run_non_fileset_folders', 'customer_connection_type'],
+                                               'run_non_fileset_folders'],
                            defaults=['https://raw.githubusercontent.com/tdcoa/sql/master/',
                                      'filesets.yaml',
                                      'motd.txt',
                                      '{download}/filesets.yaml',
-                                     'True',
-                                     'sqlalchemy']
+                                     'True']
                            )
         self.filesetpath = self.settings['localfilesets']
 
@@ -1101,6 +1119,8 @@ class tdcoa:
         runlogdst = os.path.join(outputpath, 'runlog.txt')
         shutil.move(runlogsrc, runlogdst)
 
+
+
     def upload_to_transcend(self, _outputpath=''):
         self.utils.bufferlogs = True
         self.utils.log('upload_to_transcend started', header=True)
@@ -1285,3 +1305,66 @@ class tdcoa:
 
         self.utils.log('\ndone!')
         self.utils.log('time', str(dt.datetime.now()))
+
+    def yaml_config(self):
+        tmp = []
+        tmp.append('substitutions:')
+        tmp.append('  account:            "Demo Customer"')
+        tmp.append('  startdate:          "Current_Date - 7"')
+        tmp.append('  enddate:            "Current_Date - 1"')
+        tmp.append('')
+        tmp.append('transcend:')
+        tmp.append('  host:       "tdprdcop3.td.teradata.com"')
+        tmp.append('  username:   "{td_quicklook}"')
+        tmp.append('  password:   "{td_password}"')
+        tmp.append('  logmech:    "LDAP"')
+        tmp.append('  db_coa:     "adlste_coa"')
+        tmp.append('  db_region:  "adlste_westcomm"')
+        tmp.append('  db_stg:     "adlste_coa_stg"')
+        tmp.append('')
+        tmp.append('folders:')
+        tmp.append('  override:  "0_override"')
+        tmp.append('  download:  "1_download"')
+        tmp.append('  sql:       "2_sql_store"')
+        tmp.append('  run:       "3_ready_to_run"')
+        tmp.append('  output:    "4_output"')
+        tmp.append('')
+        tmp.append('settings:')
+        tmp.append('  githost:    "https://raw.githubusercontent.com/tdcoa/sql/master/"')
+        tmp.append('  gitfileset: "filesets/filesets.yaml"')
+        tmp.append('  gitmotd:    "motd.html"')
+        tmp.append('  localfilesets:   "./{download}/filesets.yaml"')
+        tmp.append('  secrets:    "secrets.yaml"')
+        tmp.append('  systems:    "source_systems.yaml"')
+        tmp.append('  text_format_extensions: [".sql", ".yaml", ".txt", ".csv", ".py"]')
+        tmp.append('  run_non_fileset_folders: "True"')
+        tmp.append('  write_to_perm: "True"')
+        return '\n'.join(tmp)
+
+    def yaml_systems(self):
+        tmp = []
+        tmp.append('systems:')
+        tmp.append('  Transcend_Source:')
+        tmp.append('    siteid:      "TDCLOUD14TD03"  ')
+        tmp.append('    active:      "True"')
+        tmp.append('    host:        "tdprdcop3.td.teradata.com"')
+        tmp.append('    username:    "{td_quicklook}"')
+        tmp.append('    password:    "{td_password}"')
+        tmp.append('    logmech:     "ldap"')
+        tmp.append('    driver:      "sqlalchemy" ')
+        tmp.append('    encryption:  "false"')
+        tmp.append('    use:         "test"   ')
+        tmp.append('    dbsversion:  "16.20"')
+        tmp.append('    collection:  "dbc"')
+        tmp.append('    filesets:')
+        tmp.append('      demo:')
+        tmp.append('        active:     "True"')
+        tmp.append('      level1_how_much:')
+        tmp.append('        active: "False"')
+        tmp.append('        startdate:  "Current_Date - 365"')
+        tmp.append('        enddate:    "Current_Date - 1"')
+        tmp.append('      dbql_core:')
+        tmp.append('        active: "False"')
+        tmp.append('        startdate:  "Current_Date - 45"')
+        tmp.append('        enddate:    "Current_Date - 1"')
+        return '\n'.join(tmp)
