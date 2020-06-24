@@ -261,7 +261,7 @@ class coa():
         #row: Output
         irow +=1
         ttk.Label(mainframe, text='Last Output Folder:').grid(column=1, row=irow, sticky=tk.E)
-        output_entry = ttk.Entry(mainframe, width=int(col2_width-10), textvariable=self.output_var).grid(column=2, row=irow, sticky=tk.E)
+        output_entry = ttk.Entry(mainframe, width=int(col2_width-10), textvariable=self.output_var).grid(column=2, row=irow, sticky=tk.W)
         outputpath = os.path.join(self.approot_var.get(), self.output_var.get())
         ttk.Button(mainframe, text="open", command=lambda:self.__open_file_explorer(outputpath), width=5).grid(column=3, row=irow, sticky=tk.W)
 
