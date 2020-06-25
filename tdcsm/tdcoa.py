@@ -61,7 +61,7 @@ class tdcoa:
     systemspath = ''
     filesetpath = ''
     outputpath = ''
-    version = "0.3.9.6.2"
+    version = "0.3.9.6.3"
 
     # dictionaries
     secrets = {}
@@ -1058,7 +1058,7 @@ class tdcoa:
                                                     vis_file = os.path.join(workpath, sqlcmd['vis'].replace('.csv', '.py'))
                                                     self.utils.log('vis py file', vis_file)
                                                     self.utils.log('running vis file..')
-                                                    os.system('python %s' % vis_file)
+                                                    os.system('python "%s"' % vis_file)
                                                     self.utils.log('Vis file complete!')
 
                                                 if 'pptx' in sqlcmd:  # insert to pptx file

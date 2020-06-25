@@ -1,4 +1,4 @@
-import subprocess, os
+import subprocess, os, platform
 
 
 class coa():
@@ -11,10 +11,11 @@ class coa():
     systems_var = ''
     coa = ''
     pathdelim = ''
+    localos =  ''
 
     debug = False
 
-    version = "0.1.0.4"
+    version = "0.1.0.9"
 
     def __init__(self, approot=''):
         print('GUI for TDCOA started')
@@ -22,14 +23,25 @@ class coa():
             self.approot_path = os.getcwd()
         else:
             self.approot_path = approot
+
+        if platform.system()[:3]=='Win':
+            self.localos='Win'
+        else:
+            self.localos='Mac'
+
         print('application root folder:\n\t%s' %self.approot_path)
         self.pathdelim = os.path.join('123','')[3:]
         self.run()
 
+
     def openconfig(self, filepath):
         pth = os.path.join(self.approot_var.get(), filepath)
         print('opening', '"%s"' %pth)
-        subprocess.call(['open', pth])
+        if self.localos=='Win':
+            os.system("notepad.exe %s" %pth)
+        else:
+            subprocess.call(['open', pth])
+
 
     def __get_filename(self, file):
         if file =='filesets.yaml':
@@ -63,21 +75,24 @@ class coa():
 
 
     def __open_file_explorer(self,folderpath):
-        try:
-            os.startfile(folderpath)  # windows
-            return True
-        except:
-            pass
-        try:
-            subprocess.Popen(["open", folderpath])  # mac
-            return True
-        except:
-            pass
-        try:
-            subprocess.Popen(["xdg-open", folderpath])  # Linux
-            return True
-        except:
-            pass
+        print('opening folder', folderpath)
+        if self.localos == 'Win':
+            try:   # windows
+                subprocess.Popen('explorer /select, "%s"' %folderpath.replace('\\','\\\\') )
+                return True
+            except:
+                pass
+        else:
+            try:
+                subprocess.Popen(["open", folderpath])  # mac
+                return True
+            except:
+                pass
+            try:
+                subprocess.Popen(["xdg-open", folderpath])  # Linux
+                return True
+            except:
+                pass
         return False
 
 
@@ -133,13 +148,15 @@ class coa():
                 coa.prepare_sql()
             if 'e' in steps:
                 # coa.execute_run() # <-- stupid langGO error  >:^(
-                cmd = "from tdcsm.tdcoa import tdcoa; c=tdcoa(approot='%s', config='%s', systems='%s', secrets='%s'); c.execute_run()" %(self.approot_var.get(), self.config_var.get(), self.systems_var.get(), self.secrets_var.get())
+                cmd = "from tdcsm.tdcoa import tdcoa; c=tdcoa(approot='%s', config='%s', systems='%s', secrets='%s'); c.execute_run()" %( str(self.approot_var.get()).replace('\\','\\\\'), self.config_var.get(), self.systems_var.get(), self.secrets_var.get())
+                print(cmd)
                 os.system('python -c "%s"' %cmd)
                 self.output_var.set(self.__get_lastrun_folder())
             if 'u' in steps:
                 # coa.upload_to_transcend() # <-- and again  >:^(
-                outputpath = os.path.join(self.approot_var.get(), self.output_var.get())
-                cmd = "from tdcsm.tdcoa import tdcoa; c=tdcoa(approot='%s', config='%s', systems='%s', secrets='%s'); c.upload_to_transcend('%s')" %(self.approot_var.get(), self.config_var.get(), self.systems_var.get(), self.secrets_var.get(), outputpath)
+                outputpath = os.path.join(r'{}'.format(self.approot_var.get()), self.output_var.get())
+                cmd = "from tdcsm.tdcoa import tdcoa; c=tdcoa(approot='%s', config='%s', systems='%s', secrets='%s'); c.upload_to_transcend('%s')" %(str(self.approot_var.get()).replace('\\','\\\\'), self.config_var.get(), self.systems_var.get(), self.secrets_var.get(), outputpath)
+                print(cmd)
                 os.system('python -c "%s"' %cmd)
         # update last output folder
         self.output_var.set(self.__get_lastrun_folder())
