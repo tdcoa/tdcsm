@@ -1055,12 +1055,18 @@ class tdcoa:
                                                     self.utils.log('file saved!')
                                                     csvfile_exists = os.path.exists(csvfile)
                                                 if 'vis' in sqlcmd:  # run visualization py file
-                                                    self.utils.log('\nvis cmd', 'found')
-                                                    vis_file = os.path.join(workpath, sqlcmd['vis'].replace('.csv', '.py'))
-                                                    self.utils.log('vis py file', vis_file)
-                                                    self.utils.log('running vis file..')
-                                                    os.system('python %s' % vis_file)
-                                                    self.utils.log('Vis file complete!')
+                                                    if csvfile_exists == False:  # Avoid load error by skipping the manifest file entry if SQL returns zero records.
+                                                        self.utils.log(
+                                                            'The SQL returned Zero records and hence the file was not generated, So skipping the vis special command',
+                                                            csvfile)
+                                                    else:
+
+                                                        self.utils.log('\nvis cmd', 'found')
+                                                        vis_file = os.path.join(workpath, sqlcmd['vis'].replace('.csv', '.py'))
+                                                        self.utils.log('vis py file', vis_file)
+                                                        self.utils.log('running vis file..')
+                                                        os.system('python %s' % vis_file)
+                                                        self.utils.log('Vis file complete!')
 
                                                 if 'pptx' in sqlcmd:  # insert to pptx file
                                                     self.utils.log('\npptx cmd', 'found')
