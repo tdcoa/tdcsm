@@ -247,7 +247,7 @@ class Utils(Logger):
     def recursive_delete(self, delpath):
         if os.path.isdir(delpath):
             self.log(' recursively deleting', delpath)
-            shutil.rmtree(delpath)
+            shutil.rmtree(delpath,ignore_errors=True) # Set ignore error as true to avoid failure because of read only files not being deleted.
         else:
             self.log(' path not found', delpath)
 
