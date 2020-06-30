@@ -1,0 +1,45 @@
+# Substitutions can be used in both the config.yaml (below), 
+#   as well as all .coa.sql files generated in later steps.
+#   format is {name} --> value   (all instances)
+#   Order of config substitution is: 
+#      - secrets.yaml
+#      - config.yaml: substitutions, folders, settings, transcend
+#   Order of sql substitution is, per file set: 
+#      - config.yaml: system, substitutions, filesets (in download folder)
+
+
+substitutions:
+  account:            "Demo Customer"
+  startdate:          "Current_Date - 7"
+  enddate:            "Current_Date - 1"
+  some_value:         "Camel"
+
+
+transcend:
+  host:       "tdprdcop3.td.teradata.com"
+  username:   "{td_quicklook}"
+  password:   "{td_password}"
+  logmech:    "LDAP"
+  db_coa:     "adlste_coa"
+  db_region:  "adlste_westcomm"
+  db_stg:     "adlste_coa_stg"
+
+
+folders:
+  override:  "0_override"
+  download:  "1_download"
+  sql:       "2_sql_store"
+  run:       "3_ready_to_run"
+  output:    "4_output"
+
+
+settings:
+  githost:    "https://raw.githubusercontent.com/tdcoa/sql/master/"
+  gitfileset: "filesets/filesets.yaml"
+  gitmotd:    "motd.html"
+  localfilesets:   "./{download}/filesets.yaml"
+  secrets:    "secrets.yaml"
+  systems:    "source_systems.yaml"
+  text_format_extensions: ['.sql', '.yaml', '.txt', '.csv', '.py']
+  run_non_fileset_folders: "True"
+  write_to_perm: "True"
