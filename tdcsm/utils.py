@@ -482,49 +482,19 @@ class Utils(Logger):
 
                     # insert image
                     if '.png' in shape.text:
-                        # img_name = shape.text.replace('{{pic:', '').replace('}}', '')  # get img file name to be inserted
-                        # slide.shapes.add_picture(os.path.join(workpath, img_name),
-                        #                          left=shape.left,
-                        #                          top=shape.top,
-                        #                          height=shape.height,
-                        #                          width=shape.width)  # insert with same dimensions as placeholder
-                        #
-                        # # remove placeholder shape
-                        # shape_to_remove = shape._element
-                        # shape_to_remove.getparent().remove(shape_to_remove)
+                        img_name = shape.text.replace('{{pic:', '').replace('}}', '')  # get img file name to be inserted
+                        slide.shapes.add_picture(os.path.join(workpath, img_name),
+                                                 left=shape.left,
+                                                 top=shape.top,
+                                                 height=shape.height,
+                                                 width=shape.width)  # insert with same dimensions as placeholder
 
-                        try:
-                            img_name = shape.text.replace('{{pic:', '').replace('}}', '').replace('**',
-                                                                                                  '')  # get img file name to be inserted
-                            slide.shapes.add_picture(os.path.join(workpath, img_name),
-                                                     left=shape.left,
-                                                     top=shape.top,
-                                                     height=shape.height,
-                                                     width=shape.width)  # insert with same dimensions as placeholder
-
-                            # remove placeholder shape
-                            shape_to_remove = shape._element
-                            shape_to_remove.getparent().remove(shape_to_remove)
-
-                        except OSError as e:
-                            text_ori = shape.text.replace('**', '')
-                            text_frame = shape.text_frame
-                            text_frame.clear()  # not necessary for newly-created shape
-
-                            p = text_frame.paragraphs[0]
-                            run = p.add_run()
-                            run.text = text_ori + '**'
-
-                            font = run.font
-                            #                         font.name = 'Calibri'
-                            #                         font.size = Pt(18)
-                            #                         font.bold = True
-                            #                         font.color.rgb = RGBColor(0xFF, 0x7F, 0x50)
-
-                            print("File Not Found!!")
+                        # remove placeholder shape
+                        shape_to_remove = shape._element
+                        shape_to_remove.getparent().remove(shape_to_remove)
                     else:
                         # csv_name = shape.text[shape.text.find("{{")+2 : shape.text.find("}}")]
-                        file_not_found = False
+
                         index = 0
                         csv_name_list = []
                         text = shape.text
@@ -555,20 +525,10 @@ class Utils(Logger):
                             df_name_cell = csv_name.split('.csv')
                             df_name = df_name_cell[0]
                             df_cell = df_name_cell[1]
-                            # df_csv = pd.read_csv(os.path.join(workpath, df_name + '.csv'))
-                            # # df_value = df_csv[df_cell[1]:df_cell[3]]
-                            # df_value = df_csv.iloc[int(df_cell[1]) - 2, int(df_cell[3]) - 1]
-                            # csv_name_value.append(df_value)
-
-                            try:
-                                df_csv = pd.read_csv(os.path.join(workpath, df_name + '.csv'))
-                                # df_value = df_csv[df_cell[1]:df_cell[3]]
-                                df_value = df_csv.iloc[int(df_cell[1]) - 2, int(df_cell[3]) - 1]
-                                csv_name_value.append(df_value)
-                            except OSError as e:
-
-                                csv_name_value.append(csv_name)
-                                file_not_found = True
+                            df_csv = pd.read_csv(os.path.join(workpath, df_name + '.csv'))
+                            # df_value = df_csv[df_cell[1]:df_cell[3]]
+                            df_value = df_csv.iloc[int(df_cell[1]) - 2, int(df_cell[3]) - 1]
+                            csv_name_value.append(df_value)
 
                         text_2 = ''
                         i = 0
@@ -603,28 +563,19 @@ class Utils(Logger):
                             try:
                                 text_2 = text_2 + text[text_start:start_index - 6] + csv_name_value[i]
                             except:
-                                # text_2 = text_2 + text[text_start:start_index - 6] + csv_name_value[i].astype(numpy.str)
-                                try:
-                                    text_2 = text_2 + text[text_start:start_index - 6] + csv_name_value[i].astype(
-                                        numpy.str)
-                                except:
-                                    file_not_found = True
+                                text_2 = text_2 + text[text_start:start_index - 6] + csv_name_value[i].astype(numpy.str)
+
                             i += 1
 
                             text_start = index
 
                         text_2 = text_2 + text[end_index + 2:]
 
-                        # #     csv_name = text[start_index:end_index]
-                        # #     csv_name_list.append(csv_name)
-                        #
-                        # # new_text = shape.text[0:shape.text.find("{{")] + df_value + " " + shape.text[shape.text.find("}}") + 2 : ]
-                        # shape.text = text_2
+                        #     csv_name = text[start_index:end_index]
+                        #     csv_name_list.append(csv_name)
 
-                        if file_not_found == True:
-                            shape.text = text_ori.replace('**', '') + "**"
-                        else:
-                            shape.text = text_2.replace('**', '')
+                        # new_text = shape.text[0:shape.text.find("{{")] + df_value + " " + shape.text[shape.text.find("}}") + 2 : ]
+                        shape.text = text_2
 
                 elif shape.shape_type == 19:
                     num_of_columns_in_ppt = len(shape.table.columns)
@@ -676,66 +627,32 @@ class Utils(Logger):
 
                                     cell_text = shape.table.cell(j_row_counter_in_ppt, i_col_counter_in_ppt).text
 
-                                    # df_name = cell_text[cell_text.find('{{col:') + 6: cell_text.find('.csv') + 4]
-                                    # print('df_name: ', df_name)
-                                    # # df = pd.read_csv(workpath + '\\' + df_name)
-                                    # df = pd.read_csv(os.path.join(workpath, df_name))
-                                    #
-                                    # df_columns = df.columns
-                                    # print('df_columns:', df_columns)
-                                    #
-                                    # df_length_new = len(df.index)
-                                    #
-                                    # if df_length == -1 or df_length < df_length_new:
-                                    #     df_length = df_length_new
-                                    #
-                                    # if len(df_name) > 0:
-                                    #     cell_text_index = int(cell_text[cell_text.find('[') + 1:cell_text.find(']')])
-                                    #     print('cell_text_index:', cell_text_index)
-                                    #     column_name = df_columns[cell_text_index - 1]
-                                    #     print('column_name:', column_name)
-                                    # else:
-                                    #     column_name = ''
-                                    #
-                                    # column_name_list.append(column_name)
-                                    #
-                                    # single_column_list = list(df[column_name].values)
-                                    #
-                                    # skip_column_list.append(i_col_counter_in_ppt)
+                                    df_name = cell_text[cell_text.find('{{col:') + 6: cell_text.find('.csv') + 4]
+                                    print('df_name: ', df_name)
+                                    # df = pd.read_csv(workpath + '\\' + df_name)
+                                    df = pd.read_csv(os.path.join(workpath, df_name))
 
-                                    try:
+                                    df_columns = df.columns
+                                    print('df_columns:', df_columns)
 
-                                        df_name = cell_text[cell_text.find('{{col:') + 6: cell_text.find('.csv') + 4]
-                                        print('df_name: ', df_name)
-                                        # df = pd.read_csv(workpath + '\\' + df_name)
-                                        df = pd.read_csv(os.path.join(workpath, df_name))
+                                    df_length_new = len(df.index)
 
-                                        df_columns = df.columns
-                                        print('df_columns:', df_columns)
+                                    if df_length == -1 or df_length < df_length_new:
+                                        df_length = df_length_new
 
-                                        df_length_new = len(df.index)
+                                    if len(df_name) > 0:
+                                        cell_text_index = int(cell_text[cell_text.find('[') + 1:cell_text.find(']')])
+                                        print('cell_text_index:', cell_text_index)
+                                        column_name = df_columns[cell_text_index - 1]
+                                        print('column_name:', column_name)
+                                    else:
+                                        column_name = ''
 
-                                        if df_length == -1 or df_length < df_length_new:
-                                            df_length = df_length_new
+                                    column_name_list.append(column_name)
 
-                                        if len(df_name) > 0:
-                                            cell_text_index = int(
-                                                cell_text[cell_text.find('[') + 1:cell_text.find(']')])
-                                            print('cell_text_index:', cell_text_index)
-                                            column_name = df_columns[cell_text_index - 1]
-                                            print('column_name:', column_name)
-                                        else:
-                                            column_name = ''
+                                    single_column_list = list(df[column_name].values)
 
-                                        column_name_list.append(column_name)
-
-                                        single_column_list = list(df[column_name].values)
-
-                                        skip_column_list.append(i_col_counter_in_ppt)
-
-                                    except:
-                                        column_name = cell_text.replace('**', '') + "**"
-                                        column_name_list.append(column_name)
+                                    skip_column_list.append(i_col_counter_in_ppt)
 
 
                                 else:
@@ -759,47 +676,23 @@ class Utils(Logger):
                                     print('yes, value')
 
                                     #                             if df_name == '':
-                                    # df_name = cell_text[cell_text.find('{{val:') + 6: cell_text.find('.csv') + 4]
-                                    # print('df_name: ', df_name)
-                                    # # df = pd.read_csv(workpath + '\\' + df_name)
-                                    # df = pd.read_csv(os.path.join(workpath, df_name))
-                                    #
-                                    # if ':' in cell_text:
-                                    #     cell_text_index = cell_text[cell_text.find('[') + 1:cell_text.find(']')].split(
-                                    #         ':')
-                                    #     print('cell_text_index:', cell_text_index)
-                                    #
-                                    #     # cell_value = df.iloc[int(cell_text_index[1]) - 2, int(cell_text_index[0]) -1]
-                                    #     cell_value = df.iloc[int(cell_text_index[0]) - 2, int(cell_text_index[1]) -1]
+                                    df_name = cell_text[cell_text.find('{{val:') + 6: cell_text.find('.csv') + 4]
+                                    print('df_name: ', df_name)
+                                    # df = pd.read_csv(workpath + '\\' + df_name)
+                                    df = pd.read_csv(os.path.join(workpath, df_name))
 
+                                    if ':' in cell_text:
+                                        cell_text_index = cell_text[cell_text.find('[') + 1:cell_text.find(']')].split(
+                                            ':')
+                                        print('cell_text_index:', cell_text_index)
 
-                                    # else:
-                                    #     cell_value = cell_text
-                                    #
-                                    # print('cell_value:', cell_value)
+                                        # cell_value = df.iloc[int(cell_text_index[1]) - 2, int(cell_text_index[0]) -1]
+                                        cell_value = df.iloc[int(cell_text_index[0]) - 2, int(cell_text_index[1]) -1]
 
-                                    try:
-                                        df_name = cell_text[cell_text.find('{{val:') + 6: cell_text.find('.csv') + 4]
-                                        print('df_name: ', df_name)
-                                        # df = pd.read_csv(workpath + '\\' + df_name)
-                                        df = pd.read_csv(os.path.join(workpath, df_name))
+                                    else:
+                                        cell_value = cell_text
 
-                                        if ':' in cell_text:
-                                            cell_text_index = cell_text[
-                                                              cell_text.find('[') + 1:cell_text.find(']')].split(
-                                                ':')
-                                            print('cell_text_index:', cell_text_index)
-
-                                            # cell_value = df.iloc[int(cell_text_index[1]) - 2, int(cell_text_index[0]) -1]
-                                            cell_value = df.iloc[
-                                                int(cell_text_index[0]) - 2, int(cell_text_index[1]) - 1]
-
-                                        else:
-                                            cell_value = cell_text
-
-                                        print('cell_value:', cell_value)
-                                    except:
-                                        cell_value = cell_text.replace('**', '') + "**"
+                                    print('cell_value:', cell_value)
 
                                 else:
                                     cell_value = cell_text
