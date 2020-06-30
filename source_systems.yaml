@@ -1,0 +1,50 @@
+systems:
+  # this is actual information for running on Transcend
+  # as if it were a customer system
+  # (the information for uploading to Transcend is in config.yaml)
+  Transcend_Source:
+    siteid:      "TDCLOUD14TD03"  # this is the actual SiteID for Transcend Prod (on-prem)
+    active:      "True"
+    host:        "tdprdcop3.td.teradata.com"
+    username:    "{td_quicklook}"
+    password:    "{td_password}"
+    logmech:     "ldap"
+    driver:      "sqlalchemy" # valid values: "sqlalchemy", "teradataml", or an odbc driver name
+    encryption:  "false"
+    use:         "test"   # prod/qa/dr/dev/etc
+    some_value:  "Bear"
+    dbsversion:  "16.20"
+    collection:  "dbc"
+    filesets:
+      demo:
+        active:     "True"
+        some_value: "Aardvark"
+
+  # this is intended as a mock-up, to alter for your customer:
+  Customer_System_Example:
+    siteid:      "custabcprod01"
+    active:      "false"
+    host:        "prod.custabc.com"
+    username:    "{custabc_username}"
+    password:    "{custabc_password}"
+    logmech:     ""
+    driver:      "sqlalchemy" # valid values: "sqlalchemy", "teradataml", or an odbc driver name
+    encryption:  "false"
+    use:         "prod"
+    dbsversion:  "16.20"
+    collection:  "dbc"
+    filesets:
+      demo:
+        active: "False"
+      level1_how_much:
+        active: "False"
+        startdate:  "Current_Date - 365"
+        enddate:    "Current_Date - 1"
+      level2_how_well:
+        active: "False"
+        startdate:  "Current_Date - 90"
+        enddate:    "Current_Date - 1"
+      dbql_core:
+        active: "False"
+        startdate:  "Current_Date - 45"
+        enddate:    "Current_Date - 1"
