@@ -14,7 +14,7 @@ systems:
     use:         "test"   # prod/qa/dr/dev/etc
     some_value:  "Bear"
     dbsversion:  "16.20"
-    collection:  "dbc"
+    collection:  "pdcr"
     filesets:
       demo:
         active:     "True"

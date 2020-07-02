@@ -61,7 +61,8 @@ class tdcoa:
     systemspath = ''
     filesetpath = ''
     outputpath = ''
-    version = "0.3.9.5.4"
+    version = "0.3.9.6.6"
+    skip_dbs = False
 
     # dictionaries
     secrets = {}
@@ -277,8 +278,13 @@ class tdcoa:
                                      'filesets.yaml',
                                      'motd.txt',
                                      '{download}/filesets.yaml',
-                                     'True']
-                           )
+                                     'True'])
+
+        # add skip_dbs back in as silent (unlisted) option
+        if 'skip_dbs' in self.settings:
+            if self.settings['skip_dbs'].strip().lower() == 'true':
+                self.skip_dbs = True
+                
         self.filesetpath = self.settings['localfilesets']
 
         # create missing folders
@@ -992,7 +998,8 @@ class tdcoa:
                                     conn = self.utils.open_connection(
                                         conntype=self.systems[sysname]['driver'],
                                         encryption=self.systems[sysname]['encryption'],
-                                        system=self.systems[sysname])  # <------------------------------- Connect to the database
+                                        system=self.systems[sysname],
+                                        skip = self.skip_dbs)  # <------------------------------- Connect to the database
 
                                     # loop thru all sql files:
                                     for coasqlfile in sorted(coasqlfiles):
@@ -1014,7 +1021,7 @@ class tdcoa:
                                                 sqlcmd = self.utils.get_special_commands(sql)
                                                 sql = sqlcmd.pop('sql', '')
 
-                                                df = self.utils.open_sql(conn, sql)  # <--------------------- Run SQL
+                                                df = self.utils.open_sql(conn, sql, skip = self.skip_dbs)  # <--------------------- Run SQL
 
                                                 if len(df) != 0:  # Save non-empty returns to .csv
 
@@ -1032,7 +1039,7 @@ class tdcoa:
                                                     # Col names will be merged upon save
                                                     col_names = []
                                                     if conn['type'] not in ('sqlalchemy', 'teradataml'):
-                                                        col_names = self.utils.open_sql(conn, sql, columns=True)
+                                                        col_names = self.utils.open_sql(conn, sql, columns=True, skip = self.skip_dbs)
 
                                                     # once built, append output folder, SiteID on the front, iterative counter if duplicates
                                                     # csvfile = os.path.join(outputfo, sqlcmd['save'])
@@ -1170,7 +1177,8 @@ class tdcoa:
 
         transcend = self.utils.open_connection(
             'teradataml',
-            system=self.transcend)  # <--------------------------------- Connect
+            system=self.transcend,
+            skip = self.skip_dbs)  # <--------------------------------- Connect
 
         # Walk the directory structure looking for upload_manifest.json files
         for workpath, subfo, files in os.walk(outputpath):
@@ -1236,16 +1244,18 @@ class tdcoa:
                                     self.utils.log('perm table', entry['schema'] + '.' + entry['table'] + '_%s' % self.unique_id)
 
                                     # create staging table (perm) with unique id
-                                    copy_to_sql(dfcsv, entry['table'] + '_%s' % self.unique_id, entry['schema'], if_exists='replace')
+                                    if self.settings['skip_dbs'] != 'True':
+                                        copy_to_sql(dfcsv, entry['table'] + '_%s' % self.unique_id, entry['schema'], if_exists='replace')
                                     self.utils.log('complete', str(dt.datetime.now()))
 
                                     # load to GTT
                                     self.utils.log('\nload to GTT', entry['schema'] + '.' + entry['table'])
-                                    transcend['connection'].execute("""
-                                    INSERT INTO {db}.{table} SELECT * FROM {db}.{unique_table}
-                                    """.format(db=entry['schema'],
-                                               table=entry['table'],
-                                               unique_table=entry['table'] + '_%s' % self.unique_id))
+                                    if self.settings['skip_dbs'] != 'True':
+                                        transcend['connection'].execute("""
+                                        INSERT INTO {db}.{table} SELECT * FROM {db}.{unique_table}
+                                        """.format(db=entry['schema'],
+                                                   table=entry['table'],
+                                                   unique_table=entry['table'] + '_%s' % self.unique_id))
                                     self.utils.log('complete', str(dt.datetime.now()))
                                     successful_load = True
 
@@ -1256,7 +1266,8 @@ class tdcoa:
                                 # 2. call sp on GTT to merge to final table
                                 else:
                                     self.utils.log('write_to_perm', 'False')
-                                    copy_to_sql(dfcsv, entry['table'], entry['schema'], if_exists='append')
+                                    if self.settings['skip_dbs'] != 'True':
+                                        copy_to_sql(dfcsv, entry['table'], entry['schema'], if_exists='append')
                                     self.utils.log('complete', str(dt.datetime.now()))
                                     successful_load = True
 
@@ -1284,17 +1295,19 @@ class tdcoa:
                             if str(entry['call']).strip() != "" and successful_load:
                                 self.utils.log('\nStored Proc', str(entry['call']))
                                 try:
-                                    transcend['connection'].execute('call %s ;' % str(entry['call']))
+                                    if self.settings['skip_dbs'] != 'True':
+                                        transcend['connection'].execute('call %s ;' % str(entry['call']))
                                     self.utils.log('complete', str(dt.datetime.now()))
 
                                     # if write_to_perm == true, drop unique perm table after successful sp call
                                     if self.settings['write_to_perm'].lower() == 'true':
                                         self.utils.log('\ndrop unique perm table', entry['schema'] + '.' + entry['table'] + '_%s' % self.unique_id)
 
-                                        transcend['connection'].execute("""
-                                        DROP TABLE {db}.{unique_table}
-                                        """.format(db=entry['schema'],
-                                                   unique_table=entry['table'] + '_%s' % self.unique_id))
+                                        if self.settings['skip_dbs'] != 'True':
+                                            transcend['connection'].execute("""
+                                            DROP TABLE {db}.{unique_table}
+                                            """.format(db=entry['schema'],
+                                                       unique_table=entry['table'] + '_%s' % self.unique_id))
 
                                         self.utils.log('complete', str(dt.datetime.now()))
 
