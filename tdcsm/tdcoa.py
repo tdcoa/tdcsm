@@ -1015,7 +1015,8 @@ class tdcoa:
                                                 sql = sqlcmd.pop('sql', '')
 
                                                 df = self.utils.open_sql(conn, sql)  # <--------------------- Run SQL
-
+                                                csvfile=''
+                                                csvfile_exists=False
                                                 if len(df) != 0:  # Save non-empty returns to .csv
 
                                                     if len(sqlcmd) == 0:
@@ -1052,14 +1053,20 @@ class tdcoa:
                                                     else:  # if odbc conn type, merge in column names
                                                         df.to_csv(csvfile, header=col_names)  # <---------------------- Save to .csv
                                                     self.utils.log('file saved!')
-
+                                                    csvfile_exists = os.path.exists(csvfile)
                                                 if 'vis' in sqlcmd:  # run visualization py file
-                                                    self.utils.log('\nvis cmd', 'found')
-                                                    vis_file = os.path.join(workpath, sqlcmd['vis'].replace('.csv', '.py'))
-                                                    self.utils.log('vis py file', vis_file)
-                                                    self.utils.log('running vis file..')
-                                                    os.system('python "%s"' % vis_file)
-                                                    self.utils.log('Vis file complete!')
+                                                    if csvfile_exists == False:  # Avoid load error by skipping the manifest file entry if SQL returns zero records.
+                                                        self.utils.log(
+                                                            'The SQL returned Zero records and hence the file was not generated, So skipping the vis special command',
+                                                            csvfile)
+                                                    else:
+
+                                                        self.utils.log('\nvis cmd', 'found')
+                                                        vis_file = os.path.join(workpath, sqlcmd['vis'].replace('.csv', '.py'))
+                                                        self.utils.log('vis py file', vis_file)
+                                                        self.utils.log('running vis file..')
+                                                        os.system('python %s' % vis_file)
+                                                        self.utils.log('Vis file complete!')
 
                                                 if 'pptx' in sqlcmd:  # insert to pptx file
                                                     self.utils.log('\npptx cmd', 'found')
@@ -1070,19 +1077,25 @@ class tdcoa:
                                                     self.utils.log('pptx file complete!')
 
                                                 if 'load' in sqlcmd:  # add to manifest
-                                                    self.utils.log(
-                                                        'file marked for loading to Transcend, adding to upload-manifest.json')
-                                                    if 'call' not in sqlcmd:
-                                                        sqlcmd['call'] = ''
-                                                    manifest_entry = '%s{"file": "%s",  "table": "%s",  "call": "%s"}' % (
+
+                                                    if csvfile_exists == False: #Avoid load error by skipping the manifest file entry if SQL returns zero records.
+                                                        self.utils.log('The SQL returned Zero records and hence the file was not generated, So skipping the manifest entry',
+                                                                       csvfile)
+                                                    else:
+                                                        self.utils.log(
+                                                            'file marked for loading to Transcend, adding to upload-manifest.json')
+                                                        if 'call' not in sqlcmd:
+                                                            sqlcmd['call'] = ''
+
+                                                        manifest_entry = '%s{"file": "%s",  "table": "%s",  "call": "%s"}' % (
                                                         manifestdelim, sqlcmd['save'], sqlcmd['load'],
                                                         sqlcmd['call'])
-                                                    manifestdelim = '\n,'
+                                                        manifestdelim = '\n,'
 
-                                                    with open(os.path.join(outputfo, 'upload-manifest.json'),
+                                                        with open(os.path.join(outputfo, 'upload-manifest.json'),
                                                               'a') as manifest:
-                                                        manifest.write(manifest_entry)
-                                                        self.utils.log('Manifest updated',
+                                                            manifest.write(manifest_entry)
+                                                            self.utils.log('Manifest updated',
                                                                  str(manifest_entry).replace(',', ',\n'))
 
                                         # archive file we just processed (for re-run-ability)
