@@ -97,6 +97,34 @@ class tdcoa:
         # filesets.yaml is validated at download time
 
         self.reload_config()
+        if os.path.exists(self.filesetpath) and os.path.exists(self.systemspath):
+            self.update_sourcesystem_yaml()
+
+    # Function to add Source system yaml file with all the fileset entries in the filesets.yaml file and set active to false
+    def update_sourcesystem_yaml(self):
+        with open(self.systemspath, 'r') as fh:
+            filesetstr = fh.read()
+        sourcesysyaml = yaml.load(filesetstr, Loader=yaml.FullLoader)
+        fh.close()
+        with open(self.filesetpath, 'r') as fh:
+            filesetstr = fh.read()
+        filesetsyaml = yaml.load(filesetstr, Loader=yaml.FullLoader)
+        fh.close()
+        filesets = []
+        for fileset, filesetobj in filesetsyaml.items():
+            filesets.append(fileset)
+
+        for sysname in sourcesysyaml['systems'].keys():
+            sys_filesets = list(sourcesysyaml['systems'][sysname]['filesets'].keys())
+            missing_filesets = list(set(filesets) - set(sys_filesets))
+            for fileset in missing_filesets:
+                sourcesysyaml['systems'][sysname]['filesets'][fileset] = {}
+                sourcesysyaml['systems'][sysname]['filesets'][fileset]['active'] = 'False'
+
+        with open(self.systemspath, 'w') as fh:
+            fh.write(yaml.dump(sourcesysyaml))
+        fh.close()
+        self.utils.log('Updated the Sourcesystem yaml file with all the fileset entries in the filesets.yaml file')
 
     def reload_config(self, configpath='', secretpath='', systemspath='', refresh_defaults=False):
         """Reloads configuration YAML files (config & secrets) used as
@@ -479,7 +507,9 @@ class tdcoa:
 
                         else:  # not found
                             self.utils.log(' not found in filesets.yaml', sys_setname)
-
+        # Update the Sourcesystem yaml file with all the available filesets in the filesets.yaml
+        if os.path.exists(self.filesetpath) and os.path.exists(self.systemspath):
+            self.update_sourcesystem_yaml()
         self.utils.log('\ndone!')
         self.utils.log('time', str(dt.datetime.now()))
 
@@ -536,15 +566,6 @@ class tdcoa:
                             # todo add logging regarding which files are being skipped / copied
                             if dbsversion_match and collection_match:
                                 shutil.copyfile(os.path.join(srcpath, downloaded_file), os.path.join(dstpath, downloaded_file))
-
-
-
-
-
-
-
-
-
 
         self.utils.log('\ndone!')
         self.utils.log('time', str(dt.datetime.now()))
