@@ -284,7 +284,7 @@ class tdcoa:
         if 'skip_dbs' in self.settings:
             if self.settings['skip_dbs'].strip().lower() == 'true':
                 self.skip_dbs = True
-                
+
         self.filesetpath = self.settings['localfilesets']
 
         # create missing folders
@@ -1244,13 +1244,13 @@ class tdcoa:
                                     self.utils.log('perm table', entry['schema'] + '.' + entry['table'] + '_%s' % self.unique_id)
 
                                     # create staging table (perm) with unique id
-                                    if self.settings['skip_dbs'] != 'True':
+                                    if not self.skip_dbs:
                                         copy_to_sql(dfcsv, entry['table'] + '_%s' % self.unique_id, entry['schema'], if_exists='replace')
                                     self.utils.log('complete', str(dt.datetime.now()))
 
                                     # load to GTT
                                     self.utils.log('\nload to GTT', entry['schema'] + '.' + entry['table'])
-                                    if self.settings['skip_dbs'] != 'True':
+                                    if not self.skip_dbs:
                                         transcend['connection'].execute("""
                                         INSERT INTO {db}.{table} SELECT * FROM {db}.{unique_table}
                                         """.format(db=entry['schema'],
@@ -1266,7 +1266,7 @@ class tdcoa:
                                 # 2. call sp on GTT to merge to final table
                                 else:
                                     self.utils.log('write_to_perm', 'False')
-                                    if self.settings['skip_dbs'] != 'True':
+                                    if not self.skip_dbs:
                                         copy_to_sql(dfcsv, entry['table'], entry['schema'], if_exists='append')
                                     self.utils.log('complete', str(dt.datetime.now()))
                                     successful_load = True
@@ -1295,7 +1295,7 @@ class tdcoa:
                             if str(entry['call']).strip() != "" and successful_load:
                                 self.utils.log('\nStored Proc', str(entry['call']))
                                 try:
-                                    if self.settings['skip_dbs'] != 'True':
+                                    if not self.skip_dbs:
                                         transcend['connection'].execute('call %s ;' % str(entry['call']))
                                     self.utils.log('complete', str(dt.datetime.now()))
 
@@ -1303,7 +1303,7 @@ class tdcoa:
                                     if self.settings['write_to_perm'].lower() == 'true':
                                         self.utils.log('\ndrop unique perm table', entry['schema'] + '.' + entry['table'] + '_%s' % self.unique_id)
 
-                                        if self.settings['skip_dbs'] != 'True':
+                                        if not self.skip_dbs:
                                             transcend['connection'].execute("""
                                             DROP TABLE {db}.{unique_table}
                                             """.format(db=entry['schema'],
