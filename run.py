@@ -1,27 +1,33 @@
 from tdcsm.tdcoa import tdcoa
 
-coa = tdcoa(approot=r'C:\Deepan\Data_Science\tdcsm\tdcoa_demo')
+coa = tdcoa(approot='../coa/Test', secrets='../!secrets.yaml')
 
 options = """
 Select a step:
 
+0) Reload Configs
 1) Download Files
 2) Prepare SQL
 3) Execute Run
 4) Upload to Transcend
+5) Exit
 """
 
 while True:
 
-    x = 0
-    while x < 1 or x > 5:
+    x = -1
+    while x < 0 or x > 6:
         try:
             x = int(input(options))
         except ValueError as e:
             print('\nInput needs to be a number between 1 and 4')
 
+    # 0) RELOAD_Config
+    if int(x) == 0:
+        coa.reload_config()
+
     # 1) DOWNLOAD FILES
-    if int(x) == 1:
+    elif int(x) == 1:
         coa.download_files()
 
     # 2) PREPARE SQL
@@ -35,5 +41,7 @@ while True:
     # 4) UPLOAD TO TRANSCEND
     elif int(x) == 4:
         coa.upload_to_transcend()
-        break
 
+    # 4) UPLOAD TO TRANSCEND
+    elif int(x) == 5:
+        break

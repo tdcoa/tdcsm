@@ -1,10 +1,10 @@
-# Substitutions can be used in both the config.yaml (below), 
+# Substitutions can be used in both the config.yaml (below),
 #   as well as all .coa.sql files generated in later steps.
 #   format is {name} --> value   (all instances)
-#   Order of config substitution is: 
+#   Order of config substitution is:
 #      - secrets.yaml
 #      - config.yaml: substitutions, folders, settings, transcend
-#   Order of sql substitution is, per file set: 
+#   Order of sql substitution is, per file set:
 #      - config.yaml: system, substitutions, filesets (in download folder)
 
 
@@ -40,6 +40,7 @@ settings:
   localfilesets:   "./{download}/filesets.yaml"
   secrets:    "secrets.yaml"
   systems:    "source_systems.yaml"
+  skip_dbs:   "False"
   text_format_extensions: ['.sql', '.yaml', '.txt', '.csv', '.py']
   run_non_fileset_folders: "True"
   write_to_perm: "True"
