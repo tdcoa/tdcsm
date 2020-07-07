@@ -281,6 +281,7 @@ class tdcoa:
                                      'True'])
 
         # add skip_dbs back in as silent (unlisted) option
+        self.skip_dbs = False
         if 'skip_dbs' in self.settings:
             if self.settings['skip_dbs'].strip().lower() == 'true':
                 self.skip_dbs = True
