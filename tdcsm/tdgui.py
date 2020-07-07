@@ -17,7 +17,7 @@ class coa():
 
     version = "0.1.0.9"
 
-    def __init__(self, approot=''):
+    def __init__(self, approot='', secrets='', systems='', config=''):
         print('GUI for TDCOA started')
         if approot == '':
             self.approot_path = os.getcwd()
@@ -29,6 +29,9 @@ class coa():
         else:
             self.localos='Mac'
 
+        if secrets != '': self.secrets_var = secrets
+        if systems != '': self.systems_var = systems
+        if config  != '': self.config_var  = config
         print('application root folder:\n\t%s' %self.approot_path)
         self.pathdelim = os.path.join('123','')[3:]
         self.run()

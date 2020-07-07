@@ -136,7 +136,7 @@ class Utils(Logger):
 
         return sql
 
-    def check_setting(self, settings_dict=None, required_item_list=None, defaults=None):
+    def check_setting(self, settings_dict=None, required_item_list=None, defaults=None, printwarning=True):
         if settings_dict is None:
             settings_dict = {}
         if required_item_list is None:
@@ -159,7 +159,7 @@ class Utils(Logger):
                                                     '(note: names are case-sensitive)',
                                                     'Some functionality may not work until this is added and you reload_config()',
                                                     msgsuffix)
-                self.log(msg, warning=True)
+                if printwarning: self.log(msg, warning=True)
 
     def get_special_commands(self, sql, replace_with='', keys_to_skip=None):
         if keys_to_skip is None:
@@ -478,8 +478,8 @@ class Utils(Logger):
             for shape in slide.shapes:  # loop through all shape objects in a slide
 
                 # shape_type 19 = table which does not have text field
-                if shape.shape_type not in (13, 19) and '{{' in shape.text and '}}' in shape.text:  # search for special command
-
+                # if shape.shape_type not in (13, 19) and '{{' in shape.text and '}}' in shape.text:  # search for special command
+                if shape.shape_type in (1, 14) and '{{' in shape.text and '}}' in shape.text:  # search for special command
                     # insert image
                     if '.png' in shape.text:
                         # img_name = shape.text.replace('{{pic:', '').replace('}}', '')  # get img file name to be inserted
@@ -921,4 +921,3 @@ class Utils(Logger):
                         shape_to_remove.getparent().remove(shape_to_remove)
 
         prs.save(pptx_path)  # save updated pptx
-
