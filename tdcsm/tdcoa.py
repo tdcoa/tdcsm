@@ -61,7 +61,7 @@ class tdcoa:
     systemspath = ''
     filesetpath = ''
     outputpath = ''
-    version = "0.3.9.6.8"
+    version = "0.3.9.6.9"
     skip_dbs = False
 
     # dictionaries
