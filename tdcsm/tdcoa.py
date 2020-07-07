@@ -61,7 +61,7 @@ class tdcoa:
     systemspath = ''
     filesetpath = ''
     outputpath = ''
-    version = "0.3.9.6.6"
+    version = "0.3.9.6.8"
     skip_dbs = False
 
     # dictionaries
@@ -174,77 +174,53 @@ class tdcoa:
         self.utils.log('time', str(dt.datetime.now()))
         self.utils.log('tdcoa version', self.version)
 
+
         # ensure all required configuration files are present:
         self.utils.log('checking core config files')
-        startfiles = ['coa.py','secrets.yaml','config.yaml','source_systems.yaml']
+        startfiles = ['secrets.yaml','config.yaml','source_systems.yaml','run_gui.py','run_cmdline.py','run_cmdline']
         startfilecontent = ''
         for startfile in startfiles:
             startfile_src = os.path.join(os.path.dirname(tdcsm.__file__), startfile)
+            startfile_ovr = os.path.join(self.approot,'0_override', startfile)
             startfile_dst = os.path.join(self.approot, startfile)
+
+            # remove files if "refresh defaults" is requested via __init__ param
             if self.refresh_defaults and os.path.isfile(startfile_dst) and startfiles != 'secrets.yaml':
                 os.remove(startfile_dst)
+
+            # if file is missing:
             if not os.path.isfile(startfile_dst):
-                self.utils.log(' MISSING FILE, REPLACING WITH TEMPLATE ', startfile)
-                if os.path.isfile(startfile_src):
+                self.utils.log(' MISSING FILE', startfile)
+                # check if the file is in the 0_override folder... if so, use that:
+                if os.path.isfile(startfile_ovr):
+                    self.utils.log('   Adding from 0_override')
+                    with open(startfile_ovr) as f1:
+                        startfilecontent = f1.read()
+                # if no override, pull from package directory
+                elif os.path.isfile(startfile_src):
+                    self.utils.log('   Adding from installed package')
                     with open(startfile_src) as f1:
                         startfilecontent = f1.read()
-                        self.utils.log('  template file pulled from package')
                 else:  # this is just-in-case, until I can be sure above logic is working.
                     if startfile == 'coa.py': startfilecontent = 'from tdcsm.tdgui import coa\nc=coa()'
                     if startfile == 'secrets.yaml': startfilecontent = 'secrets:\n  td_quicklook: "qlikuserid"\n  td_password:  "qlikpassword"'
                     if startfile == 'config.yaml': startfilecontent = self.yaml_config()
                     if startfile == 'source_systems.yaml': startfilecontent = self.yaml_systems()
-                    self.utils.log('  template file generated from backup')
+                    self.utils.log('   Adding from internal string (should not happen)')
                 with open(startfile_dst, 'w') as f2:
                     f2.write(startfilecontent)
 
 
 
-        # remove 2 default files -> config, source_systems
-        # todo NOTE: currently not removing secrets file because it shouldnt require format updates
-        #if self.refresh_defaults:
-        #    self.utils.log('\nRefresh defaults = True     **Note: secrets.yaml will not be changed**')
-        #    if os.path.isfile(self.configpath):
-        #        os.remove(self.configpath)
-        #        self.utils.log('old config.yaml found and removed')
-        #    if os.path.isfile(self.systemspath):
-        #        os.remove(self.systemspath)
-        #        self.utils.log('old source_systems.yaml found and removed')
-        #    # if os.path.isfile(self.secretpath):
-        #    #     os.remove(self.secretpath)
-        #    self.utils.log('')
-
-        # load secrets. create default if missing
-        #self.utils.log('loading secrets', os.path.basename(self.secretpath))
-        #if not os.path.isfile(self.secretpath):
-        #    self.utils.log('creating default secrets', self.secretpath)
-        #    with open(os.path.join(os.path.dirname(tdcsm.__file__), 'secrets.yaml')) as f:
-        #        with open(secretpath, 'w') as f2:
-        #            f2.write(f.read())
-        #else:
-        #    self.utils.log('found secrets.yaml', self.secretpath)
-
+        # load secrets.yaml
         with open(secretpath, 'r') as fh:
             secretstr = fh.read()
         self.secrets = yaml.load(secretstr, Loader=yaml.FullLoader)['secrets']
         self.utils.secrets = self.secrets  # update secrets attribute in logger
 
-        # load config. create default if missing
-        #if self.refresh_defaults:
-        #    self.utils.log('loading config', os.path.basename(self.configpath) + ' [FORCED REFRESH]')
-        #else:
-        #    self.utils.log('loading config', os.path.basename(self.configpath))
-        #if not os.path.isfile(self.configpath) or self.refresh_defaults:
-        #    self.utils.log('creating default config', self.configpath)
-        #    with open(os.path.join(os.path.dirname(tdcsm.__file__), 'config.yaml')) as f:
-        #        with open(configpath, 'w') as f2:
-        #            f2.write(f.read())
-        #else:
-        #    self.utils.log('found config.yaml', self.configpath)
-
+        # load config.yaml
         with open(configpath, 'r') as fh:
             configstr = fh.read()
-
         configyaml = yaml.load(configstr, Loader=yaml.FullLoader)
         configstr = self.utils.substitute(configstr, self.secrets, 'secrets')
         configstr = self.utils.substitute(configstr, configyaml['substitutions'], 'config:substitutions')
@@ -256,23 +232,8 @@ class tdcoa:
         # load substitutions
         self.utils.log('loading dictionary', 'substitutions')
         self.substitutions = configyaml['substitutions']
-
-        # load source systems. create default if missing
-        #if self.refresh_defaults:
-        #    self.utils.log('loading source systems', os.path.basename(self.systemspath) + ' [FORCED REFRESH]')
-        #else:
-        #    self.utils.log('loading source systems', os.path.basename(self.systemspath))
-        #if not os.path.isfile(self.systemspath) or self.refresh_defaults:
-        #    self.utils.log('creating default source_systems', self.systemspath)
-        #    with open(os.path.join(os.path.dirname(tdcsm.__file__), 'source_systems.yaml')) as f:
-        #        with open(systemspath, 'w') as f2:
-        #            f2.write(f.read())
-        #else:
-        #    self.utils.log('found source_systems.yaml', self.systemspath)
-
         with open(systemspath, 'r') as fh:
             systemsstr = fh.read()
-
         systemsstr = self.utils.substitute(systemsstr, self.secrets, 'secrets')
         systemsstr = self.utils.substitute(systemsstr, self.substitutions, 'systems:substitutions')
         systemsyaml = yaml.load(systemsstr, Loader=yaml.FullLoader)
@@ -309,6 +270,7 @@ class tdcoa:
                                      'True'])
 
         # add skip_dbs back in as silent (unlisted) option
+        self.skip_dbs = False
         if 'skip_dbs' in self.settings:
             if self.settings['skip_dbs'].strip().lower() == 'true':
                 self.skip_dbs = True
