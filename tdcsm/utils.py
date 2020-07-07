@@ -478,8 +478,8 @@ class Utils(Logger):
             for shape in slide.shapes:  # loop through all shape objects in a slide
 
                 # shape_type 19 = table which does not have text field
-                if shape.shape_type not in (13, 19) and '{{' in shape.text and '}}' in shape.text:  # search for special command
-
+                # if shape.shape_type not in (13, 19) and '{{' in shape.text and '}}' in shape.text:  # search for special command
+                if shape.shape_type in (1, 14) and '{{' in shape.text and '}}' in shape.text:  # search for special command
                     # insert image
                     if '.png' in shape.text:
                         # img_name = shape.text.replace('{{pic:', '').replace('}}', '')  # get img file name to be inserted
