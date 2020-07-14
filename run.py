@@ -9,16 +9,17 @@ Select a step:
 2) Prepare SQL
 3) Execute Run
 4) Upload to Transcend
+5) Make Customer Files
 """
 
 while True:
 
     x = 0
-    while x < 1 or x > 5:
+    while x < 1 or x > 6:
         try:
             x = int(input(options))
         except ValueError as e:
-            print('\nInput needs to be a number between 1 and 4')
+            print('\nInput needs to be a number between 1 and 5')
 
     # 1) DOWNLOAD FILES
     if int(x) == 1:
@@ -36,4 +37,8 @@ while True:
     elif int(x) == 4:
         coa.upload_to_transcend()
         break
+
+        # 5) Make Manual Files
+    elif int(x) == 5:
+        coa.make_customer_files()
 
