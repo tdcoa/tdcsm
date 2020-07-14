@@ -5,6 +5,7 @@ coa = tdcoa(approot=r'C:\Deepan\Data_Science\tdcsm\tdcoa_demo')
 options = """
 Select a step:
 
+0) Reload Configs
 1) Download Files
 2) Prepare SQL
 3) Execute Run
@@ -14,12 +15,16 @@ Select a step:
 
 while True:
 
-    x = 0
-    while x < 1 or x > 6:
+    x = -1
+    while x < 0 or x > 6:
         try:
             x = int(input(options))
         except ValueError as e:
-            print('\nInput needs to be a number between 1 and 5')
+            print('\nInput needs to be a number between 1 and 4')
+
+    # 0) RELOAD_Config
+    if int(x) == 0:
+        coa.reload_config()
 
     # 1) DOWNLOAD FILES
     if int(x) == 1:

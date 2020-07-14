@@ -1,0 +1,10 @@
+cd "$(dirname "$0")"
+echo LOADING, PLEASE WAIT...
+python run_cmdline.py --help
+
+python run_cmdline.py
+
+# two arguments exist to specify different location
+# note, secrets.yaml location is RELATIIVE TO APPROOT not CWD
+
+# python run_cmdline.py --approot '../coa/myCust' --secrets '../!secrets.yaml'
