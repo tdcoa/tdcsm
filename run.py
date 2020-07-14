@@ -1,6 +1,6 @@
 from tdcsm.tdcoa import tdcoa
 
-coa = tdcoa(approot='../coa/Test', secrets='../!secrets.yaml')
+coa = tdcoa(approot=r'C:\Deepan\Data_Science\tdcsm\tdcoa_demo')
 
 options = """
 Select a step:
@@ -10,7 +10,7 @@ Select a step:
 2) Prepare SQL
 3) Execute Run
 4) Upload to Transcend
-5) Exit
+5) Make Customer Files
 """
 
 while True:
@@ -27,7 +27,7 @@ while True:
         coa.reload_config()
 
     # 1) DOWNLOAD FILES
-    elif int(x) == 1:
+    if int(x) == 1:
         coa.download_files()
 
     # 2) PREPARE SQL
@@ -41,7 +41,9 @@ while True:
     # 4) UPLOAD TO TRANSCEND
     elif int(x) == 4:
         coa.upload_to_transcend()
-
-    # 4) UPLOAD TO TRANSCEND
-    elif int(x) == 5:
         break
+
+        # 5) Make Manual Files
+    elif int(x) == 5:
+        coa.make_customer_files()
+

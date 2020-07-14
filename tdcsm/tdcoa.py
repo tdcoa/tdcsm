@@ -61,7 +61,7 @@ class tdcoa:
     systemspath = ''
     filesetpath = ''
     outputpath = ''
-    version = "0.3.9.6.8"
+    version = "0.3.9.6.9"
     skip_dbs = False
 
     # dictionaries
@@ -1125,6 +1125,163 @@ class tdcoa:
         shutil.move(runlogsrc, runlogdst)
 
 
+    def make_customer_files(self, name=''):
+        self.utils.log('make_customer_files started', header=True)
+        self.utils.log('time', str(dt.datetime.now()))
+
+        # at this point, we make the assumption that everything in the "run" directory is valid
+
+        # make output directory for execution output and other collateral
+        runpath = os.path.join(self.approot, self.folders['run'])
+        outputpath = self.make_output_folder(name)
+
+        # create hidden file containing last run's output -- to remain in the root folder
+        with open(os.path.join(self.approot, '.last_run_output_path.txt'), 'w') as lastoutput:
+
+            # convert to relative path in case of system change (i.e. switching laptops)
+            lastoutput.write(outputpath[outputpath.find(self.folders['output']):])
+
+        self.utils.log('save location of last-run output folder to hidden file')
+        self.utils.log('last-run output', outputpath)
+
+        # loop through systems
+        for sysname in os.listdir(runpath):
+            sysfolder = os.path.join(runpath, sysname)
+            if os.path.isdir(sysfolder):
+
+                # iterate system folders  -- must exist in config.yaml!
+                if sysname not in self.systems:
+                    self.utils.log('SYSTEM NOT FOUND IN CONFIG.YAML', sysname, warning=True)
+
+                else:
+                    # iterate file set folders -- ok to NOT exist, depending on setting
+                    for setname in os.listdir(sysfolder):
+                        setfolder = os.path.join(sysfolder, setname)
+                        if os.path.isdir(setfolder):
+
+                            if setname not in self.systems[sysname]['filesets'] and str(
+                                    self.settings['run_non_fileset_folders']).strip().lower() != 'true':
+                                self.utils.log('-' * self.utils.logspace)
+                                self.utils.log('WARNING!!!\nfileset does not exist', setname)
+                                self.utils.log(' AND setting "run_non_fileset_folders" is not "True"')
+                                self.utils.log(' Skipping folder', setname)
+
+                            else:
+                                self.utils.log('SYSTEM:  %s   FILESET:  %s' % (sysname, setname), header=True)
+                                workpath = setfolder
+                                #outputfo = os.path.join(outputpath, sysname, setname)
+
+                                self.utils.log('work (sql) path', workpath)
+                                #self.utils.log('output path', outputfo)
+
+                                # collect all prepared sql files, place in alpha order
+                                coasqlfiles = []
+                                for coafile in os.listdir(workpath):
+                                    if coafile[:1] != '.' and coafile[-8:] == '.coa.sql':
+                                        self.utils.log('found prepared sql file', coafile)
+                                        coasqlfiles.append(coafile)
+
+                                coasqlfiles.sort()
+
+                                if len(coasqlfiles) == 0:
+                                    self.utils.log('no .coa.sql files found in\n  %s' % workpath, warning=True)
+
+                                else:
+                                    self.utils.log('all sql files alpha-sorted for exeuction consistency')
+                                    self.utils.log('sql files found', str(len(coasqlfiles)))
+
+
+
+                                    # create our upload-manifest, 1 manifest per fileset
+                                    self.utils.log('creating upload manifest file')
+                                    with open(os.path.join(outputpath, 'upload-manifest.json'), 'w') as manifest:
+                                        manifest.write('{"entries":[ ')
+                                    manifestdelim = '\n '
+
+
+                                    # loop thru all sql files:
+                                    for coasqlfile in sorted(coasqlfiles):
+                                        self.utils.log('\nOPENING SQL FILE', coasqlfile)
+                                        with open(os.path.join(workpath, coasqlfile), 'r') as coasqlfilehdlr:
+                                            sqls = coasqlfilehdlr.read()  # all sql statements in a sql file
+
+                                        sqlcnt = 0
+                                        for sql in sqls.split(';'):  # loop thru the individual sql statements
+                                            sqlcnt += 1
+
+                                            if sql.strip() == '':
+                                                self.utils.log('null statement, skipping')
+
+                                            else:
+                                                self.utils.log('\n---- SQL #%i' % sqlcnt)
+
+                                                # pull out any embedded SQLcommands:
+                                                sqlcmd = self.utils.get_special_commands(sql)
+
+
+                                                if len(sqlcmd) == 0:
+                                                    self.utils.log('no special commands found')
+
+                                                if 'save' in sqlcmd or 'load' in sqlcmd or 'call' in sqlcmd:
+                                                    file_ext = ".manual.coa.sql"
+                                                    manual_sqlfile_name = sysname + "." + setname + file_ext
+                                                    manual_sqlfile_path= os.path.join(outputpath,manual_sqlfile_name)
+                                                    with open(manual_sqlfile_path, 'a') as manual_file:
+                                                        manual_file.write("/* Save the result of the below sql as a csv file with name " + sqlcmd['save'] + "*/ \n")
+                                                        manual_file.write(sql+";")
+                                                        manual_file.write("\n\n")
+
+
+                                                #csvfile = os.path.join(workpath, sqlcmd['save'])
+
+                                                if 'load' in sqlcmd:  # add to manifest
+
+
+                                                        self.utils.log(
+                                                            'file marked for loading to Transcend, adding to upload-manifest.json')
+                                                        if 'call' not in sqlcmd:
+                                                            sqlcmd['call'] = ''
+
+                                                        manifest_entry = '%s{"file": "%s",  "table": "%s",  "call": "%s"}' % (
+                                                        manifestdelim, sqlcmd['save'], sqlcmd['load'],
+                                                        sqlcmd['call'])
+                                                        manifestdelim = '\n,'
+
+                                                        with open(os.path.join(outputpath, 'upload-manifest.json'),
+                                                              'a') as manifest:
+                                                            manifest.write(manifest_entry)
+                                                            self.utils.log('Manifest updated',
+                                                                 str(manifest_entry).replace(',', ',\n'))
+
+
+
+                                # close JSON object
+                                with open(os.path.join(outputpath, 'upload-manifest.json'), 'a') as manifest:
+                                    manifest.write("\n  ]}")
+                                    self.utils.log('closing out upload-manifest.json')
+
+                                # Move all files from run folder to output, for posterity:
+                                #self.utils.log('moving all other run artifacts to output folder, for archiving')
+                                #self.utils.recursive_copy(workpath, outputpath, replace_existing=False)
+                                self.utils.recursive_delete(workpath)
+
+        # also COPY a few other operational files to output folder, for ease of use:
+        self.utils.log('-' * self.utils.logspace)
+        self.utils.log('post-processing')
+        for srcpath in [os.path.join(self.approot, '.last_run_output_path.txt'),
+                        self.configpath, self.filesetpath]:
+            self.utils.log('copy to output folder root, for ease of use: \n  %s' % srcpath)
+            dstpath = os.path.join(outputpath, os.path.basename(srcpath))
+            shutil.copyfile(srcpath, dstpath)
+
+        self.utils.log('\ndone!')
+        self.utils.log('time', str(dt.datetime.now()))
+
+        # after logging is done, move the log file too...
+        runlogsrc = os.path.join(self.approot, self.folders['run'], 'runlog.txt')
+        runlogdst = os.path.join(outputpath, 'runlog.txt')
+        shutil.move(runlogsrc, runlogdst)
+        self.utils.log('make_customer_files Completed', header=True)
 
     def upload_to_transcend(self, _outputpath=''):
         self.utils.bufferlogs = True

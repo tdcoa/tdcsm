@@ -13,7 +13,7 @@ if (args['approot'] is None) or (not os.path.exists(args['approot'])):
 else:
     approot = args['approot']
 
-if (args['secrets'] is None) or (not os.path.exists(args['secrets'])):
+if (args['secrets'] is None) or (not os.path.exists(os.path.join(approot, args['secrets']))):
     secrets  =  ''
 else:
     secrets = args['secrets']
