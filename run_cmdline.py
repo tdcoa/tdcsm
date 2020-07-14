@@ -61,6 +61,7 @@ SELECT AN ACTION:
 2)  Prepare SQL
 3)  Execute Run
 4)  Upload to Transcend
+5)  Make Customer Files
 9)  Run R,1,2,3,4
 
 --- other options (not cap sensitive)
@@ -86,6 +87,7 @@ while True:
     elif x == '2': c.prepare_sql()
     elif x == '3': c.execute_run()
     elif x == '4': c.upload_to_transcend()
+    elif x == '5': c.make_customer_files()
     elif x == '9':
         c.reload_config()
         c.skip_dbs = skip_dbs
