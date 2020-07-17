@@ -538,6 +538,7 @@ class tdcoa:
         self.utils.log('\ndone!')
         self.utils.log('time', str(dt.datetime.now()))
 
+
     def apply_override(self, override_folder='', target_folder=''):
         self.utils.log('applying file override')
 
@@ -565,6 +566,7 @@ class tdcoa:
                 self.utils.log('these files replace any matching filename, regardless of subfolder location')
                 for file in files:
                     if file == 'config.yaml' or file == 'secrets.yaml':
+                        # TODO: add  source_systems.yaml -- or, maybe can be removed?
                         copyops[os.path.join(self.approot, file)] = os.path.join(override_folder, file)
                         reloadconfig = True
                         self.utils.log('  config file found, reload imminent', file)
@@ -608,6 +610,7 @@ class tdcoa:
             self.reload_config()
         self.utils.log('\napply override complete!')
 
+
     def prepare_sql(self, sqlfolder='', override_folder=''):
         self.utils.log('prepare_sql started', header=True)
         self.utils.log('time', str(dt.datetime.now()))
@@ -624,7 +627,7 @@ class tdcoa:
         self.utils.log('empty run folder entirely')
         self.utils.recursively_delete_subfolders(os.path.join(self.approot, self.folders['run']))
 
-        # iterate all system level folders in "run" folder...
+        # iterate all system level folders in "sql" folder...
         for sysfolder in os.listdir(os.path.join(self.approot, self.folders['sql'])):
             if os.path.isdir(os.path.join(self.approot, self.folders['sql'])):
                 self.utils.log('\n' + '-' * self.utils.logspace)
@@ -673,7 +676,7 @@ class tdcoa:
                                 sqlpath = os.path.join(self.approot, self.folders['sql'], sysfolder, setfolder)
                                 runpath = os.path.join(self.approot, self.folders['run'], sysfolder)
 
-                                # todo combine into single makedirs statement instead of 2 mkdir
+                                # TODO: combine into single makedirs statement instead of 2 mkdir
                                 if not os.path.isdir(runpath):
                                     self.utils.log('  creating system folder', runpath)
                                     os.mkdir(runpath)
