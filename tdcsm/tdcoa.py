@@ -177,7 +177,7 @@ class tdcoa:
 
         # ensure all required configuration files are present:
         self.utils.log('checking core config files')
-        startfiles = ['secrets.yaml','config.yaml','source_systems.yaml','run_gui.py','run_cmdline.py','run_cmdline']
+        startfiles = ['secrets.yaml','config.yaml','source_systems.yaml','run_gui.py','run_gui','run_cmdline.py','run_cmdline']
         startfilecontent = ''
         for startfile in startfiles:
             startfile_src = os.path.join(os.path.dirname(tdcsm.__file__), startfile)

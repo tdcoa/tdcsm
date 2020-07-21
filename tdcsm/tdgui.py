@@ -5,6 +5,7 @@ from tkinter.ttk import *
 from PIL import Image
 from PIL import ImageTk
 from tdcsm.tdcoa import tdcoa
+import tdcsm
 
 class coa():
 
@@ -13,8 +14,8 @@ class coa():
 
     entryvars = {}
     defaults = {}
-    images = {'banner':{'file':'TDCOA_Banner.gif', 'X':700, 'Y':27, 'scale':1, 'object':None}
-              ,'logo' :{'file':'TDCOAdot.gif', 'X':330, 'Y':55, 'scale':0.5, 'object':None}}
+    images = {'banner':{'file':'pic_TDCOA_Banner.gif', 'X':700, 'Y':27, 'scale':1, 'object':None}
+              ,'logo' :{'file':'pic_TDCOAdot.gif', 'X':330, 'Y':55, 'scale':0.5, 'object':None}}
     sampleTx2 = {'systems_left':['one','two','three'],
                  'systems_right':['four','five','six'],
                  'filesets_left':['one','two','three'],
@@ -159,7 +160,8 @@ class coa():
         x = int(i['X']*i['scale'])
         y = int(i['Y']*i['scale'])
         c = Canvas(parent, width=x+20, height=y+20, bg='black', bd=0, highlightthickness=0)
-        img = Image.open(i['file']).resize((x,y), Image.ANTIALIAS)
+        pix = os.path.join(os.path.dirname(tdcsm.__file__), i['file'])
+        img = Image.open(pix).resize((x,y), Image.ANTIALIAS)
         i['object'] = ImageTk.PhotoImage(img)
         c.create_image(10,10, anchor=NW, image=i['object'])
         if self.debug: print('created Image: %s' %image_name)
@@ -327,7 +329,6 @@ class coa():
         if  ev['download_files'].get() == 1 \
         and ev['prepare_sql'].get() == 1 \
         and ev['execute_run'].get() == 1 \
-        and ev['make_customer_files'].get() == 1 \
         and ev['upload_to_transcend'].get() == 1 :
             # if all boxes checked, then uncheck:
             ev['download_files'].set(0)
@@ -340,7 +341,6 @@ class coa():
             ev['download_files'].set(1)
             ev['prepare_sql'].set(1)
             ev['execute_run'].set(1)
-            ev['make_customer_files'].set(1)
             ev['upload_to_transcend'].set(1)
             ev['run_all_checked'].set(1)
 
