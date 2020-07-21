@@ -61,7 +61,7 @@ class tdcoa:
     systemspath = ''
     filesetpath = ''
     outputpath = ''
-    version = "0.3.9.6.8"
+    version = "0.3.9.6.9"
     skip_dbs = False
 
     # dictionaries
@@ -177,7 +177,7 @@ class tdcoa:
 
         # ensure all required configuration files are present:
         self.utils.log('checking core config files')
-        startfiles = ['secrets.yaml','config.yaml','source_systems.yaml','run_gui.py','run_cmdline.py','run_cmdline']
+        startfiles = ['secrets.yaml','config.yaml','source_systems.yaml','run_gui.py','run_gui','run_cmdline.py','run_cmdline']
         startfilecontent = ''
         for startfile in startfiles:
             startfile_src = os.path.join(os.path.dirname(tdcsm.__file__), startfile)
@@ -262,12 +262,13 @@ class tdcoa:
         self.settings = configyaml['settings']
         self.utils.check_setting(self.settings,
                            required_item_list=['githost', 'gitfileset', 'gitmotd', 'localfilesets',
-                                               'run_non_fileset_folders'],
+                                               'run_non_fileset_folders', 'gui_show_dev_filesets'],
                            defaults=['https://raw.githubusercontent.com/tdcoa/sql/master/',
                                      'filesets.yaml',
                                      'motd.txt',
                                      '{download}/filesets.yaml',
-                                     'True'])
+                                     'True',
+                                     'False'])
 
         # add skip_dbs back in as silent (unlisted) option
         self.skip_dbs = False
