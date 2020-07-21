@@ -479,6 +479,482 @@ class Utils(Logger):
 
                 # shape_type 19 = table which does not have text field
                 # if shape.shape_type not in (13, 19) and '{{' in shape.text and '}}' in shape.text:  # search for special command
+                if shape.shape_type in (
+                1, 14) and '{{' in shape.text and '}}' in shape.text:  # search for special command
+                    # insert image
+                    if '.png' in shape.text:
+                        # img_name = shape.text.replace('{{pic:', '').replace('}}', '')  # get img file name to be inserted
+                        # slide.shapes.add_picture(os.path.join(workpath, img_name),
+                        #                          left=shape.left,
+                        #                          top=shape.top,
+                        #                          height=shape.height,
+                        #                          width=shape.width)  # insert with same dimensions as placeholder
+                        #
+                        # # remove placeholder shape
+                        # shape_to_remove = shape._element
+                        # shape_to_remove.getparent().remove(shape_to_remove)
+
+                        try:
+                            img_name = shape.text.replace('{{pic:', '').replace('}}', '').replace('**',
+                                                                                                  '')  # get img file name to be inserted
+                            slide.shapes.add_picture(os.path.join(workpath, img_name),
+                                                     left=shape.left,
+                                                     top=shape.top,
+                                                     height=shape.height,
+                                                     width=shape.width)  # insert with same dimensions as placeholder
+
+                            # remove placeholder shape
+                            shape_to_remove = shape._element
+                            shape_to_remove.getparent().remove(shape_to_remove)
+
+                        except OSError as e:
+                            text_ori = shape.text.replace('**', '')
+                            text_frame = shape.text_frame
+                            text_frame.clear()  # not necessary for newly-created shape
+
+                            p = text_frame.paragraphs[0]
+                            run = p.add_run()
+                            run.text = text_ori + '**'
+
+                            font = run.font
+                            #                         font.name = 'Calibri'
+                            #                         font.size = Pt(18)
+                            #                         font.bold = True
+                            #                         font.color.rgb = RGBColor(0xFF, 0x7F, 0x50)
+
+                            print("File Not Found!!")
+                    else:
+                        # csv_name = shape.text[shape.text.find("{{")+2 : shape.text.find("}}")]
+                        file_not_found = False
+                        index = 0
+                        csv_name_list = []
+                        text = shape.text
+
+                        while index < len(text):
+                            index = text.find('{{val:', index)
+                            if index == -1:
+                                break
+                            print('{{ found at', index)
+
+                            index += 6  # +2 because len('ll') == 2
+                            start_index = index
+
+                            index = text.find('}}', index)
+                            if index == -1:
+                                break
+                            print('}} found at', index)
+
+                            end_index = index
+                            index += 2  # +2 because len('ll') == 2
+
+                            csv_name = text[start_index:end_index]
+                            csv_name_list.append(csv_name)
+
+                        csv_name_value = []
+
+                        for csv_name in csv_name_list:
+                            df_name_cell = csv_name.split('.csv')
+                            df_name = df_name_cell[0]
+                            df_cell = df_name_cell[1]
+                            # df_csv = pd.read_csv(os.path.join(workpath, df_name + '.csv'))
+                            # # df_value = df_csv[df_cell[1]:df_cell[3]]
+                            # df_value = df_csv.iloc[int(df_cell[1]) - 2, int(df_cell[3]) - 1]
+                            # csv_name_value.append(df_value)
+
+                            try:
+                                df_csv = pd.read_csv(os.path.join(workpath, df_name + '.csv'))
+                                # df_value = df_csv[df_cell[1]:df_cell[3]]
+                                df_value = df_csv.iloc[int(df_cell[1]) - 2, int(df_cell[3]) - 1]
+                                csv_name_value.append(df_value)
+                            except OSError as e:
+
+                                csv_name_value.append(csv_name)
+                                file_not_found = True
+
+                        text_2 = ''
+                        i = 0
+                        index = 0
+                        text_start = 0
+
+                        while index < len(text):
+                            index = text.find('{{val:', index)
+                            if index == -1:
+                                break
+                            print('{{ found at', index)
+
+                            index += 6  # +2 because len('ll') == 2
+                            start_index = index
+
+                            index = text.find('}}', index)
+                            if index == -1:
+                                break
+                            print('}} found at', index)
+
+                            end_index = index
+                            index += 2  # +2 because len('ll') == 2
+                            #     text_start = index
+
+                            print('text_2:', text_2)
+                            print('text:', text)
+                            print('text_start:', text_start)
+                            print('start_index:', start_index)
+                            print('text[text_start:start_index - 6]:', text[text_start:start_index - 6])
+                            print('csv_name_list[i]:', csv_name_list[i])
+
+                            try:
+                                text_2 = text_2 + text[text_start:start_index - 6] + csv_name_value[i]
+                            except:
+                                # text_2 = text_2 + text[text_start:start_index - 6] + csv_name_value[i].astype(numpy.str)
+                                try:
+                                    text_2 = text_2 + text[text_start:start_index - 6] + csv_name_value[i].astype(
+                                        numpy.str)
+                                except:
+                                    file_not_found = True
+                            i += 1
+
+                            text_start = index
+
+                        text_2 = text_2 + text[end_index + 2:]
+
+                        # #     csv_name = text[start_index:end_index]
+                        # #     csv_name_list.append(csv_name)
+                        #
+                        # # new_text = shape.text[0:shape.text.find("{{")] + df_value + " " + shape.text[shape.text.find("}}") + 2 : ]
+                        # shape.text = text_2
+
+                        if file_not_found == True:
+                            shape.text = text_ori.replace('**', '') + "**"
+                        else:
+                            shape.text = text_2.replace('**', '')
+
+                elif shape.shape_type == 19:
+                    num_of_columns_in_ppt = len(shape.table.columns)
+                    num_of_rows_in_ppt = len(shape.table.rows)
+
+                    df_name = ''
+
+                    index = 0
+
+                    print('\n')
+
+                    print('New Table: ')
+                    print('total number of cols: ', num_of_columns_in_ppt)
+                    print('total number of rows: ', num_of_rows_in_ppt)
+
+                    i_col_counter_in_ppt = 0
+                    is_entire_column = False
+
+                    df_length = -1
+
+                    column_name_list = []
+                    columns_list = []
+
+                    skip_column_list = []
+
+                    while i_col_counter_in_ppt < num_of_columns_in_ppt:
+
+                        j_row_counter_in_ppt = 0
+
+                        single_column_list = []
+
+                        while j_row_counter_in_ppt < num_of_rows_in_ppt:
+
+                            col_text = shape.table.cell(j_row_counter_in_ppt, i_col_counter_in_ppt).text
+
+                            print('row: ', j_row_counter_in_ppt)
+                            print('col: ', i_col_counter_in_ppt)
+                            print('cell text:', col_text)
+
+                            if j_row_counter_in_ppt == 0:
+                                is_column = True
+                            else:
+                                is_column = False
+
+                            if is_column:
+
+                                if '{{col:' in col_text:
+                                    print('inside col')
+
+                                    cell_text = shape.table.cell(j_row_counter_in_ppt, i_col_counter_in_ppt).text
+
+                                    #                                 '''
+
+                                    # df_name = cell_text[cell_text.find('{{col:') + 6: cell_text.find('.csv') + 4]
+                                    # print('df_name: ', df_name)
+                                    # # df = pd.read_csv(workpath + '\\' + df_name)
+                                    # df = pd.read_csv(os.path.join(workpath, df_name))
+                                    #
+                                    # df_columns = df.columns
+                                    # print('df_columns:', df_columns)
+                                    #
+                                    # df_length_new = len(df.index)
+                                    #
+                                    # if df_length == -1 or df_length < df_length_new:
+                                    #     df_length = df_length_new
+                                    #
+                                    # if len(df_name) > 0:
+                                    #     cell_text_index = int(cell_text[cell_text.find('[') + 1:cell_text.find(']')])
+                                    #     print('cell_text_index:', cell_text_index)
+                                    #     column_name = df_columns[cell_text_index - 1]
+                                    #     print('column_name:', column_name)
+                                    # else:
+                                    #     column_name = ''
+                                    #
+                                    # column_name_list.append(column_name)
+                                    #
+                                    # single_column_list = list(df[column_name].values)
+                                    #
+                                    # skip_column_list.append(i_col_counter_in_ppt)
+                                    #                                 '''
+
+                                    try:
+
+                                        df_name = cell_text[cell_text.find('{{col:') + 6: cell_text.find('.csv') + 4]
+                                        print('df_name: ', df_name)
+                                        # df = pd.read_csv(workpath + '\\' + df_name)
+                                        df = pd.read_csv(os.path.join(workpath, df_name))
+
+                                        df_columns = df.columns
+                                        print('df_columns:', df_columns)
+
+                                        df_length_new = len(df.index)
+
+                                        if df_length == -1 or df_length < df_length_new:
+                                            df_length = df_length_new
+
+                                        if len(df_name) > 0:
+                                            cell_text_index = int(
+                                                cell_text[cell_text.find('[') + 1:cell_text.find(']')])
+                                            print('cell_text_index:', cell_text_index)
+                                            column_name = df_columns[cell_text_index - 1]
+                                            print('column_name:', column_name)
+                                        else:
+                                            column_name = ''
+
+                                        column_name_list.append(column_name)
+
+                                        single_column_list = list(df[column_name].values)
+
+                                        skip_column_list.append(i_col_counter_in_ppt)
+
+                                    except:
+                                        column_name = cell_text.replace('**', '') + "**"
+                                        column_name_list.append(column_name)
+
+
+                                else:
+
+                                    if i_col_counter_in_ppt in skip_column_list:
+                                        j_row_counter_in_ppt += 1
+                                        break
+
+                                    cell_text = shape.table.cell(j_row_counter_in_ppt, i_col_counter_in_ppt).text
+                                    print('column cell_text:', cell_text)
+                                    column_name_list.append(cell_text)
+
+                            else:
+                                if i_col_counter_in_ppt in skip_column_list:
+                                    j_row_counter_in_ppt += 1
+                                    break
+
+                                cell_text = shape.table.cell(j_row_counter_in_ppt, i_col_counter_in_ppt).text
+                                #
+                                if '{{val:' in cell_text:
+                                    print('yes, value')
+
+                                    #                                 '''
+
+                                    #                             if df_name == '':
+                                    # df_name = cell_text[cell_text.find('{{val:') + 6: cell_text.find('.csv') + 4]
+                                    # print('df_name: ', df_name)
+                                    # # df = pd.read_csv(workpath + '\\' + df_name)
+                                    # df = pd.read_csv(os.path.join(workpath, df_name))
+                                    #
+                                    # if ':' in cell_text:
+                                    #     cell_text_index = cell_text[cell_text.find('[') + 1:cell_text.find(']')].split(
+                                    #         ':')
+                                    #     print('cell_text_index:', cell_text_index)
+                                    #
+                                    #     # cell_value = df.iloc[int(cell_text_index[1]) - 2, int(cell_text_index[0]) -1]
+                                    #     cell_value = df.iloc[int(cell_text_index[0]) - 2, int(cell_text_index[1]) -1]
+
+                                    # else:
+                                    #     cell_value = cell_text
+                                    #
+                                    # print('cell_value:', cell_value)
+
+                                    #                                 '''
+
+                                    try:
+                                        df_name = cell_text[cell_text.find('{{val:') + 6: cell_text.find('.csv') + 4]
+                                        print('df_name: ', df_name)
+                                        # df = pd.read_csv(workpath + '\\' + df_name)
+                                        df = pd.read_csv(os.path.join(workpath, df_name))
+
+                                        if ':' in cell_text:
+                                            cell_text_index = cell_text[
+                                                              cell_text.find('[') + 1:cell_text.find(']')].split(
+                                                ':')
+                                            print('cell_text_index:', cell_text_index)
+
+                                            # cell_value = df.iloc[int(cell_text_index[1]) - 2, int(cell_text_index[0]) -1]
+                                            cell_value = df.iloc[
+                                                int(cell_text_index[0]) - 2, int(cell_text_index[1]) - 1]
+
+                                        else:
+                                            cell_value = cell_text
+
+                                        print('cell_value:', cell_value)
+                                    except:
+                                        cell_value = cell_text.replace('**', '') + "**"
+
+                                else:
+                                    cell_value = cell_text
+
+                                single_column_list.append(cell_value)
+
+                            #                             '''
+
+                            #                         print('After Modification cell text:', cell_text)
+
+                            #                         if '{{col:' in cell_text:
+                            #                             print('yes')
+
+                            #                             if df_name == '':
+                            #                             df_name = cell_text[cell_text.find('{{col:') + 6 : cell_text.find('.csv') + 4]
+                            #                             print('df_name: ', df_name)
+                            #                             df = pd.read_csv(r'C:\Users\KT250034\Pictures\customer_success\\' + df_name)
+
+                            #                             df_columns = df.columns
+                            #                             print('df_columns:', df_columns)
+
+                            #                             df_length_new = len(df.index)
+
+                            #                             if df_length == -1 or df_length < df_length_new:
+                            #                                 df_length = df_length_new
+
+                            #                             if len(df_name)>0:
+                            #                                 cell_text_index = int(cell_text[cell_text.find('[') + 1:cell_text.find(']')])
+                            #                                 print('cell_text_index:',cell_text_index)
+                            #                                 cell_value = df_columns[cell_text_index]
+                            #                                 print('cell_value:',cell_value)
+
+                            #                             else:
+                            #                                 cell_value = ''
+
+                            #                         write column headings
+                            #                         try:
+                            #                             table.cell(j_row_counter_in_ppt, i_col_counter_in_ppt).text = str(cell_value)
+                            #                         except:
+                            #                             table.cell(j_row_counter_in_ppt, i_col_counter_in_ppt).text = cell_value.astype(numpy.str)
+                            #                         '''
+
+                            j_row_counter_in_ppt += 1
+
+                        single_column_list = Utils.pad(single_column_list, '', df_length)
+
+                        columns_list.append(single_column_list)
+
+                        i_col_counter_in_ppt += 1
+
+                    print('column_name_list: ', column_name_list)
+                    print('columns_list: ', columns_list)
+
+                    #                 '''
+
+                    #                 df_test = pd.DataFrame(list(zip(lst1, lst2, lst3)),
+                    #                 columns=['lst1_title','lst2_title', 'lst3_title'])
+
+                    #                 '''
+
+                    # if len(columns_list[0][0]) > 0:
+                    if len(columns_list) > 0:
+                        df_new = pd.DataFrame(columns_list, index=None)
+                        df_new = df_new.transpose()
+                        print(df_new)
+
+                        df_new.columns = column_name_list
+
+                        rows = df_new.shape[0] + 1
+                        cols = df_new.shape[1]
+                        left = top = Inches(2.0)
+                        width = Inches(6.0)
+
+                        rows = num_of_rows_in_ppt
+                        cols = num_of_columns_in_ppt
+
+                        #                     num_of_columns_in_ppt = len(shape.table.columns)
+                        #                 num_of_rows_in_ppt = len(shape.table.rows)
+
+                        #                     '''
+                        #                 height_inch = 0.6 * rows
+                        # height = Inches(height_inch)
+
+                        #                 if is_entire_column:
+                        #                     height = Inches(height_inch)
+                        #                 else:
+                        #                     height = shape.height
+                        #                     '''
+
+                        height = shape.height
+
+                        #                     table = slide.shapes.add_table(rows, cols, left=shape.left, top=shape.top, width=shape.width,
+                        #                                                    height=height).table
+
+                        #                     '''
+                        #                 table = slide.shapes.add_table(rows, cols, left=shape.left, top=shape.top, width=shape.width
+                        #                                               ).table
+
+                        #                 # set column widths
+                        #                 table.columns[0].width = Inches(2.0)
+                        #                 table.columns[1].width = Inches(4.0)
+
+                        #                     table.rows[0].width = Inches(2.0)
+                        #                     table.rows[1].width = Inches(4.0)
+
+                        #                     write column headings
+                        #                     '''
+
+                        r = 0
+
+                        for c in range(0, len(column_name_list)):
+                            cell_value = column_name_list[c]
+                            try:
+                                shape.table.cell(0, c).text = str(cell_value)
+                            except:
+                                shape.table.cell(0, c).text = cell_value.astype(numpy.str)
+
+                        while r < rows - 1:
+                            c = 0
+                            while c < cols:
+                                #                                 table.cell(r, c).text = df_new.iloc[r, c]
+                                # print('r: ', r)
+                                # print('c: ', c)
+                                cell_value = df_new.iloc[r, c]
+
+                                try:
+                                    shape.table.cell(r + 1, c).text = str(cell_value)
+                                except:
+                                    shape.table.cell(r + 1, c).text = cell_value.astype(numpy.str)
+
+                                c += 1
+                            r += 1
+
+                        # remove placeholder shape
+        #                     shape_to_remove = shape._element
+        #                     shape_to_remove.getparent().remove(shape_to_remove)
+
+        prs.save(pptx_path)  # save updated pptx
+
+    @staticmethod
+    def insert_to_pptx_old(pptx_path, workpath):
+        prs = Presentation(pptx_path)
+
+        for slide in prs.slides:  # loop through all slides
+            for shape in slide.shapes:  # loop through all shape objects in a slide
+
+                # shape_type 19 = table which does not have text field
+                # if shape.shape_type not in (13, 19) and '{{' in shape.text and '}}' in shape.text:  # search for special command
                 if shape.shape_type in (1, 14) and '{{' in shape.text and '}}' in shape.text:  # search for special command
                     # insert image
                     if '.png' in shape.text:

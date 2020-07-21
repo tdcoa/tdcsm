@@ -177,7 +177,7 @@ class tdcoa:
 
         # ensure all required configuration files are present:
         self.utils.log('checking core config files')
-        startfiles = ['secrets.yaml','config.yaml','source_systems.yaml','run_gui.py','run_cmdline.py','run_cmdline']
+        startfiles = ['secrets.yaml','config.yaml','source_systems.yaml','run_gui.py','run_gui','run_cmdline.py','run_cmdline']
         startfilecontent = ''
         for startfile in startfiles:
             startfile_src = os.path.join(os.path.dirname(tdcsm.__file__), startfile)
@@ -262,12 +262,13 @@ class tdcoa:
         self.settings = configyaml['settings']
         self.utils.check_setting(self.settings,
                            required_item_list=['githost', 'gitfileset', 'gitmotd', 'localfilesets',
-                                               'run_non_fileset_folders'],
+                                               'run_non_fileset_folders', 'gui_show_dev_filesets'],
                            defaults=['https://raw.githubusercontent.com/tdcoa/sql/master/',
                                      'filesets.yaml',
                                      'motd.txt',
                                      '{download}/filesets.yaml',
-                                     'True'])
+                                     'True',
+                                     'False'])
 
         # add skip_dbs back in as silent (unlisted) option
         self.skip_dbs = False
@@ -1147,6 +1148,10 @@ class tdcoa:
         self.utils.log('save location of last-run output folder to hidden file')
         self.utils.log('last-run output', outputpath)
 
+        self.utils.log('creating upload manifest file')
+        with open(os.path.join(outputpath, 'upload-manifest.json'), 'a') as manifest:
+            manifest.write('{"entries":[ ')
+
         # loop through systems
         for sysname in os.listdir(runpath):
             sysfolder = os.path.join(runpath, sysname)
@@ -1157,6 +1162,7 @@ class tdcoa:
                     self.utils.log('SYSTEM NOT FOUND IN CONFIG.YAML', sysname, warning=True)
 
                 else:
+
                     # iterate file set folders -- ok to NOT exist, depending on setting
                     for setname in os.listdir(sysfolder):
                         setfolder = os.path.join(sysfolder, setname)
@@ -1190,15 +1196,13 @@ class tdcoa:
                                     self.utils.log('no .coa.sql files found in\n  %s' % workpath, warning=True)
 
                                 else:
-                                    self.utils.log('all sql files alpha-sorted for exeuction consistency')
+                                    self.utils.log('all sql files alpha-sorted for execution consistency')
                                     self.utils.log('sql files found', str(len(coasqlfiles)))
 
 
 
                                     # create our upload-manifest, 1 manifest per fileset
-                                    self.utils.log('creating upload manifest file')
-                                    with open(os.path.join(outputpath, 'upload-manifest.json'), 'w') as manifest:
-                                        manifest.write('{"entries":[ ')
+
                                     manifestdelim = '\n '
 
 
@@ -1225,49 +1229,58 @@ class tdcoa:
                                                 if len(sqlcmd) == 0:
                                                     self.utils.log('no special commands found')
 
-                                                if 'save' in sqlcmd or 'load' in sqlcmd or 'call' in sqlcmd:
-                                                    file_ext = ".manual.coa.sql"
-                                                    manual_sqlfile_name = sysname + "." + setname + file_ext
-                                                    manual_sqlfile_path= os.path.join(outputpath,manual_sqlfile_name)
-                                                    with open(manual_sqlfile_path, 'a') as manual_file:
-                                                        manual_file.write("/* Save the result of the below sql as a csv file with name " + sqlcmd['save'] + "*/ \n")
-                                                        manual_file.write(sql+";")
-                                                        manual_file.write("\n\n")
 
+                                            file_ext = ".manual.coa.sql"
+                                            manual_sqlfile_name = sysname + "." + setname + file_ext
+                                            manual_sqlfile_path= os.path.join(outputpath,manual_sqlfile_name)
+                                            manual_save_file_name = ""
+                                            if 'save' in sqlcmd or 'load' in sqlcmd or 'call' in sqlcmd:
+                                                manual_save_file_name=sysname + "." + setname + "." + sqlcmd['save']
 
-                                                #csvfile = os.path.join(workpath, sqlcmd['save'])
+                                                with open(manual_sqlfile_path, 'a') as manual_file:
+                                                    manual_file.write(
+                                                        "------------------------------------------------------------- \n")
+                                                    manual_file.write(
+                                                        "/* Save the result of the below sql as a csv file with name: " +
+                                                        manual_save_file_name + "*/ \n")
+                                                    manual_file.write(
+                                                        "------------------------------------------------------------- \n")
+                                                    manual_file.write(sql + ";")
+                                                    manual_file.write("\n\n")
+                                            else:
+                                                with open(manual_sqlfile_path, 'a') as manual_file:
+                                                    manual_file.write(sql + ";")
+                                                    manual_file.write("\n\n")
 
-                                                if 'load' in sqlcmd:  # add to manifest
-
-
-                                                        self.utils.log(
+                                            if 'load' in sqlcmd:  # add to manifest
+                                                self.utils.log(
                                                             'file marked for loading to Transcend, adding to upload-manifest.json')
-                                                        if 'call' not in sqlcmd:
-                                                            sqlcmd['call'] = ''
-
-                                                        manifest_entry = '%s{"file": "%s",  "table": "%s",  "call": "%s"}' % (
-                                                        manifestdelim, sqlcmd['save'], sqlcmd['load'],
-                                                        sqlcmd['call'])
-                                                        manifestdelim = '\n,'
-
-                                                        with open(os.path.join(outputpath, 'upload-manifest.json'),
-                                                              'a') as manifest:
-                                                            manifest.write(manifest_entry)
-                                                            self.utils.log('Manifest updated',
-                                                                 str(manifest_entry).replace(',', ',\n'))
+                                                if 'call' not in sqlcmd:
+                                                    sqlcmd['call'] = ''
+                                                manifestdelim = '\n,'
+                                                manifest_entry = '{"file": "%s",  "table": "%s",  "call": "%s"}%s' % (
+                                                     manual_save_file_name, sqlcmd['load'],
+                                                    sqlcmd['call'],manifestdelim)
 
 
+                                                manifest_filepath=os.path.join(outputpath, 'upload-manifest.json')
+                                                manifest=open(manifest_filepath,'a')
+                                                manifest.write(manifest_entry)
+                                                self.utils.log('Manifest updated',str(manifest_entry).replace(',', ',\n'))
+                                                manifest.close()
 
-                                # close JSON object
-                                with open(os.path.join(outputpath, 'upload-manifest.json'), 'a') as manifest:
-                                    manifest.write("\n  ]}")
-                                    self.utils.log('closing out upload-manifest.json')
-
-                                # Move all files from run folder to output, for posterity:
-                                #self.utils.log('moving all other run artifacts to output folder, for archiving')
-                                #self.utils.recursive_copy(workpath, outputpath, replace_existing=False)
                                 self.utils.recursive_delete(workpath)
 
+        manifest = open(os.path.join(outputpath, 'upload-manifest.json'), 'a')
+        manifest.write("\n  ]}")
+        self.utils.log('closing out upload-manifest.json')
+        manifest.close()
+        # Below logic is to remove the comma (,) at the end of the last element in the manifest json file.
+        with open(os.path.join(outputpath, 'upload-manifest.json'),'r') as manifest_file:
+            manifest_content=manifest_file.read()
+            manifest_content=manifest_content.replace(",\n  ]}","\n  ]}")
+        with open(os.path.join(outputpath, 'upload-manifest.json'), 'w') as manifest_file:
+            manifest_file.write(manifest_content)
         # also COPY a few other operational files to output folder, for ease of use:
         self.utils.log('-' * self.utils.logspace)
         self.utils.log('post-processing')
