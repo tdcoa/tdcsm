@@ -262,12 +262,13 @@ class tdcoa:
         self.settings = configyaml['settings']
         self.utils.check_setting(self.settings,
                            required_item_list=['githost', 'gitfileset', 'gitmotd', 'localfilesets',
-                                               'run_non_fileset_folders'],
+                                               'run_non_fileset_folders', 'gui_show_dev_filesets'],
                            defaults=['https://raw.githubusercontent.com/tdcoa/sql/master/',
                                      'filesets.yaml',
                                      'motd.txt',
                                      '{download}/filesets.yaml',
-                                     'True'])
+                                     'True',
+                                     'False'])
 
         # add skip_dbs back in as silent (unlisted) option
         self.skip_dbs = False
