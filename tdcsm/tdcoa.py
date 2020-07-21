@@ -61,8 +61,10 @@ class tdcoa:
     systemspath = ''
     filesetpath = ''
     outputpath = ''
-    version = "0.3.9.7.0"
-    skip_dbs = False
+    version = "0.3.9.7.1"
+    skip_dbs = False    # skip ALL dbs connections / executions
+    manual_run = False  # skip dbs executions in execute_run() but not upload_to_transcend()
+                        # also skips /*{{save:}}*/ special command
 
     # dictionaries
     secrets = {}
@@ -344,9 +346,9 @@ class tdcoa:
                 # todo add default dbsversion and collection
                 self.utils.check_setting(self.systems[sysname],
                                    required_item_list=['active', 'siteid', 'use', 'host', 'username', 'password',
-                                                       'logmech', 'driver', 'encryption'],
+                                                       'logmech', 'driver', 'encryption','manual_run'],
                                    defaults=['True', 'siteid123', 'unknown', 'customer.host.missing.com',
-                                             'username_missing', 'password_missing', '', 'sqlalchemy', ''])
+                                             'username_missing', 'password_missing', '', 'sqlalchemy', '', 'False'])
 
                 if 'connectionstring' not in sysobject:
                     if sysobject['logmech'].strip() == '':
