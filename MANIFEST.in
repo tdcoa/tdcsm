@@ -1,0 +1,6 @@
+include tdcsm/*.yaml
+include tdcsm/*.gif
+include tdcsm/run_*
+include *.yaml
+include *.gif
+include run_*

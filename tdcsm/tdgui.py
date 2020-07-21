@@ -9,13 +9,13 @@ import tdcsm
 
 class coa():
 
-    version = "0.2.0.0"
+    version = "0.2.0.2"
     debug = False
 
     entryvars = {}
     defaults = {}
-    images = {'banner':{'file':'pic_TDCOA_Banner.gif', 'X':700, 'Y':27, 'scale':1, 'object':None}
-              ,'logo' :{'file':'pic_TDCOAdot.gif', 'X':330, 'Y':55, 'scale':0.5, 'object':None}}
+    images = {'banner':{'file':'pic_TDCOA_Banner.gif', 'X':700, 'Y':27, 'scale':1, 'object':None, 'alttext':'Teradata CSM Automation'}
+              ,'logo' :{'file':'pic_TDCOAdot.gif', 'X':330, 'Y':55, 'scale':0.5, 'object':None, 'alttext':'Teradata'}}
     sampleTx2 = {'systems_left':['one','two','three'],
                  'systems_right':['four','five','six'],
                  'filesets_left':['one','two','three'],
@@ -26,7 +26,7 @@ class coa():
 
     def __init__(self, approot='', secrets=''):
         print('GUI for TDCOA started')
-        self.version =  str(datetime.now()).replace('-','').replace(':','').split('.')[0].replace(' ','.')
+        #self.version = str(datetime.now()).replace('-','').replace(':','').split('.')[0].replace(' ','.')
         if approot != '': self.defaults['approot'] = approot
         if secrets != '': self.defaults['secrets'] = secrets
         if platform.system()[:3]=='Win':
@@ -161,10 +161,14 @@ class coa():
         y = int(i['Y']*i['scale'])
         c = Canvas(parent, width=x+20, height=y+20, bg='black', bd=0, highlightthickness=0)
         pix = os.path.join(os.path.dirname(tdcsm.__file__), i['file'])
-        img = Image.open(pix).resize((x,y), Image.ANTIALIAS)
-        i['object'] = ImageTk.PhotoImage(img)
-        c.create_image(10,10, anchor=NW, image=i['object'])
-        if self.debug: print('created Image: %s' %image_name)
+        try:
+            img = Image.open(pix).resize((x,y), Image.ANTIALIAS)
+            i['object'] = ImageTk.PhotoImage(img)
+            c.create_image(10,10, anchor=NW, image=i['object'])
+            print('created Image: %s' %image_name)
+        except:
+            print('Image Load Failed:', pix)
+            Label(c, text=i['alttext'], anchor=CENTER).pack(side=TOP, fill=BOTH, expand=True)
         return c
 # =================== END: MAKE NEW GUI OBJECT COLLECTIONS ==============================
 
@@ -575,7 +579,8 @@ class coa():
 
         #-------------- TAB: HELP ------------------
         frmHelp  = Frame(tabHelp, padding=5, style="help-normal.TFrame"); frmHelp.pack(fill=BOTH, expand=True, anchor=N)
-        Label(frmHelp, text='COMING SOON!', style='help-bold.TLabel').pack(fill=X, anchor=N)
+        Label(frmHelp, text='MORE COMING SOON!', style='help-bold.TLabel').pack(fill=X, anchor=N)
+        Label(frmHelp, text='Version of tdgui = %s' %self.version, style='help-bold.TLabel').pack(fill=X, anchor=N)
 
 
         #-------------- RUN!!!
@@ -584,6 +589,7 @@ class coa():
         self.button_click('tv_systems_left') # this 'click' will refresh both left and right treeviews
         self.button_click('tv_filesets_left')
         self.upload_get_lastrun_folder()
+        Label(frmHelp, text='Version of tdcsm = %s' %self.coa.version, style='help-bold.TLabel').pack(fill=X, anchor=N)
 
         app.bind('<Escape>', self.close)
         app.mainloop()
