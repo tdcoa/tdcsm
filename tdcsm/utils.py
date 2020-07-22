@@ -229,10 +229,10 @@ class Utils(Logger):
 
         if str(dictTarget['active']).lower() == 'true':
             if also_contains_key == '' or (also_contains_key != '' and also_contains_key in dictTarget):
-                self.log('  active dictionary', dictName)
+                self.log('  ACTIVE dictionary', dictName)
                 return True
 
-        self.log('  INACTIVE dictionary', dictName)
+        self.log('  Inactive dictionary', dictName)
 
         return False
 
