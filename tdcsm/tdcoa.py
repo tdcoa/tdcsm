@@ -61,7 +61,7 @@ class tdcoa:
     systemspath = ''
     filesetpath = ''
     outputpath = ''
-    version = "0.3.9.7.3"
+    version = "0.3.9.7.4"
     skip_dbs = False    # skip ALL dbs connections / executions
     manual_run = False  # skip dbs executions in execute_run() but not upload_to_transcend()
                         # also skips /*{{save:}}*/ special command
@@ -337,28 +337,28 @@ class tdcoa:
             if str(setobject['active']).strip().lower() == 'true':
                 self.filesets.update({setname: setobject})
 
-        # load systems (active only)
-        self.utils.log('loading system dictionaries (active only)')
+        # load systems (no longer active only)
+        self.utils.log('loading system dictionaries')
         for sysname, sysobject in systemsyaml['systems'].items():
-            if self.utils.dict_active(sysobject, sysname):
-                self.systems.update({sysname: sysobject})
+            # if self.utils.dict_active(sysobject, sysname): #<--- no more, really messed up lots of UI work before
+            self.systems.update({sysname: sysobject})
 
-                # todo add default dbsversion and collection
-                self.utils.check_setting(self.systems[sysname],
-                                   required_item_list=['active', 'siteid', 'use', 'host', 'username', 'password',
-                                                       'logmech', 'driver', 'encryption','manual_run'],
-                                   defaults=['True', 'siteid123', 'unknown', 'customer.host.missing.com',
-                                             'username_missing', 'password_missing', '', 'sqlalchemy', '', 'False'])
+            # todo add default dbsversion and collection
+            self.utils.check_setting(self.systems[sysname],
+                               required_item_list=['active', 'siteid', 'use', 'host', 'username', 'password',
+                                                   'logmech', 'driver', 'encryption','manual_run'],
+                               defaults=['True', 'siteid123', 'unknown', 'customer.host.missing.com',
+                                         'username_missing', 'password_missing', '', 'sqlalchemy', '', 'False'])
 
-                if 'connectionstring' not in sysobject:
-                    if sysobject['logmech'].strip() == '':
-                        logmech = ''
-                    else:
-                        logmech = '/?logmech=%s' % sysobject['logmech']
-                    sysobject['connectionstring'] = 'teradatasql://%s:%s@%s%s' % (sysobject['username'],
-                                                                                  sysobject['password'],
-                                                                                  sysobject['host'],
-                                                                                  logmech)
+            if 'connectionstring' not in sysobject:
+                if sysobject['logmech'].strip() == '':
+                    logmech = ''
+                else:
+                    logmech = '/?logmech=%s' % sysobject['logmech']
+                sysobject['connectionstring'] = 'teradatasql://%s:%s@%s%s' % (sysobject['username'],
+                                                                              sysobject['password'],
+                                                                              sysobject['host'],
+                                                                              logmech)
 
         self.utils.log('done!')
         self.utils.log('time', str(dt.datetime.now()))
@@ -395,7 +395,7 @@ class tdcoa:
 
         # iterate all active systems.filesets:
         for sysname, sysobject in self.systems.items():
-            if self.utils.dict_active(sysobject, sysname, also_contains_key='filesets'):
+            if self.utils.dict_active(sysobject, sysname, also_contains_key='filesets'):  # must be ACTIVE (this test pre-dated systems.active change)
                 self.utils.log('\nINTERROGATING SYSTEM', sysname)
 
                 # get all filesets as defined in each system:
@@ -484,7 +484,8 @@ class tdcoa:
         self.utils.log('\ndone!')
         self.utils.log('time', str(dt.datetime.now()))
 
-        self.copy_download_to_sql()
+        # self.copy_download_to_sql()  #<-- moved to the beginning of prepare_sql()
+        #   otherwise, changes to sql in 1_download can never perpetuate downstream
 
     def copy_download_to_sql(self, overwrite=False):
         self.utils.log('copy_download_to_sql started', header=True)
@@ -496,8 +497,8 @@ class tdcoa:
         self.utils.recursively_delete_subfolders(sqlpath)
 
         for sysname, sysobject in self.systems.items():
-            self.utils.log('processing system', sysname)
-            if self.utils.dict_active(sysobject, also_contains_key='filesets'):
+            if self.utils.dict_active(sysobject, also_contains_key='filesets'):  # must be ACTIVE (this test pre-dated systems.active change)
+                self.utils.log('processing system', sysname)  # just shuffled log inside of active test
                 for setname, setobject in sysobject['filesets'].items():
                     self.utils.log('processing fileset', setname)
                     if self.utils.dict_active(setobject):
@@ -615,6 +616,8 @@ class tdcoa:
 
 
     def prepare_sql(self, sqlfolder='', override_folder=''):
+        self.copy_download_to_sql()  # moved from end of download_files() to here
+
         self.utils.log('prepare_sql started', header=True)
         self.utils.log('time', str(dt.datetime.now()))
 
@@ -636,7 +639,7 @@ class tdcoa:
                 self.utils.log('\n' + '-' * self.utils.logspace)
                 self.utils.log('SYSTEM FOLDER FOUND', sysfolder)
 
-                if sysfolder not in self.systems or self.utils.dict_active(self.systems[sysfolder]) is False:
+                if sysfolder not in self.systems or self.utils.dict_active(self.systems[sysfolder]) is False:  # must be ACTIVE (this test pre-dated systems.active change)
                     self.utils.log('folder not defined as an active system, skipping...')
 
                 else:
@@ -702,14 +705,14 @@ class tdcoa:
                                             self.utils.log('  characters in file', str(len(runfiletext)))
 
                                         # SUBSTITUTE values for:  system-fileset override [source_systems.yaml --> filesets]
-                                        if setfolder in self.systems[sysfolder]['filesets']:
+                                        if setfolder in self.systems[sysfolder]['filesets']:   # sysfolder is only ACTIVE systems per line 642(ish) above
                                             sub_dict = self.systems[sysfolder]['filesets'][setfolder]
                                             if self.utils.dict_active(sub_dict, 'system-fileset overrides'):
                                                 runfiletext = self.utils.substitute(runfiletext, sub_dict,
                                                                               subname='system-fileset overrides (highest priority)')
 
                                         # SUBSTITUTE values for: system-defaults [source_systems.yaml]
-                                        sub_dict = self.systems[sysfolder]
+                                        sub_dict = self.systems[sysfolder]   # sysfolder is only ACTIVE systems per line 642(ish) above
                                         if self.utils.dict_active(sub_dict, 'system defaults'):
                                             runfiletext = self.utils.substitute(runfiletext, sub_dict, skipkeys=['filesets'],
                                                                           subname='system defaults')
@@ -907,9 +910,6 @@ class tdcoa:
         self.utils.log('execute_run started', header=True)
         self.utils.log('time', str(dt.datetime.now()))
 
-        # TODO: paramterize final database location (adlste_wetcomm should be {})
-        #  when building out the upload_manifest.json, so EMEA and APAC can use
-
         # at this point, we make the assumption that everything in the "run" directory is valid
 
         # make output directory for execution output and other collateral
@@ -930,16 +930,16 @@ class tdcoa:
             sysfolder = os.path.join(runpath, sysname)
             if os.path.isdir(sysfolder):
 
-                # iterate system folders  -- must exist in config.yaml!
-                if sysname not in self.systems:
-                    self.utils.log('SYSTEM NOT FOUND IN CONFIG.YAML', sysname, warning=True)
+                # iterate system folders  -- must exist in source_systems.yaml!
+                if sysname not in self.systems or self.utils.dict_active(self.systems[sysname]) == False:  # ADDED to ensure ACTIVE systems only
+                    self.utils.log('SYSTEM NOT FOUND IN SOURCE_SYSTEMS.YAML', sysname, warning=True)
 
                 else:
                     # iterate file set folders -- ok to NOT exist, depending on setting
                     for setname in os.listdir(sysfolder):
                         setfolder = os.path.join(sysfolder, setname)
                         if os.path.isdir(setfolder):
-
+                                                # ACTIVE ONLY, within loop a few lines above
                             if setname not in self.systems[sysname]['filesets'] and str(
                                     self.settings['run_non_fileset_folders']).strip().lower() != 'true':
                                 self.utils.log('-' * self.utils.logspace)
@@ -983,7 +983,7 @@ class tdcoa:
                                         manifest.write('{"entries":[ ')
                                     manifestdelim = '\n '
 
-                                    # connect to customer system:
+                                    # connect to customer system:   # ACTIVE ONLY within loop above
                                     conn = self.utils.open_connection(
                                         conntype=self.systems[sysname]['driver'],
                                         encryption=self.systems[sysname]['encryption'],
@@ -1160,7 +1160,7 @@ class tdcoa:
             if os.path.isdir(sysfolder):
 
                 # iterate system folders  -- must exist in config.yaml!
-                if sysname not in self.systems:
+                if sysname not in self.systems or self.utils.dict_active(self.systems[sysname]) == False:  # ADDED to ensure ACTIVE systems only :
                     self.utils.log('SYSTEM NOT FOUND IN CONFIG.YAML', sysname, warning=True)
 
                 else:
@@ -1169,7 +1169,7 @@ class tdcoa:
                     for setname in os.listdir(sysfolder):
                         setfolder = os.path.join(sysfolder, setname)
                         if os.path.isdir(setfolder):
-
+                                                # ACTIVE ONLY, within loop a few lines above
                             if setname not in self.systems[sysname]['filesets'] and str(
                                     self.settings['run_non_fileset_folders']).strip().lower() != 'true':
                                 self.utils.log('-' * self.utils.logspace)
