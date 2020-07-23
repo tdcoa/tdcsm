@@ -445,14 +445,14 @@ class coa():
         elif name == 'prepare_sql':
             self.coa.prepare_sql()
         elif name == 'execute_run':
-            # self.systems_save2disk()
+            self.systems_save2disk()
             self.run_external('execute_run')
             self.upload_get_lastrun_folder()
             #self.coa.execute_run()
         elif name == 'make_customer_files':
             self.coa.make_customer_files()
         elif name == 'upload_to_transcend':
-            # self.systems_save2disk()
+            self.systems_save2disk()
             self.run_external('upload_to_transcend')
             #self.coa.execute_run()
         elif name == 'last_output_folder':
