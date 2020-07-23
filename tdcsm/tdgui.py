@@ -398,7 +398,7 @@ class coa():
             # build and execute subprocess
             cmd = []
             cmd.append("from tdcsm.tdcoa import tdcoa;")
-            cmd.append("c=tdcoa(approot='%s'," %self.entryvar('approot').replace('\\','\\\\'))
+            cmd.append("c=tdcoa(approot='%s'," %self.entryvar('approot'))
             cmd.append("config='%s',"   %self.entryvar('config'))
             cmd.append("systems='%s',"  %self.entryvar('systems'))
             cmd.append("secrets='%s');" %self.entryvar('secrets'))
