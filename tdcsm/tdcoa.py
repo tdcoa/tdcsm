@@ -96,6 +96,7 @@ class tdcoa:
         self.utils.log('tdcoa version', self.version)
 
         self.unique_id = dt.datetime.now().strftime("%m%d%Y%H%M")  # unique id to append to table
+        self.motd_url = 'file://' + os.path.abspath(os.path.join(self.approot, 'motd.html'))
 
         # filesets.yaml is validated at download time
 
@@ -360,11 +361,11 @@ class tdcoa:
                                                                               sysobject['password'],
                                                                               sysobject['host'],
                                                                               logmech)
-
         self.utils.log('done!')
         self.utils.log('time', str(dt.datetime.now()))
 
-    def download_files(self):
+
+    def download_files(self, motd=True):
         self.utils.log('download_files started', header=True)
         self.utils.log('time', str(dt.datetime.now()))
         githost = self.settings['githost']
@@ -384,8 +385,8 @@ class tdcoa:
             fh.write(filecontent)
 
         # open motd.html in browser
-        file_url = 'file://' + os.path.abspath(os.path.join(self.approot, 'motd.html'))
-        webbrowser.open(file_url)
+        self.motd_url = 'file://' + os.path.abspath(os.path.join(self.approot, 'motd.html'))
+        if motd: webbrowser.open(self.motd_url)
 
         # delete all pre-existing download folders
         # Commented the below code, in order to make the script download only if the files doesn't exist
@@ -1492,6 +1493,10 @@ class tdcoa:
 
         self.utils.log('\ndone!')
         self.utils.log('time', str(dt.datetime.now()))
+
+
+    def display_motd(self):
+        webbrowser.open(self.motd_url)
 
     def yaml_config(self):
         tmp = []
