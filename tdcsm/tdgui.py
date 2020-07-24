@@ -261,7 +261,10 @@ class coa():
         pth = os.path.join(pathprefix, filepath)
         print('Opening File in Default Editor:', pth)
         if self.localos=='Win':
-            os.system("notepad.exe %s" %pth)
+            try:
+                os.startfile(pth, "edit")
+            except OSError:
+                subprocess.run(["notepad", pth])
         else:
             subprocess.call(['open', pth])
 
@@ -270,7 +273,7 @@ class coa():
         if not os.path.exists(pth): os.mkdir(pth)
         print('Opening Folder in File Explorer:', pth)
         if self.localos=='Win':
-            os.system('%s' %pth)
+            os.startfile(pth, "explore")
         else:
             subprocess.call(['open', pth])
 
