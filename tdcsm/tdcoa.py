@@ -61,7 +61,7 @@ class tdcoa:
     systemspath = ''
     filesetpath = ''
     outputpath = ''
-    version = "0.3.9.7.4"
+    version = "0.3.9.7.6"
     skip_dbs = False    # skip ALL dbs connections / executions
     manual_run = False  # skip dbs executions in execute_run() but not upload_to_transcend()
                         # also skips /*{{save:}}*/ special command
@@ -264,13 +264,14 @@ class tdcoa:
         self.settings = configyaml['settings']
         self.utils.check_setting(self.settings,
                            required_item_list=['githost', 'gitfileset', 'gitmotd', 'localfilesets',
-                                               'run_non_fileset_folders', 'gui_show_dev_filesets'],
+                                               'run_non_fileset_folders', 'gui_show_dev_filesets', 'python_call'],
                            defaults=['https://raw.githubusercontent.com/tdcoa/sql/master/',
                                      'filesets.yaml',
                                      'motd.txt',
                                      '{download}/filesets.yaml',
                                      'True',
-                                     'False'])
+                                     'False',
+                                     'python'])
 
         # add skip_dbs back in as silent (unlisted) option
         self.skip_dbs = False

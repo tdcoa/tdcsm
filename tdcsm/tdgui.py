@@ -9,7 +9,7 @@ import tdcsm
 
 class coa():
 
-    version = "0.2.0.3"
+    version = "0.2.0.6"
     debug = False
 
     entryvars = {}
@@ -40,13 +40,14 @@ class coa():
         for name, default in kwargs.items():
             self.defaults[name] = default
         if 'approot'  not in self.defaults: self.defaults['approot']  = os.getcwd()
+        self.approot = self.defaults['approot']
         if 'config'   not in self.defaults: self.defaults['config']   = 'config.yaml'
         if 'systems'  not in self.defaults: self.defaults['systems']  = 'source_systems.yaml'
         if 'filesets' not in self.defaults: self.defaults['filesets'] = '%s%sfilesets.yaml' %('1_download', os.sep)
         if 'secrets'  not in self.defaults: self.defaults['secrets']  = self.first_file_that_exists(
-                                     os.path.join(self.defaults['approot'], '..','!secrets.yaml')
-                                    ,os.path.join(self.defaults['approot'], '..', 'secrets.yaml')
-                                    ,os.path.join(self.defaults['approot'], 'secrets.yaml'))
+                                                                         os.path.join('..','!secrets.yaml')
+                                                                        ,os.path.join('..', 'secrets.yaml')
+                                                                        ,os.path.join('secrets.yaml'))
         self.defaults['secrets'] = self.defaults['secrets'].replace(self.defaults['approot']+os.sep,'')
         for name, default in self.defaults.items():
             if name not in self.entryvars: self.entryvars[name] = StringVar()
@@ -179,8 +180,8 @@ class coa():
 
     def first_file_that_exists(self, *args):
         for file in args:
-            if os.path.isfile(file): return file
-        return 'NONE_FOUND'
+            if os.path.isfile(os.path.join(self.approot, file)): return file
+        return ''
 
     def print_dict(self, dict2print={}, lvl=0):
         """Simply prints dictionaries in a more nested/human readable form"""
@@ -292,7 +293,6 @@ class coa():
 # =================== END: HELPER FUNCTIONS ==============================
 
 
-
 # =================== START: PROGRAM BEHAVIOR ==============================
     def close(*args):
         print("GUI Closed")
@@ -401,7 +401,7 @@ class coa():
             # build and execute subprocess
             cmd = []
             cmd.append("from tdcsm.tdcoa import tdcoa;")
-            cmd.append("c=tdcoa(approot='%s'," %self.entryvar('approot').replace('\\','\\\\'))
+            cmd.append("c=tdcoa(approot='%s'," %self.entryvar('approot'))
             cmd.append("config='%s',"   %self.entryvar('config'))
             cmd.append("systems='%s',"  %self.entryvar('systems'))
             cmd.append("secrets='%s');" %self.entryvar('secrets'))
@@ -410,8 +410,12 @@ class coa():
             if coacmd[-1:] != ')': coacmd = '%s()' %coacmd
             cmd.append(coacmd)
             cmd = ' '.join(cmd)
+            if 'python_call' in self.coa.settings:
+                pycall = self.coa.settings['python_call']
+            else:
+                pycall = 'python'
             print(cmd)
-            os.system('python -c "%s"' %cmd)
+            os.system('%s -c "%s"' %(pycall, cmd))
 
     def button_click(self, name='', **kwargs):
         print('button clicked',  name)
@@ -422,7 +426,7 @@ class coa():
         print('%s' %argstr)
 
         if name == 'reload_config':
-            self.systems_save2disk()
+            # self.systems_save2disk()
             self.coa.approot      = self.entryvar('approot')
             self.coa.configpath   = os.path.join(self.coa.approot, self.entryvar('config'))
             self.coa.secretpath   = os.path.join(self.coa.approot, self.entryvar('secrets'))
@@ -434,7 +438,7 @@ class coa():
             print('secret: ', self.coa.secretpath)
             print('system: ', self.coa.systemspath)
             print('fileset: ', self.coa.filesetpath)
-            self.systems_readfromdisk()
+            # self.systems_readfromdisk()
             self.button_click('tv_systems_left') # this 'click' will refresh both left and right treeviews
             self.button_click('tv_filesets_left')
         elif name == 'approot':
@@ -469,7 +473,7 @@ class coa():
         elif name in ['tv_systems_left','tv_systems_right']:
             if 'selected' in kwargs.keys(): # if item was "selected" kwargs will return which item (else refresh without change)
                 active = 'True'
-                if name[-4:] == 'left':  active = 'False' # left is active, so click is moving to inactive
+                if name[-4:] == 'left':  active = 'False'
                 self.coa.systems[kwargs['selected']]['active'] = active
             d = self.split_dict(self.coa.systems, 'active', default='True', addifmissing=['True','False'])
             self.reload_Tx2('systems', leftlist = d['True'].keys(), rightlist = d['False'].keys())
@@ -587,11 +591,24 @@ class coa():
 
 
         #-------------- RUN!!!
+        print('approot: ' + self.entryvar('approot') )
+        print('config:  ' + self.entryvar('config') )
+        print('systems: ' + self.entryvar('systems') )
+        print('secrets: ' + self.entryvar('secrets') )
         self.coa = tdcoa(approot = self.entryvar('approot'), secrets = self.entryvar('secrets'))
-        self.systems_readfromdisk()
+        # self.systems_readfromdisk()
         self.button_click('tv_systems_left') # this 'click' will refresh both left and right treeviews
         self.button_click('tv_filesets_left')
         self.upload_get_lastrun_folder()
+
+        # update our secrets file if default was different than coa.settings value (chicken/egg problem)
+        secrets_from_settings = self.coa.settings['secrets']
+        secrets_from_default =  self.entryvars['secrets'].get()
+        if secrets_from_default != secrets_from_settings:
+            self.entryvars['secrets'].set(self.first_file_that_exists(secrets_from_settings, secrets_from_default))
+            self.coa.secrets = self.entryvars['secrets'].get()
+            self.coa.reload_config()
+
         Label(frmHelp, text='Version of tdcsm = %s' %self.coa.version, style='help-bold.TLabel').pack(fill=X, anchor=N)
 
         app.bind('<Escape>', self.close)
