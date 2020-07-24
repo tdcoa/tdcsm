@@ -1125,6 +1125,365 @@ class tdcoa:
         runlogdst = os.path.join(outputpath, 'runlog.txt')
         shutil.move(runlogsrc, runlogdst)
 
+    def collect_data(self, name=''):
+        self.utils.log('collect_data started', header=True)
+        self.utils.log('time', str(dt.datetime.now()))
+
+        # at this point, we make the assumption that everything in the "run" directory is valid
+
+        # make output directory for execution output and other collateral
+        runpath = os.path.join(self.approot, self.folders['run'])
+        outputpath = self.make_output_folder(name)
+
+        # create hidden file containing last run's output -- to remain in the root folder
+        with open(os.path.join(self.approot, '.last_run_output_path.txt'), 'w') as lastoutput:
+
+            # convert to relative path in case of system change (i.e. switching laptops)
+            lastoutput.write(outputpath[outputpath.find(self.folders['output']):])
+
+        self.utils.log('save location of last-run output folder to hidden file')
+        self.utils.log('last-run output', outputpath)
+
+        # loop through systems
+        for sysname in os.listdir(runpath):
+            sysfolder = os.path.join(runpath, sysname)
+            if os.path.isdir(sysfolder):
+
+                # iterate system folders  -- must exist in config.yaml!
+                if sysname not in self.systems:
+                    self.utils.log('SYSTEM NOT FOUND IN CONFIG.YAML', sysname, warning=True)
+
+                else:
+                    # iterate file set folders -- ok to NOT exist, depending on setting
+                    for setname in os.listdir(sysfolder):
+                        setfolder = os.path.join(sysfolder, setname)
+                        if os.path.isdir(setfolder):
+
+                            if setname not in self.systems[sysname]['filesets'] and str(
+                                    self.settings['run_non_fileset_folders']).strip().lower() != 'true':
+                                self.utils.log('-' * self.utils.logspace)
+                                self.utils.log('WARNING!!!\nfileset does not exist', setname)
+                                self.utils.log(' AND setting "run_non_fileset_folders" is not "True"')
+                                self.utils.log(' Skipping folder', setname)
+
+                            else:
+                                self.utils.log('SYSTEM:  %s   FILESET:  %s' % (sysname, setname), header=True)
+                                workpath = setfolder
+                                outputfo = os.path.join(outputpath, sysname, setname)
+
+                                self.utils.log('work (sql) path', workpath)
+                                self.utils.log('output path', outputfo)
+
+                                # collect all prepared sql files, place in alpha order
+                                coasqlfiles = []
+                                for coafile in os.listdir(workpath):
+                                    if coafile[:1] != '.' and coafile[-8:] == '.coa.sql':
+                                        self.utils.log('found prepared sql file', coafile)
+                                        coasqlfiles.append(coafile)
+
+                                coasqlfiles.sort()
+
+                                if len(coasqlfiles) == 0:
+                                    self.utils.log('no .coa.sql files found in\n  %s' % workpath, warning=True)
+
+                                else:
+                                    self.utils.log('all sql files alpha-sorted for exeuction consistency')
+                                    self.utils.log('sql files found', str(len(coasqlfiles)))
+
+                                    # create output folder:
+                                    self.utils.log('output folder', outputfo)
+                                    if not os.path.exists(outputfo):
+                                        os.makedirs(outputfo)
+                                    self.outputpath = outputfo
+
+                                    # create our upload-manifest, 1 manifest per fileset
+                                    self.utils.log('creating upload manifest file')
+                                    with open(os.path.join(outputfo, 'upload-manifest.json'), 'w') as manifest:
+                                        manifest.write('{"entries":[ ')
+                                    manifestdelim = '\n '
+
+                                    # connect to customer system:
+                                    conn = self.utils.open_connection(
+                                        conntype=self.systems[sysname]['driver'],
+                                        encryption=self.systems[sysname]['encryption'],
+                                        system=self.systems[sysname],
+                                        skip = self.skip_dbs)  # <------------------------------- Connect to the database
+
+                                    # loop thru all sql files:
+                                    for coasqlfile in sorted(coasqlfiles):
+                                        self.utils.log('\nOPENING SQL FILE', coasqlfile)
+                                        with open(os.path.join(workpath, coasqlfile), 'r') as coasqlfilehdlr:
+                                            sqls = coasqlfilehdlr.read()  # all sql statements in a sql file
+
+                                        sqlcnt = 0
+                                        for sql in sqls.split(';'):  # loop thru the individual sql statements
+                                            sqlcnt += 1
+
+                                            if sql.strip() == '':
+                                                self.utils.log('null statement, skipping')
+
+                                            else:
+                                                self.utils.log('\n---- SQL #%i' % sqlcnt)
+
+                                                # pull out any embedded SQLcommands:
+                                                sqlcmd = self.utils.get_special_commands(sql)
+                                                sql = sqlcmd.pop('sql', '')
+
+
+                                                df = self.utils.open_sql(conn, sql, skip = self.skip_dbs)  # <--------------------- Run SQL
+                                                csvfile=''
+                                                csvfile_exists=False
+
+                                                if len(df) != 0:  # Save non-empty returns to .csv
+
+                                                    if len(sqlcmd) == 0:
+                                                        self.utils.log('no special commands found')
+
+                                                    if 'save' not in sqlcmd:
+                                                        sqlcmd['save'] = '%s.%s--%s' % (
+                                                            sysname, setname, coasqlfile) + '%04d' % sqlcnt + '.csv'
+
+                                                    # ODBC CONNECTION ONLY:
+                                                    # df.read_sql() does not work properly for odbc connections.
+                                                    # Can directly execute using odbc connection but then there are no column names
+                                                    # This code block retrieves the column names before saving the csv file
+                                                    # Col names will be merged upon save
+                                                    col_names = []
+                                                    if conn['type'] not in ('sqlalchemy', 'teradataml'):
+                                                        col_names = self.utils.open_sql(conn, sql, columns=True, skip = self.skip_dbs)
+
+                                                    # once built, append output folder, SiteID on the front, iterative counter if duplicates
+                                                    # csvfile = os.path.join(outputfo, sqlcmd['save'])
+                                                    csvfile = os.path.join(workpath, sqlcmd['save'])
+                                                    i = 0
+                                                    while os.path.isfile(csvfile):
+                                                        i += 1
+                                                        if i == 1:
+                                                            csvfile = csvfile[:-4] + '.%03d' % i + csvfile[-4:]
+                                                        else:
+                                                            csvfile = csvfile[:-8] + '.%03d' % i + csvfile[-4:]
+                                                    self.utils.log('CSV save location', csvfile)
+
+                                                    self.utils.log('saving file...')
+                                                    if conn['type'] in ('sqlalchemy', 'teradataml'):
+                                                        df.to_csv(csvfile)  # <---------------------- Save to .csv
+                                                    else:  # if odbc conn type, merge in column names
+                                                        df.to_csv(csvfile, header=col_names)  # <---------------------- Save to .csv
+                                                    self.utils.log('file saved!')
+                                                    csvfile_exists = os.path.exists(csvfile)
+
+
+                                                if 'load' in sqlcmd:  # add to manifest
+
+                                                    if csvfile_exists == False: #Avoid load error by skipping the manifest file entry if SQL returns zero records.
+                                                        self.utils.log('The SQL returned Zero records and hence the file was not generated, So skipping the manifest entry',
+                                                                       csvfile)
+                                                    else:
+                                                        self.utils.log(
+                                                            'file marked for loading to Transcend, adding to upload-manifest.json')
+                                                        if 'call' not in sqlcmd:
+                                                            sqlcmd['call'] = ''
+
+                                                        manifest_entry = '%s{"file": "%s",  "table": "%s",  "call": "%s"}' % (
+                                                        manifestdelim, sqlcmd['save'], sqlcmd['load'],
+                                                        sqlcmd['call'])
+                                                        manifestdelim = '\n,'
+
+                                                        with open(os.path.join(outputfo, 'upload-manifest.json'),
+                                                              'a') as manifest:
+                                                            manifest.write(manifest_entry)
+                                                            self.utils.log('Manifest updated',
+                                                                 str(manifest_entry).replace(',', ',\n'))
+
+                                        # archive file we just processed (for re-run-ability)
+                                        self.utils.log('Moving coa.sql file to Output folder', coasqlfile)
+                                        src = os.path.join(workpath, coasqlfile)
+                                        dst = os.path.join(outputfo, coasqlfile)
+                                        shutil.move(src, dst)
+                                        self.utils.log('')
+
+                                # close JSON object
+                                with open(os.path.join(outputfo, 'upload-manifest.json'), 'a') as manifest:
+                                    manifest.write("\n  ]}")
+                                    self.utils.log('closing out upload-manifest.json')
+
+                                # Move all files from run folder to output, for posterity:
+                                self.utils.log('moving all other run artifacts to output folder, for archiving')
+                                self.utils.recursive_copy(workpath, outputfo, replace_existing=False)
+                                self.utils.recursive_delete(workpath)
+
+        # also COPY a few other operational files to output folder, for ease of use:
+        self.utils.log('-' * self.utils.logspace)
+        self.utils.log('post-processing')
+        for srcpath in [os.path.join(self.approot, '.last_run_output_path.txt'),
+                        self.configpath, self.filesetpath]:
+            self.utils.log('copy to output folder root, for ease of use: \n  %s' % srcpath)
+            dstpath = os.path.join(outputpath, os.path.basename(srcpath))
+            shutil.copyfile(srcpath, dstpath)
+
+        self.utils.log('\ndone!')
+        self.utils.log('time', str(dt.datetime.now()))
+
+        # after logging is done, move the log file too...
+        runlogsrc = os.path.join(self.approot, self.folders['run'], 'runlog.txt')
+        runlogdst = os.path.join(outputpath, 'runlog.txt')
+        shutil.move(runlogsrc, runlogdst)
+
+    def process_data(self, _outputpath=''):
+        self.utils.log('process_data started', header=True)
+        self.utils.log('time', str(dt.datetime.now()))
+        #
+        # Find the latest output path where the output of collect_data resides
+        if _outputpath != '':  # use supplied path
+            outputpath = _outputpath
+            self.utils.log('output folder = manual param', outputpath)
+        elif os.path.isfile(os.path.join(self.approot,
+                                         '.last_run_output_path.txt')):  # get path from hidden .last_run_output_path.txt
+            # .last_run_output_path.txt  in approot
+            with open(os.path.join(self.approot, '.last_run_output_path.txt'), 'r') as fh:
+                outputpath = fh.read().strip().split('\n')[0]
+            outputpath = os.path.join(self.approot, outputpath)  # create absolute path from relative path in file
+            self.utils.log('output folder', outputpath)
+        elif self.outputpath != '':
+            # local variable set
+            outputpath = self.outputpath
+            self.utils.log('output folder = class variable: coa.outputpath', outputpath)
+        else:
+            outputpath = ''
+            self.utils.log('no output path defined')
+
+        # now that outputfo is defined, let's make sure the dir actually exists:
+        if not os.path.isdir(outputpath):
+            self.utils.log('\nERROR = invalid path', outputpath)
+            raise NotADirectoryError('Invalid Path: %s' % outputpath)
+
+        else:
+            self.outputpath = outputpath
+
+        # update log file to correct location
+        self.utils.log('updating runlog.txt location')
+        self.utils.logpath = os.path.join(outputpath, 'runlog.txt')
+        self.utils.bufferlogs = False
+        self.utils.log('unbuffer logs')
+
+        # at this point, we make the assumption that everything in the "run" directory is valid
+
+
+        # create hidden file containing last run's output -- to remain in the root folder
+        with open(os.path.join(self.approot, '.last_run_output_path.txt'), 'w') as lastoutput:
+
+            # convert to relative path in case of system change (i.e. switching laptops)
+            lastoutput.write(outputpath[outputpath.find(self.folders['output']):])
+
+        self.utils.log('save location of last-run output folder to hidden file')
+        self.utils.log('last-run output', outputpath)
+
+        # loop through systems
+        for sysname in os.listdir(outputpath):
+            sysfolder = os.path.join(outputpath, sysname)
+            if os.path.isdir(sysfolder):
+
+                # iterate system folders  -- must exist in config.yaml!
+                if sysname not in self.systems:
+                    self.utils.log('SYSTEM NOT FOUND IN CONFIG.YAML', sysname, warning=True)
+
+                else:
+                    # iterate file set folders -- ok to NOT exist, depending on setting
+                    for setname in os.listdir(sysfolder):
+                        setfolder = os.path.join(sysfolder, setname)
+                        if os.path.isdir(setfolder):
+
+                            if setname not in self.systems[sysname]['filesets'] and str(
+                                    self.settings['run_non_fileset_folders']).strip().lower() != 'true':
+                                self.utils.log('-' * self.utils.logspace)
+                                self.utils.log('WARNING!!!\nfileset does not exist', setname)
+                                self.utils.log(' AND setting "run_non_fileset_folders" is not "True"')
+                                self.utils.log(' Skipping folder', setname)
+
+                            else:
+                                self.utils.log('SYSTEM:  %s   FILESET:  %s' % (sysname, setname), header=True)
+                                workpath = setfolder
+                                outputfo = os.path.join(outputpath, sysname, setname)
+
+                                self.utils.log('work (sql) path', workpath)
+                                self.utils.log('output path', outputfo)
+
+                                # collect all prepared sql files, place in alpha order
+                                coasqlfiles = []
+                                for coafile in os.listdir(workpath):
+                                    if coafile[:1] != '.' and coafile[-8:] == '.coa.sql':
+                                        self.utils.log('found prepared sql file', coafile)
+                                        coasqlfiles.append(coafile)
+
+                                coasqlfiles.sort()
+
+                                if len(coasqlfiles) == 0:
+                                    self.utils.log('no .coa.sql files found in\n  %s' % workpath, warning=True)
+
+                                else:
+                                    self.utils.log('all sql files alpha-sorted for exeuction consistency')
+                                    self.utils.log('sql files found', str(len(coasqlfiles)))
+
+
+                                    # loop thru all sql files:
+                                    for coasqlfile in sorted(coasqlfiles):
+                                        self.utils.log('\nOPENING SQL FILE', coasqlfile)
+                                        with open(os.path.join(workpath, coasqlfile), 'r') as coasqlfilehdlr:
+                                            sqls = coasqlfilehdlr.read()  # all sql statements in a sql file
+
+                                        sqlcnt = 0
+                                        for sql in sqls.split(';'):  # loop thru the individual sql statements
+                                            sqlcnt += 1
+
+                                            if sql.strip() == '':
+                                                self.utils.log('null statement, skipping')
+
+                                            else:
+                                                self.utils.log('\n---- SQL #%i' % sqlcnt)
+
+                                                # pull out any embedded SQLcommands:
+                                                sqlcmd = self.utils.get_special_commands(sql)
+                                                sql = sqlcmd.pop('sql', '')
+
+
+                                                csvfile=''
+                                                csvfile_exists=False
+
+                                                if len(sqlcmd) == 0:
+                                                    self.utils.log('no special commands found')
+
+                                                if 'save' in sqlcmd:
+                                                    csvfile = os.path.join(workpath, sqlcmd['save'])
+                                                    csvfile_exists = os.path.exists(csvfile)
+
+
+
+                                                if 'vis' in sqlcmd:  # run visualization py file
+                                                    if csvfile_exists == False:  # Avoid load error by skipping the manifest file entry if SQL returns zero records.
+                                                        self.utils.log(
+                                                            'The SQL returned Zero records and hence the file was not generated, So skipping the vis special command',
+                                                            csvfile)
+                                                    else:
+
+                                                        self.utils.log('\nvis cmd', 'found')
+                                                        vis_file = os.path.join(workpath, sqlcmd['vis'].replace('.csv', '.py'))
+                                                        self.utils.log('vis py file', vis_file)
+                                                        self.utils.log('running vis file..')
+                                                        os.system('python %s' % vis_file)
+                                                        self.utils.log('Vis file complete!')
+
+                                                if 'pptx' in sqlcmd:  # insert to pptx file
+                                                    self.utils.log('\npptx cmd', 'found')
+                                                    pptx_file = os.path.join(workpath, sqlcmd['pptx'])
+                                                    self.utils.log('pptx file', pptx_file)
+                                                    self.utils.log('inserting to pptx file..')
+                                                    self.utils.insert_to_pptx(pptx_file, workpath)
+                                                    self.utils.log('pptx file complete!')
+
+
+        self.utils.log('\ndone!')
+        self.utils.log('time', str(dt.datetime.now()))
+
 
     def make_customer_files(self, name=''):
         self.utils.log('make_customer_files started', header=True)

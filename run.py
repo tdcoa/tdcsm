@@ -11,12 +11,14 @@ Select a step:
 3) Execute Run
 4) Upload to Transcend
 5) Make Customer Files
+6) Collect Data
+7) Process Data
 """
 
 while True:
 
     x = -1
-    while x < 0 or x > 6:
+    while x < 0 or x > 7:
         try:
             x = int(input(options))
         except ValueError as e:
@@ -46,4 +48,10 @@ while True:
         # 5) Make Manual Files
     elif int(x) == 5:
         coa.make_customer_files()
+
+    elif int(x) == 6:
+        coa.collect_data()
+
+    elif int(x) == 7:
+        coa.process_data()
 
