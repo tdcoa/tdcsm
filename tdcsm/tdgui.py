@@ -407,8 +407,8 @@ class coa():
             if coacmd[-1:] != ')': coacmd = '%s()' %coacmd
             cmd.append(coacmd)
             cmd = ' '.join(cmd)
-            if 'gui_python_call' in self.coa.settings:
-                pycall = self.coa.settings['gui_python_call']
+            if 'python_call' in self.coa.settings:
+                pycall = self.coa.settings['python_call']
             else:
                 pycall = 'python'
             print(cmd)
