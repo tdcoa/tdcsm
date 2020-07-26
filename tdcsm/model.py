@@ -1,6 +1,6 @@
 "Models"
 
-from typing import Optional, Dict
+from typing import Optional, Dict, Any
 from pathlib import Path
 from pydantic import BaseModel
 from yaml import safe_load, dump
@@ -83,5 +83,16 @@ def load_srcsys(fname: str = 'source_systems.yaml', approot: Path = Path.cwd()) 
 
 def dump_srcsys(sys: Dict[str, SrcSys], fname: str = 'source_systems.yaml', approot: Path = Path.cwd()) -> None:
 	"load source systems"
+	# TODO: remove legacy code that stores boolean as text in yaml
+	def nobool(value: Any) -> Any:
+		"return value, including nested, converted to string if it is bool or as is"
+		if isinstance(value, dict):
+			return {k: nobool(v) for k, v in value.items()}
+		if isinstance(value, list):
+			return [nobool(v) for v in value]
+		if isinstance(value, bool):
+			return str(value)
+		return value
+
 	with open(approot / fname, 'w') as f:
-		dump({'systems': {k: v.dict() for k, v in sys.items()}}, f)
+		dump({'systems': {k: nobool(v.dict()) for k, v in sys.items()}}, f)
