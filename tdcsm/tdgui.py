@@ -22,6 +22,7 @@ class coa():
                  'filesets_right':['four','five','six']}
     approot = ''
     secrets = ''
+    motd = True
 
 
     def __init__(self, approot='', secrets=''):
@@ -123,7 +124,17 @@ class coa():
         if self.debug: print('created CB: %s' %btntext)
         return f
 
-    def newbutton(self, parent, btntext = 'not set', btncommand='test', command=print('check command'), btnwidth=15, style = 'default', side=RIGHT):
+    def newframe_LC(self, parent, labeltext='', checkcommand='test', style = 'default'):
+        f = Frame(parent, padding=1, style=str('%s.TFrame' %style))
+        if checkcommand not in self.entryvars: self.entryvars[checkcommand] = IntVar(value=0)
+        c = Checkbutton(f, variable=self.entryvars[checkcommand], command=lambda:self.button_click(checkcommand, state=self.entryvars[checkcommand].get()), style=str('%s.TCheckbutton' %style))
+        if labeltext != '': l = Label(f, text=labeltext, anchor=E, style=str('%s.TLabel' %style))
+        c.pack(side=RIGHT, expand=False)
+        if labeltext != '': l.pack(side=LEFT, expand=False)
+        if self.debug: print('created CB: %s' %btntext)
+        return f
+
+    def newbutton(self, parent, btntext = 'not set', btncommand='test', btnwidth=15, style = 'default', side=RIGHT):
         if btncommand not in self.entryvars: self.entryvars[btncommand] = IntVar(value=0)
         b = Button(parent,text=btntext, command=lambda:self.button_click(btncommand), width=btnwidth, style=str('%s.TButton' %style))
         b.pack(side=side)
@@ -176,23 +187,12 @@ class coa():
 
 
 # =================== START: HELPER FUNCTIONS =============================
-#  these probably ought be added to util in the future
+#  TODO: Move all of these to the tdcsm.utils, and import back here.
 
     def first_file_that_exists(self, *args):
         for file in args:
             if os.path.isfile(os.path.join(self.approot, file)): return file
         return ''
-
-    def print_dict(self, dict2print={}, lvl=0):
-        """Simply prints dictionaries in a more nested/human readable form"""
-        if lvl==0: print('-'*30)
-        for n,v in dict2print.items():
-            if type(v) == dict:
-                print('%s%s:' %('  '*lvl, n))
-                self.print_dict(v, lvl+1)
-            else:
-                print('%s%s:  %s'  %('  '*lvl, n, v))
-        if lvl==0: print('-'*30)
 
     def split_dict(self, dict2split={}, delim_key='active', use_subdict='', default='<missing>', addifmissing=[]):
         """splits a supplied dictionary into multiple dictionaries based on some child value,
@@ -278,6 +278,42 @@ class coa():
         else:
             subprocess.call(['open', pth])
 
+    @staticmethod
+    def validate_boolean(sbool, returntype = 'string'):
+        """accepts a string-as-boolean, and depending on returntype[:3], returns
+          - 'str'  == well-formed bool as string (default)
+          - 'boo' == boolean value itself
+        Special note: this is the first step in transitioning YAML from string-as-boolean to pure boolean: isolate the change as-is.
+        Once we've wrapped all instances here, we can change the default behavior once and test results."""
+        if str(sbool).strip().lower() == 'true':
+            if returntype[:3] == 'str': return 'True'
+            if returntype[:3] == 'boo': return  True
+        elif str(sbool).strip().lower() == 'false':
+            if returntype[:3] == 'str': return 'False'
+            if returntype[:3] == 'boo': return  False
+
+    @staticmethod
+    def safepath(strpath=''):
+        """Converts a pre-existing string-path to windows-safe path.
+        This is probably really easy, this is just a wrapper for said logic"""
+        return str(strpath).replace('/', os.sep).replace(r':\U', r':\\U').strip()
+
+    def print_dict(self, dicttoprint={}, name='', lvl=0, secretdict={}):
+        if lvl==0: print('\n%s\n%s\n%s' %('-'*30, str(name).upper(), '-'*30))
+        for n,v in dicttoprint.items():
+            if isinstance(v, dict):
+                if lvl==0: print('')
+                print(self.stripsecrets('%s%s:'  %(' '*lvl, n), secretdict))
+                self.print_dict(v, lvl=lvl+2, secretdict=secretdict)
+            else:
+                print(self.stripsecrets('%s%s%s'  %(' '*lvl, str(n+':').ljust(20), str(v)), secretdict))
+
+    def stripsecrets(self, msg='', secretdict={}):
+        for nm, secret in secretdict.items():
+            if secret in msg:
+                msg = msg.replace(secret, '%s%s%s' % (secret[:1], '*' * (len(secret) - 2), secret[-1:]))
+        return str(msg)
+
     def yaml_write(self, dict2write={}, filepath=''):
         with open(filepath, 'w') as fh:
             fh.write(yaml.dump(dict2write))
@@ -356,66 +392,54 @@ class coa():
         # internal langGo processes throws wicked errors when called from inside TK
         # works fine in script, so this is a work-around until that is fixed  :^(
         # affects  coa.execute_run() and coa.upload_to_transcend
-        # ALSO
-        # we need to write source_systems.yaml to disk for the subprocess to pick up
-        # but tdcoa does not keep inactive systems in-memory, which means we can't
-        # just materialize coa.systems to disk directly, or we'll end up erasing
-        # inactive systems from people's source_systems.yaml file.
-        # Until tdcoa can be adjusted to keep inactive SYSTEMS in memory (coa.systems)
-        # this process merges adjusted (active) and inactive dictionaries before
-        # saving to disk.   Whew.
 
         # load from disk, and filter out only INACTIVE systems:
-        syspath =os.path.join( self.entryvar('approot'), self.entryvar('systems'))
-        sysdict = self.split_dict(self.yaml_read(syspath)['systems'],'active', default='True')
-        if 'False' not in sysdict:
-            sysInactive = {}
-        else:
-            sysInactive = sysdict['False']
-
-        # merge new inactive systems with active systems, in-memory
+        syspath = self.safepath(os.path.join( self.entryvar('approot'), self.entryvar('systems')))
         sysAll = {}
         sysAll['systems'] = {}
+        print('-'*40)
         for sysname, sysdict in self.coa.systems.items():
+            print('SAVING:', sysname)
+            sysdict['connectionstring'] = '' # removed as it contains password info, regenerated on reload_config()
             sysAll['systems'][sysname] = sysdict
-        for sysname, sysdict in sysInactive.items():
-            if sysname not in sysAll['systems']:
-                sysAll['systems'][sysname] = sysdict
+        print('-'*40)
 
-        # write back to disk, so subprocess can pick up
         self.yaml_write(sysAll, syspath)
+        self.button_click('reload_config')
+        return True
 
-    def systems_readfromdisk(self):
-        syspath =os.path.join( self.entryvar('approot'), self.entryvar('systems'))
-        sysdict = self.yaml_read(syspath)['systems']
-        self.coa.systems = sysdict
+    def systems_validate(self, reset=False):
+        """resets and validates in-memory systems object, including
+          - validating all 'active' flags are well-formed
+          - moving all Systems and FileSets to inactive, if reset=True """
+        for sysname, sysobject  in  self.coa.systems.items():
+            # validate, and optionally make all system inactive
+            sysobject['active'] = 'False' if reset else self.validate_boolean(sysobject['active'])
+            # validate, and optionally make all filesets inactive
+            for setname, setobject in  sysobject['filesets'].items():
+                setobject['active'] = 'False' if reset else self.validate_boolean(setobject['active'])
 
     def run_external(self, coa_function='execute_run()'):
         # --> stupid langGO error  >:^(
         # internal langGo processes throws wicked errors when called from inside TK
         # works fine in script, so this is a work-around until that is fixed  :^(
         # affects  coa.execute_run() and coa.upload_to_transcend
-
-        self.coa.systems = self.split_dict(self.coa.systems, 'active', addifmissing=['True','False'])['True']
-        if self.coa.systems != {}:
+        if self.split_dict(self.coa.systems, 'active', addifmissing=['True','False'])['True'] != {}:
             # build and execute subprocess
             cmd = []
             cmd.append("from tdcsm.tdcoa import tdcoa;")
-            cmd.append("c=tdcoa(approot='%s'," %self.entryvar('approot'))
-            cmd.append("config='%s',"   %self.entryvar('config'))
-            cmd.append("systems='%s',"  %self.entryvar('systems'))
-            cmd.append("secrets='%s');" %self.entryvar('secrets'))
+            cmd.append("c=tdcoa(approot='%s'," %self.safepath( self.entryvar('approot')))
+            cmd.append("config='%s',"   %self.safepath(self.entryvar('config')))
+            cmd.append("systems='%s',"  %self.safepath(self.entryvar('systems')))
+            cmd.append("secrets='%s',"  %self.safepath(self.entryvar('secrets')))
+            cmd.append("skip_dbs=%s);"  %self.safepath(self.coa.skip_dbs))
+
             coacmd = coa_function.strip()
             if coacmd[:2] != 'c.': coacmd = 'c.%s' %coacmd
             if coacmd[-1:] != ')': coacmd = '%s()' %coacmd
             cmd.append(coacmd)
             cmd = ' '.join(cmd)
-            if 'python_call' in self.coa.settings:
-                pycall = self.coa.settings['python_call']
-            else:
-                pycall = 'python'
-            print(cmd)
-            os.system('%s -c "%s"' %(pycall, cmd))
+            os.system('%s -c "%s"' %(self.coa.settings['python_call'], cmd))
 
     def button_click(self, name='', **kwargs):
         print('button clicked',  name)
@@ -425,72 +449,88 @@ class coa():
             argstr += " - kwargs['%s'] = '%s'\n" %(n,v)
         print('%s' %argstr)
 
-        if name == 'reload_config':
-            # self.systems_save2disk()
-            self.coa.approot      = self.entryvar('approot')
-            self.coa.configpath   = os.path.join(self.coa.approot, self.entryvar('config'))
-            self.coa.secretpath   = os.path.join(self.coa.approot, self.entryvar('secrets'))
-            self.coa.systemspath  = os.path.join(self.coa.approot, self.entryvar('systems'))
-            self.coa.filesetpath  = os.path.join(self.coa.approot, self.entryvar('filesets'))
-            self.coa.reload_config()
-            print('approot: ', self.coa.approot)
-            print('config: ', self.coa.configpath)
-            print('secret: ', self.coa.secretpath)
-            print('system: ', self.coa.systemspath)
-            print('fileset: ', self.coa.filesetpath)
-            # self.systems_readfromdisk()
-            self.button_click('tv_systems_left') # this 'click' will refresh both left and right treeviews
-            self.button_click('tv_filesets_left')
-        elif name == 'approot':
-            self.open_folder_explorer(kwargs['entrytext'], createifmissing=True)
-        elif name == 'download_files':
-            self.coa.download_files()
-        elif name == 'prepare_sql':
-            self.coa.prepare_sql()
-        elif name == 'execute_run':
-            self.systems_save2disk()
-            self.run_external('execute_run')
-            self.upload_get_lastrun_folder()
-            #self.coa.execute_run()
-        elif name == 'make_customer_files':
-            self.coa.make_customer_files()
-        elif name == 'upload_to_transcend':
-            self.systems_save2disk()
-            self.run_external('upload_to_transcend')
-            #self.coa.execute_run()
-        elif name == 'last_output_folder':
-            self.open_folder_explorer(os.path.join(self.entryvar('approot'), kwargs['entrytext']), createifmissing=True)
-        elif name == 'run_all_checked':
-            if self.entryvar('download_files')      ==1: self.button_click('download_files')
-            if self.entryvar('prepare_sql')         ==1: self.button_click('prepare_sql')
-            if self.entryvar('execute_run')         ==1: self.button_click('execute_run')
-            if self.entryvar('make_customer_files') ==1: self.button_click('make_customer_files')
-            if self.entryvar('upload_to_transcend') ==1: self.button_click('upload_to_transcend')
+        try:
 
-        elif name in ['config','systems','filesets']:
-            self.open_text_file(kwargs['entrytext'], self.entryvar('approot'))
+            if name == 'reload_config':
+                self.coa.approot      = self.entryvar('approot')
+                self.coa.configpath   = os.path.join(self.coa.approot, self.entryvar('config'))
+                self.coa.secretpath   = os.path.join(self.coa.approot, self.entryvar('secrets'))
+                self.coa.systemspath  = os.path.join(self.coa.approot, self.entryvar('systems'))
+                self.coa.filesetpath  = os.path.join(self.coa.approot, self.entryvar('filesets'))
+                self.coa.reload_config()
+                print('approot: ', self.coa.approot)
+                print('config: ', self.coa.configpath)
+                print('secret: ', self.coa.secretpath)
+                print('system: ', self.coa.systemspath)
+                print('fileset: ', self.coa.filesetpath)
+                self.button_click('tv_systems_left') # this 'click' will refresh both left and right treeviews
+                self.button_click('tv_filesets_left')
+            elif name == 'approot':
+                approot = kwargs['entrytext'].replace(r':\U',r':\\U')
+                self.open_folder_explorer(approot, createifmissing=True)
+            elif name == 'download_files':
+                self.coa.download_files(self.motd)
+                self.motd = False
+            elif name == 'prepare_sql':
+                self.coa.prepare_sql()
+            elif name == 'execute_run':
+                self.systems_save2disk()
+                self.run_external('execute_run')
+                self.upload_get_lastrun_folder()
+                #self.coa.execute_run()
+            elif name == 'make_customer_files':
+                self.coa.make_customer_files()
+            elif name == 'upload_to_transcend':
+                self.systems_save2disk()
+                self.run_external('upload_to_transcend')
+                #self.coa.execute_run()
+            elif name == 'motd':
+                self.coa.display_motd()
+            elif name == 'last_output_folder':
+                self.open_folder_explorer(os.path.join(self.entryvar('approot'), kwargs['entrytext']), createifmissing=True)
+            elif name == 'run_all_checked':
+                if self.entryvar('download_files')      ==1: self.button_click('download_files')
+                if self.entryvar('prepare_sql')         ==1: self.button_click('prepare_sql')
+                if self.entryvar('execute_run')         ==1: self.button_click('execute_run')
+                if self.entryvar('make_customer_files') ==1: self.button_click('make_customer_files')
+                if self.entryvar('upload_to_transcend') ==1: self.button_click('upload_to_transcend')
+            elif name in ['config','systems','filesets']:
+                self.open_text_file(kwargs['entrytext'], self.entryvar('approot'))
+            elif name in ['tv_systems_left','tv_systems_right']:
+                if 'selected' in kwargs.keys(): # if item was "selected" kwargs will return which item (else refresh without change)
+                    active = 'True'
+                    if name[-4:] == 'left':  active = 'False'
+                    self.coa.systems[kwargs['selected']]['active'] = active
+                d = self.split_dict(self.coa.systems, 'active', default='True', addifmissing=['True','False'])
+                self.reload_Tx2('systems', leftlist = d['True'].keys(), rightlist = d['False'].keys())
+            elif name in ['tv_filesets_left','tv_filesets_right']:
+                if 'selected' in kwargs.keys():  # if item was "selected" kwargs will return which item (else refresh without change)
+                    active = 'True'
+                    if name[-4:] == 'left':  active = 'False'
+                    for system in self.coa.systems.keys():  # iterate thru all systems, to update the right system.fileset object
+                        self.coa.systems[system]['filesets'][kwargs['selected']]['active'] = active
+                d = self.split_dict(self.coa.systems, 'active', 'filesets', default='True', addifmissing=['True','False'])
+                if 'gui_show_dev_filesets' in self.coa.settings and self.coa.settings['gui_show_dev_filesets'] == 'True':
+                    exclude = []
+                else:
+                    exclude = self.split_dict(self.coa.filesets, 'show_in_gui', default='True' )['False'].keys()
+                self.reload_Tx2('filesets', leftlist = d['True'].keys(), rightlist = d['False'].keys(), exclude=exclude)
+            elif name == 'skip_dbs_toggle':
+                self.coa.skip_dbs  = bool(kwargs['state'] == 1)
+            elif name == 'print_systems':
+                self.print_dict(self.coa.systems, 'systems', 0, self.coa.secrets)
+            elif name == 'print_filesets':
+                self.print_dict(self.coa.filesets, 'filesets', 0, self.coa.secrets)
+            elif name == 'print_config':
+                self.print_dict(self.coa.substitutions, 'substitutions', 0, self.coa.secrets)
+                self.print_dict(self.coa.settings, 'settings', 0, self.coa.secrets)
+                self.print_dict(self.coa.transcend, 'transcend', 0, self.coa.secrets)
+                print('\n' + '-'*30 + '\nUNLISTED\n' + '-'*30)
+                print('Skip_DBS:  %s' %str(self.coa.skip_dbs))
 
-        elif name in ['tv_systems_left','tv_systems_right']:
-            if 'selected' in kwargs.keys(): # if item was "selected" kwargs will return which item (else refresh without change)
-                active = 'True'
-                if name[-4:] == 'left':  active = 'False'
-                self.coa.systems[kwargs['selected']]['active'] = active
-            d = self.split_dict(self.coa.systems, 'active', default='True', addifmissing=['True','False'])
-            self.reload_Tx2('systems', leftlist = d['True'].keys(), rightlist = d['False'].keys())
-
-        elif name in ['tv_filesets_left','tv_filesets_right']:
-            if 'selected' in kwargs.keys():  # if item was "selected" kwargs will return which item (else refresh without change)
-                active = 'True'
-                if name[-4:] == 'left':  active = 'False'
-                for system in self.coa.systems.keys():  # iterate thru all systems, to update the right system.fileset object
-                    self.coa.systems[system]['filesets'][kwargs['selected']]['active'] = active
-            d = self.split_dict(self.coa.systems, 'active', 'filesets', default='True', addifmissing=['True','False'])
-            if 'gui_show_dev_filesets' in self.coa.settings and self.coa.settings['gui_show_dev_filesets'] == 'True':
-                exclude = []
-            else:
-                exclude = self.split_dict(self.coa.filesets, 'show_in_gui', default='True' )['False'].keys()
-            self.reload_Tx2('filesets', leftlist = d['True'].keys(), rightlist = d['False'].keys(), exclude=exclude)
-
+        except Exception as err:   # TODO: I know, bad practice... if anything goes wrong, just reload_config() - fixes most issues
+            print('\nERROR: \n%s\n' %str(err))
+            self.button_click('reload_config')
 
 
 # =================== END: PROGRAM BEHAVIOR ==============================
@@ -512,6 +552,7 @@ class coa():
         app.title(self.title)
         app.geometry('720x770')
 
+        #-------------- Page Setup ------------------
         appframe = Frame(app, style="TFrame"); appframe.pack(fill=BOTH, expand=True)
         self.newImage(appframe, image_name='banner').pack(anchor=NW)
         Label(appframe, style="title.TLabel", text='TD Consumption Analytics (COA)').pack(anchor=NW)
@@ -519,7 +560,8 @@ class coa():
         tabcontrol = Notebook(appframe, padding=5)
         tabcontrol.pack(fill=BOTH, expand=True, anchor=NW)
 
-        Button(appframe, text="Close", command=lambda:self.close(), width=10).pack(side=RIGHT)
+        Button(appframe, text="Close", command=lambda:self.close(), width=18).pack(side=RIGHT)
+        Button(appframe, text="MOTD", command=lambda:self.button_click("motd"), width=7).pack(side=RIGHT)
         #Label(appframe, style="TLabel", text='version "%s"' %self.version).pack(anchor='center')
         self.newImage(appframe, image_name='logo').pack(side=LEFT)
 
@@ -544,7 +586,7 @@ class coa():
         self.newframe_LEB(frmQuickrun_N, labeltext=' Systems File:', btntext='Open File'  , btn_width=10, btncommand='systems' , style='quickrun-normal').pack(fill=X,  expand=True)
         self.newframe_LEB(frmQuickrun_N, labeltext=' Secrets File:', btntext=''           , btn_width=10, btncommand='secrets' , style='quickrun-normal').pack(fill=X,  expand=True)
         self.newframe_LEB(frmQuickrun_N, labeltext='FileSets File:', btntext='Open File'  , btn_width=10, btncommand='filesets', style='quickrun-normal').pack(fill=X, expand=True)
-        self.newbutton(frmQuickrun_N, btntext='Reload Configs', btncommand='reload_config', command=lambda:self.button_click(btncommand), btnwidth=25, side=BOTTOM, style = 'quickrun-normal')
+        self.newbutton(frmQuickrun_N, btntext='Reload Configs', btncommand='reload_config', btnwidth=25, side=BOTTOM, style = 'quickrun-normal')
 
         frmQuickrun_S  = Frame(tabQuickrun, padding=5); frmQuickrun_S.pack(side=BOTTOM, fill=BOTH, expand=True, anchor=S)
 
@@ -586,8 +628,16 @@ class coa():
 
         #-------------- TAB: HELP ------------------
         frmHelp  = Frame(tabHelp, padding=5, style="help-normal.TFrame"); frmHelp.pack(fill=BOTH, expand=True, anchor=N)
-        Label(frmHelp, text='MORE COMING SOON!', style='help-bold.TLabel').pack(fill=X, anchor=N)
-        Label(frmHelp, text='Version of tdgui = %s' %self.version, style='help-bold.TLabel').pack(fill=X, anchor=N)
+        frmHelp_N  = Frame(frmHelp, padding=5, style="help-normal.TFrame"); frmHelp_N.pack(side=TOP, fill=BOTH, expand=True, anchor=N)
+        Label(frmHelp_N, text='MORE COMING SOON!', style='help-bold.TLabel').pack(fill=X, anchor=N)
+        frmHelp_E  = Frame(frmHelp, padding=5, style="help-normal.TFrame"); frmHelp_E.pack(side=RIGHT, fill=X, expand=False, anchor=E)
+        self.newframe_LC(frmHelp_E, labeltext='Skip_DBS Flag (debugging)', checkcommand='skip_dbs_toggle', style='help-normal').pack(anchor=S)
+        frmHelp_W  = Frame(frmHelp, padding=5, style="help-normal.TFrame"); frmHelp_W.pack(side=LEFT, expand=False, anchor=W)
+        Label(frmHelp_W, text='Print Dictionary:', style='help-bold.TLabel').pack(fill=X, anchor=N)
+        self.newbutton(frmHelp_W, btntext = 'Systems',  btncommand='print_systems',  btnwidth=15, style = 'help-normal', side=TOP)
+        self.newbutton(frmHelp_W, btntext = 'Config',   btncommand='print_config',   btnwidth=15, style = 'help-normal', side=TOP)
+        self.newbutton(frmHelp_W, btntext = 'FileSets', btncommand='print_filesets', btnwidth=15, style = 'help-normal', side=TOP)
+
 
 
         #-------------- RUN!!!
@@ -595,8 +645,9 @@ class coa():
         print('config:  ' + self.entryvar('config') )
         print('systems: ' + self.entryvar('systems') )
         print('secrets: ' + self.entryvar('secrets') )
+
         self.coa = tdcoa(approot = self.entryvar('approot'), secrets = self.entryvar('secrets'))
-        # self.systems_readfromdisk()
+        self.systems_validate(reset=True)
         self.button_click('tv_systems_left') # this 'click' will refresh both left and right treeviews
         self.button_click('tv_filesets_left')
         self.upload_get_lastrun_folder()
@@ -609,7 +660,8 @@ class coa():
             self.coa.secrets = self.entryvars['secrets'].get()
             self.coa.reload_config()
 
-        Label(frmHelp, text='Version of tdcsm = %s' %self.coa.version, style='help-bold.TLabel').pack(fill=X, anchor=N)
+        Label(frmHelp_N, text='Version of tdcsm = %s' %self.coa.version, style='help-bold.TLabel').pack(fill=X, anchor=N)
+        Label(frmHelp_N, text='Version of tdgui = %s' %self.version, style='help-bold.TLabel').pack(fill=X, anchor=N)
 
         app.bind('<Escape>', self.close)
         app.mainloop()
