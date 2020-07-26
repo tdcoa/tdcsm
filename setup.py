@@ -14,24 +14,25 @@ setuptools.setup(
     url="https://github.com/tdcoa/tdcsm",
     packages=setuptools.find_packages(),
     install_requires=[
-          "pandas",
-          "numpy",
-          "requests",
-          "pyyaml",
-          "teradatasqlalchemy",
-          "teradataml",
-          "teradata",
-          "matplotlib",
-          "seaborn",
-          "python-pptx"
-      ],
+        "pandas",
+        "numpy",
+        "requests",
+        "pyyaml",
+        "teradatasqlalchemy",
+        "teradataml",
+        "teradata",
+        "matplotlib",
+        "seaborn",
+        "python-pptx",
+        "pydantic",
+    ],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
     entry_points={
-        'console_scripts': ['tdcsm=cli:main']
+        'console_scripts': ['tdcsm=tdcsm.cli:main']
     },
     python_requires=">=3.6",
     include_package_data=True
