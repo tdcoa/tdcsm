@@ -76,7 +76,7 @@ class tdcoa:
     transcend = {}
     settings = {}
 
-    def __init__(self, approot='.', printlog=True, config='config.yaml', secrets='secrets.yaml', filesets='filesets.yaml', systems='source_systems.yaml', refresh_defaults=False):
+    def __init__(self, approot='.', printlog=True, config='config.yaml', secrets='secrets.yaml', filesets='filesets.yaml', systems='source_systems.yaml', refresh_defaults=False, skip_dbs=False):
         self.bufferlog = True
         self.printlog = printlog
         self.approot = os.path.join('.', approot)
@@ -84,6 +84,7 @@ class tdcoa:
         self.secretpath = os.path.join(self.approot, secrets)
         self.systemspath = os.path.join(self.approot, systems)
         self.refresh_defaults = refresh_defaults
+        self.skip_dbs = skip_dbs
 
         self.utils = Utils(self.version)  # utilities class. inherits Logger class
 
@@ -96,12 +97,14 @@ class tdcoa:
         self.utils.log('tdcoa version', self.version)
 
         self.unique_id = dt.datetime.now().strftime("%m%d%Y%H%M")  # unique id to append to table
+        self.motd_url = 'file://' + os.path.abspath(os.path.join(self.approot, 'motd.html'))
 
         # filesets.yaml is validated at download time
 
         self.reload_config()
         if os.path.exists(self.filesetpath) and os.path.exists(self.systemspath):
             self.update_sourcesystem_yaml()
+
 
     # Function to add Source system yaml file with all the fileset entries in the filesets.yaml file and set active to false
     def update_sourcesystem_yaml(self):
@@ -128,6 +131,7 @@ class tdcoa:
             fh.write(yaml.dump(sourcesysyaml))
         fh.close()
         self.utils.log('Updated the Sourcesystem yaml file with all the fileset entries in the filesets.yaml file')
+
 
     def reload_config(self, configpath='', secretpath='', systemspath='', refresh_defaults=False):
         """Reloads configuration YAML files (config & secrets) used as
@@ -274,10 +278,15 @@ class tdcoa:
                                      'python'])
 
         # add skip_dbs back in as silent (unlisted) option
-        self.skip_dbs = False
+        # TODO: a) move validate_boolean() from tdgui to utils
+        #       b) re-point tdgui.validate_boolean to validate_boolean
+        #       c) wrap all text-as-boolean in tdcoa with utils.validate_boolean
+        #       d) move tdcoa self.skip_dbs back into self.settings['skip_dbs'] for simplicity
         if 'skip_dbs' in self.settings:
             if self.settings['skip_dbs'].strip().lower() == 'true':
                 self.skip_dbs = True
+            else:
+                self.skip_dbs = False
 
         self.filesetpath = self.settings['localfilesets']
 
@@ -342,29 +351,30 @@ class tdcoa:
         self.utils.log('loading system dictionaries')
         for sysname, sysobject in systemsyaml['systems'].items():
             # if self.utils.dict_active(sysobject, sysname): #<--- no more, really messed up lots of UI work before
-            self.systems.update({sysname: sysobject})
+            self.systems[sysname] = sysobject
+            self.utils.log('LOADING SYSTEM', sysname)
 
             # todo add default dbsversion and collection
             self.utils.check_setting(self.systems[sysname],
                                required_item_list=['active', 'siteid', 'use', 'host', 'username', 'password',
-                                                   'logmech', 'driver', 'encryption','manual_run'],
+                                                   'logmech', 'driver', 'encryption','manual_run','dbsversion','collection'],
                                defaults=['True', 'siteid123', 'unknown', 'customer.host.missing.com',
-                                         'username_missing', 'password_missing', '', 'sqlalchemy', '', 'False'])
+                                         'username_missing', 'password_missing', '', 'sqlalchemy', '', 'False',
+                                         '16.20','pdcr'])
 
-            if 'connectionstring' not in sysobject:
-                if sysobject['logmech'].strip() == '':
-                    logmech = ''
-                else:
-                    logmech = '/?logmech=%s' % sysobject['logmech']
-                sysobject['connectionstring'] = 'teradatasql://%s:%s@%s%s' % (sysobject['username'],
-                                                                              sysobject['password'],
-                                                                              sysobject['host'],
-                                                                              logmech)
-
+            if sysobject['logmech'].strip() == '':
+                logmech = ''
+            else:
+                logmech = '/?logmech=%s' % sysobject['logmech']
+            sysobject['connectionstring'] = 'teradatasql://%s:%s@%s%s' % (sysobject['username'],
+                                                                          sysobject['password'],
+                                                                          sysobject['host'],
+                                                                          logmech)
         self.utils.log('done!')
         self.utils.log('time', str(dt.datetime.now()))
 
-    def download_files(self):
+
+    def download_files(self, motd=True):
         self.utils.log('download_files started', header=True)
         self.utils.log('time', str(dt.datetime.now()))
         githost = self.settings['githost']
@@ -384,8 +394,8 @@ class tdcoa:
             fh.write(filecontent)
 
         # open motd.html in browser
-        file_url = 'file://' + os.path.abspath(os.path.join(self.approot, 'motd.html'))
-        webbrowser.open(file_url)
+        self.motd_url = 'file://' + os.path.abspath(os.path.join(self.approot, 'motd.html'))
+        if motd: webbrowser.open(self.motd_url)
 
         # delete all pre-existing download folders
         # Commented the below code, in order to make the script download only if the files doesn't exist
@@ -858,6 +868,7 @@ class tdcoa:
         self.utils.log('done!')
         self.utils.log('time', str(dt.datetime.now()))
 
+
     def archive_prepared_sql(self, name=''):
         """Manually archives (moves) all folders / files in the 'run' folder, where
         prepared sql is stored after the prepare_sql() function.  This includes the
@@ -897,6 +908,7 @@ class tdcoa:
         self.utils.log('done!')
         self.utils.log('time', str(dt.datetime.now()))
 
+
     def make_output_folder(self, name=''):
         outputpath = os.path.join(self.approot, self.folders['output'],
                                   str(dt.datetime.now())[:-7].replace(' ', '_').replace(':', ''))
@@ -906,6 +918,7 @@ class tdcoa:
         os.makedirs(outputpath)
 
         return outputpath
+
 
     def execute_run(self, name=''):
         self.utils.log('execute_run started', header=True)
@@ -1064,7 +1077,7 @@ class tdcoa:
                                                         vis_file = os.path.join(workpath, sqlcmd['vis'].replace('.csv', '.py'))
                                                         self.utils.log('vis py file', vis_file)
                                                         self.utils.log('running vis file..')
-                                                        os.system('python %s' % vis_file)
+                                                        os.system('%s %s' %(self.settings['python_call'], vis_file))
                                                         self.utils.log('Vis file complete!')
 
                                                 if 'pptx' in sqlcmd:  # insert to pptx file
@@ -1302,6 +1315,7 @@ class tdcoa:
         shutil.move(runlogsrc, runlogdst)
         self.utils.log('make_customer_files Completed', header=True)
 
+
     def upload_to_transcend(self, _outputpath=''):
         self.utils.bufferlogs = True
         self.utils.log('upload_to_transcend started', header=True)
@@ -1492,6 +1506,10 @@ class tdcoa:
 
         self.utils.log('\ndone!')
         self.utils.log('time', str(dt.datetime.now()))
+
+
+    def display_motd(self):
+        webbrowser.open(self.motd_url)
 
     def yaml_config(self):
         tmp = []
