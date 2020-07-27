@@ -108,6 +108,20 @@ class Utils(Logger):
         return str(rtn)
 
     @staticmethod
+    def validate_boolean(sbool, returntype = 'string'):
+        """accepts a string-as-boolean, and depending on returntype[:3], returns
+          - 'str'  == well-formed bool as string (default)
+          - 'boo' == boolean value itself
+        Special note: this is the first step in transitioning YAML from string-as-boolean to pure boolean: isolate the change as-is.
+        Once we've wrapped all instances here, we can change the default behavior once and test results."""
+        if str(sbool).strip().lower() == 'true':
+            if returntype[:3] == 'str': return 'True'
+            if returntype[:3] == 'boo': return  True
+        elif str(sbool).strip().lower() == 'false':
+            if returntype[:3] == 'str': return 'False'
+            if returntype[:3] == 'boo': return  False
+
+    @staticmethod
     def format_sql(sqltext):
         sql = str(sqltext).strip().split(';')[0]
         while '\n\n' in sql:

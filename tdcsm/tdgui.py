@@ -9,7 +9,7 @@ import tdcsm
 
 class coa():
 
-    version = "0.2.0.7"
+    version = "0.3.9.7.8"
     debug = False
 
     entryvars = {}
@@ -343,6 +343,9 @@ class coa():
         if self.debug: print(varname, rtn)
         return rtn
 
+    def skip_dbs(self):
+        return self.validate_boolean(self.coa.settings['skip_dbs'],'bool')
+
     def reload_Tx2(self, treetext='not set', leftlist=[], rightlist=[], exclude=[]):
         intrs = {str('tv_%s_left' %treetext):leftlist, str('tv_%s_right' %treetext):rightlist}
         for nm, lst in intrs.items():
@@ -408,7 +411,7 @@ class coa():
         self.button_click('reload_config')
         return True
 
-    def systems_validate(self, reset=False):
+    def reset_gui_variables(self, reset=False):
         """resets and validates in-memory systems object, including
           - validating all 'active' flags are well-formed
           - moving all Systems and FileSets to inactive, if reset=True """
@@ -418,6 +421,13 @@ class coa():
             # validate, and optionally make all filesets inactive
             for setname, setobject in  sysobject['filesets'].items():
                 setobject['active'] = 'False' if reset else self.validate_boolean(setobject['active'])
+
+        # sync skip_dbs flag with coa.settings
+        if self.validate_boolean(self.coa.settings['skip_dbs'],'bool'):
+            self.entryvars['skip_dbs_toggle'].set(value=1)
+        else:
+            self.entryvars['skip_dbs_toggle'].set(value=0)
+
 
     def run_external(self, coa_function='execute_run()'):
         # --> stupid langGO error  >:^(
@@ -432,14 +442,15 @@ class coa():
             cmd.append("config='%s',"   %self.safepath(self.entryvar('config')))
             cmd.append("systems='%s',"  %self.safepath(self.entryvar('systems')))
             cmd.append("secrets='%s',"  %self.safepath(self.entryvar('secrets')))
-            cmd.append("skip_dbs=%s);"  %self.safepath(self.coa.skip_dbs))
+            cmd.append("skip_dbs=%s);"  %str(self.skip_dbs()))
 
             coacmd = coa_function.strip()
             if coacmd[:2] != 'c.': coacmd = 'c.%s' %coacmd
             if coacmd[-1:] != ')': coacmd = '%s()' %coacmd
             cmd.append(coacmd)
-            cmd = ' '.join(cmd)
-            os.system('%s -c "%s"' %(self.coa.settings['python_call'], cmd))
+            cmd = '%s -c "%s"' %(self.coa.settings['python_call'], ' '.join(cmd))
+            print(cmd)
+            os.system(cmd)
 
     def button_click(self, name='', **kwargs):
         print('button clicked',  name)
@@ -457,7 +468,7 @@ class coa():
                 self.coa.secretpath   = os.path.join(self.coa.approot, self.entryvar('secrets'))
                 self.coa.systemspath  = os.path.join(self.coa.approot, self.entryvar('systems'))
                 self.coa.filesetpath  = os.path.join(self.coa.approot, self.entryvar('filesets'))
-                self.coa.reload_config()
+                self.coa.reload_config(skip_dbs=self.skip_dbs())
                 print('approot: ', self.coa.approot)
                 print('config: ', self.coa.configpath)
                 print('secret: ', self.coa.secretpath)
@@ -516,17 +527,15 @@ class coa():
                     exclude = self.split_dict(self.coa.filesets, 'show_in_gui', default='True' )['False'].keys()
                 self.reload_Tx2('filesets', leftlist = d['True'].keys(), rightlist = d['False'].keys(), exclude=exclude)
             elif name == 'skip_dbs_toggle':
-                self.coa.skip_dbs  = bool(kwargs['state'] == 1)
+                self.coa.settings['skip_dbs'] = bool(kwargs['state'] == 1)
             elif name == 'print_systems':
                 self.print_dict(self.coa.systems, 'systems', 0, self.coa.secrets)
             elif name == 'print_filesets':
                 self.print_dict(self.coa.filesets, 'filesets', 0, self.coa.secrets)
             elif name == 'print_config':
                 self.print_dict(self.coa.substitutions, 'substitutions', 0, self.coa.secrets)
-                self.print_dict(self.coa.settings, 'settings', 0, self.coa.secrets)
                 self.print_dict(self.coa.transcend, 'transcend', 0, self.coa.secrets)
-                print('\n' + '-'*30 + '\nUNLISTED\n' + '-'*30)
-                print('Skip_DBS:  %s' %str(self.coa.skip_dbs))
+                self.print_dict(self.coa.settings, 'settings', 0, self.coa.secrets)
 
         except Exception as err:   # TODO: I know, bad practice... if anything goes wrong, just reload_config() - fixes most issues
             print('\nERROR: \n%s\n' %str(err))
@@ -647,7 +656,7 @@ class coa():
         print('secrets: ' + self.entryvar('secrets') )
 
         self.coa = tdcoa(approot = self.entryvar('approot'), secrets = self.entryvar('secrets'))
-        self.systems_validate(reset=True)
+        self.reset_gui_variables(reset=True)
         self.button_click('tv_systems_left') # this 'click' will refresh both left and right treeviews
         self.button_click('tv_filesets_left')
         self.upload_get_lastrun_folder()
