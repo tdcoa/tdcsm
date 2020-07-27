@@ -559,7 +559,7 @@ class coa():
         self.set_defaults()
         app.wm_title(self.title)
         app.title(self.title)
-        app.geometry('720x770')
+        app.geometry('720x800')
 
         #-------------- Page Setup ------------------
         appframe = Frame(app, style="TFrame"); appframe.pack(fill=BOTH, expand=True)
