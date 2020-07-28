@@ -13,12 +13,13 @@ Select a step:
 5) Make Customer Files
 6) Collect Data
 7) Process Data
+8) Process Manual Files
 """
 
 while True:
 
     x = -1
-    while x < 0 or x > 7:
+    while x < 0 or x > 8:
         try:
             x = int(input(options))
         except ValueError as e:
@@ -54,4 +55,7 @@ while True:
 
     elif int(x) == 7:
         coa.process_data()
+
+    elif int(x) == 8:
+        coa.process_manual_files()
 

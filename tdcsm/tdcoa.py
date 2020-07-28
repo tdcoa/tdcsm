@@ -1484,6 +1484,52 @@ class tdcoa:
         self.utils.log('\ndone!')
         self.utils.log('time', str(dt.datetime.now()))
 
+    def process_manual_files(self,_outputpath=''):
+        # This function assumes that the manual csv files are placed in the latest output folder
+        self.utils.log('process_manual_files started', header=True)
+        self.utils.log('time', str(dt.datetime.now()))
+        self.utils.log('Running Prepare SQL step to get the required files for manual data processing')
+        self.prepare_sql()
+        runpath = os.path.join(self.approot, self.folders['run'])
+
+        # Find the latest output path
+        if _outputpath != '':  # use supplied path
+            outputpath = _outputpath
+            self.utils.log('output folder = manual param', outputpath)
+        elif os.path.isfile(os.path.join(self.approot,
+                                         '.last_run_output_path.txt')):  # get path from hidden .last_run_output_path.txt
+            # .last_run_output_path.txt  in approot
+            with open(os.path.join(self.approot, '.last_run_output_path.txt'), 'r') as fh:
+                outputpath = fh.read().strip().split('\n')[0]
+            outputpath = os.path.join(self.approot, outputpath)  # create absolute path from relative path in file
+            self.utils.log('output folder', outputpath)
+        elif self.outputpath != '':
+            # local variable set
+            outputpath = self.outputpath
+            self.utils.log('output folder = class variable: coa.outputpath', outputpath)
+        else:
+            outputpath = ''
+            self.utils.log('no output path defined')
+
+        # now that outputfo is defined, let's make sure the dir actually exists:
+        if not os.path.isdir(outputpath):
+            self.utils.log('\nERROR = invalid path', outputpath)
+            raise NotADirectoryError('Invalid Path: %s' % outputpath)
+
+        else:
+            self.outputpath = outputpath
+
+        # update log file to correct location
+        self.utils.log('updating runlog.txt location')
+        self.utils.logpath = os.path.join(outputpath, 'runlog.txt')
+        self.utils.bufferlogs = False
+        self.utils.log('unbuffer logs')
+
+        for dirs in os.listdir(runpath):
+            if os.path.isdir(os.path.join(runpath,dirs)):
+                shutil.move(os.path.join(runpath,dirs),outputpath)
+
+
 
     def make_customer_files(self, name=''):
         self.utils.log('make_customer_files started', header=True)
