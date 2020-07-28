@@ -15,6 +15,78 @@ from pptx.util import Inches, Pt
 import textwrap
 
 
+import datetime as dt
+import os
+import shutil
+import numpy
+
+import pandas as pd
+import sqlalchemy
+# --  Teradata Drivers:
+import teradata  # odbc driver
+from teradataml.context import context as tdml_context
+from teradataml.dataframe import dataframe as tdml_df
+from tdcsm.logging import Logger
+from pptx import Presentation
+from pptx.util import Inches, Pt
+import textwrap
+
+# import statements for visualizations
+import os
+import numpy as np
+
+import pandas as pd
+from pandas.plotting import andrews_curves
+from pandas.plotting import parallel_coordinates
+
+from sklearn.cluster import AgglomerativeClustering
+
+import seaborn as sns
+
+# matplotlib and related imports
+import matplotlib
+import matplotlib.pyplot as plt
+from matplotlib.path import Path
+from matplotlib.patches import PathPatch
+from matplotlib.patches import Patch
+import matplotlib.patches as patches
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+import matplotlib.ticker as ticker
+
+# from scipy.spatial import ConvexHull
+from scipy.signal import find_peaks
+from scipy.stats import sem
+import scipy.cluster.hierarchy as shc
+
+import pandas as pd
+import os
+import datetime
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+import seaborn as sns
+
+import matplotlib.style as style
+# style.available
+import matplotlib.font_manager
+
+import numpy as np
+
+from sklearn.datasets.samples_generator import make_blobs
+from sklearn.cluster import KMeans
+
+sns.set(font_scale=1.4)
+sns.set(rc={'figure.figsize': (20, 12)})
+
+import matplotlib.ticker as tick
+from matplotlib.lines import Line2D
+
+import warnings
+warnings.filterwarnings("ignore")
+
+import matplotlib.markers as mrkrs
+
+
+
 class Utils(Logger):
 
     def __init__(self, version):
@@ -466,6 +538,716 @@ class Utils(Logger):
         self.log('record count', str(len(df)))
         return df
 
+
+
+
+    @staticmethod
+    def set_plot_sizes(plt, small = 20, medium = 30, big = 40):
+        """
+        This function sets the sizes of font, axes title, axes label, xtick, ytick, legend and figure title.
+        Sizes could be either small, medium or big.
+
+        :param plt: input matplotlib plot object. Required
+        :param small: Integer value for small size. Default set as 20
+        :param medium: Interger value for medium size
+        :param big: Integer value for big size
+        :return: output matplotlib plot object with sizes set as per the parameters
+
+        """
+        SMALL_SIZE = small
+        MEDIUM_SIZE = medium
+        BIGGER_SIZE = big
+
+        plt.rc('font', size=SMALL_SIZE)  # controls default text sizes
+        plt.rc('axes', titlesize=MEDIUM_SIZE)  # fontsize of the axes title
+        plt.rc('axes', labelsize=MEDIUM_SIZE)  # fontsize of the x and y labels
+        plt.rc('xtick', labelsize=SMALL_SIZE)  # fontsize of the tick labels
+        plt.rc('ytick', labelsize=SMALL_SIZE)  # fontsize of the tick labels
+        plt.rc('legend', fontsize=SMALL_SIZE)  # legend fontsize
+        plt.rc('figure', titlesize=MEDIUM_SIZE)  # fontsize of the figure title
+
+        return plt
+
+    @staticmethod
+    def human_readable_names(input_str_with_underscore):
+
+        names_dict = {}
+        names_dict['Cnt'] = 'Count'
+        names_dict['Sec'] = 'Seconds'
+
+
+        out_list = []
+        name_list = input_str_with_underscore.split('_')
+
+        for name in name_list:
+            if name in list(names_dict.keys()):
+                out_list.append(names_dict[name])
+            else:
+                out_list.append(name)
+
+        output_str = ' '.join(out_list)
+        return output_str
+
+
+    @staticmethod
+    def scatter_plot(df_with_selected_cols, style_column, factor_x, factor_y, hue_column, markers, bucket_unique_list):
+        scatterplot = sns.scatterplot(data=df_with_selected_cols, style=Utils.human_readable_names(style_column),
+                                      alpha=.8, s=200, palette="muted", x=Utils.human_readable_names(factor_x),
+                                      y=Utils.human_readable_names(factor_y), hue=Utils.human_readable_names(hue_column),
+                                      markers=markers)
+
+        lgnd = plt.legend(loc="upper left", bbox_to_anchor=(1, 1), scatterpoints=1, fontsize=20)
+
+        legend_handle_counter = 1
+        for cat in bucket_unique_list:
+            lgnd.legendHandles[legend_handle_counter]._sizes = [200]
+            legend_handle_counter += 1
+
+        xlabels = []
+        for x in scatterplot.get_xticks():
+            if x >= 1000000000:
+                xlabels.append('{:,.1f}'.format(x / 1000000000) + ' B')
+            elif x >= 1000000:
+                xlabels.append('{:,.1f}'.format(x / 1000000) + ' M')
+            elif x >= 1000:
+                xlabels.append('{:,.1f}'.format(x / 1000) + ' k')
+            elif x >= 0:
+                xlabels.append('{:,.0f}'.format(x))
+            else:
+                xlabels.append(x)
+
+        ylabels = []
+        for y in scatterplot.get_yticks():
+            if y >= 1000000000:
+                ylabels.append('{:,.1f}'.format(y / 1000000000) + ' B')
+            elif y >= 1000000:
+                ylabels.append('{:,.1f}'.format(y / 1000000) + ' M')
+            elif y >= 1000:
+                ylabels.append('{:,.1f}'.format(y / 1000) + ' k')
+            elif y >= 0:
+                ylabels.append('{:,.0f}'.format(y))
+            else:
+                ylabels.append(y)
+
+        scatterplot.set_xticklabels(xlabels)
+        scatterplot.set_yticklabels(ylabels)
+
+        scatterplot.set_title(Utils.human_readable_names(factor_x) + " vs " + Utils.human_readable_names(factor_y), fontsize=42)
+        scatterplot.title.set_position([.5, 1.05])
+        # sc_pl_user_buckets.xaxis.labelpad = 5
+
+        # print(scatterplot._legend_data.keys())
+
+        plt.tight_layout()
+        fig = scatterplot.get_figure()
+        return fig
+
+    @staticmethod
+    def bar_chart(df_with_selected_cols, groupBy_column, factor):
+        group_by_bucket_mean = df_with_selected_cols.groupby(
+            [Utils.human_readable_names(groupBy_column)]).mean()
+
+        group_by_bucket_mean.sort_values(Utils.human_readable_names(factor), inplace=True)
+        group_by_bucket_mean = group_by_bucket_mean.round(0).astype(int)
+
+        # fitler x and y
+        x = group_by_bucket_mean.index
+        y = group_by_bucket_mean[Utils.human_readable_names(factor)]
+
+        # ----------------------------------------------------------------------------------------------------
+        # instanciate the figure
+        fig = plt.figure(figsize=(20, 12))
+        ax = fig.add_subplot()
+
+        # ----------------------------------------------------------------------------------------------------
+        # plot the data
+        for x_, y_ in zip(x, y):
+            # this is very cool, since we can pass a function to matplotlib
+            # and it will plot the color based on the result of the evaluation
+            ax.bar(x_, y_, color="red" if y_ < y.mean() else "green", alpha=0.3)
+
+            # add some text
+            ax.text(x_, y_ + 0.3, round(y_, 1), horizontalalignment='center')
+
+        # rotate the x ticks 90 degrees
+        #         ax.set_xticklabels(x, rotation=45)
+
+        # add an y label
+        ax.set_ylabel("Average " + Utils.human_readable_names(factor))
+
+        # add an x label
+        ax.set_xlabel(Utils.human_readable_names(groupBy_column))
+
+        # set a title/
+        ax_title = "Average " + Utils.human_readable_names(factor) + " filtered by " + Utils.human_readable_names(
+            groupBy_column)
+        ax.set_title(ax_title)
+
+        ax.get_xaxis().set_minor_locator(matplotlib.ticker.AutoMinorLocator())
+        ax.get_yaxis().set_minor_locator(matplotlib.ticker.AutoMinorLocator())
+
+        #         ax.grid(b=True, which='major', color='w', linewidth=1.5)
+        #         ax.grid(b=True, which='minor', color='w', linewidth=0.75)
+
+        plt.setp(ax.get_xticklabels(), rotation=30, horizontalalignment='right')
+
+        plt.tight_layout()
+
+        return fig
+
+    @staticmethod
+    def bar_chart_simple(df_with_selected_cols, groupBy_column_x, factor_y, horizontal_bar = False):
+        # instanciate the figure
+        fig = plt.figure(figsize=(20, 12))
+        # ax = fig.add_subplot()
+
+        if horizontal_bar == False:
+            x_col = Utils.human_readable_names(groupBy_column_x)
+            y_col = Utils.human_readable_names(factor_y)
+        else:
+            x_col = Utils.human_readable_names(factor_y)
+            y_col = Utils.human_readable_names(groupBy_column_x)
+
+        ax = sns.barplot(x=x_col, y=y_col, data=df_with_selected_cols)
+        # ax.set_xticklabels(ax.get_xticklabels(),rotation=30)
+        ax.get_xaxis().set_minor_locator(matplotlib.ticker.AutoMinorLocator())
+        ax.get_yaxis().set_minor_locator(matplotlib.ticker.AutoMinorLocator())
+
+        if horizontal_bar == False:
+            ylabels = []
+            for y in ax.get_yticks():
+                if y >= 1000000000:
+                    ylabels.append('{:,.1f}'.format(y / 1000000000) + ' B')
+                elif y >= 1000000:
+                    ylabels.append('{:,.1f}'.format(y / 1000000) + ' M')
+                elif y >= 1000:
+                    ylabels.append('{:,.1f}'.format(y / 1000) + ' k')
+                elif y >= 0:
+                    ylabels.append('{:,.0f}'.format(y))
+                else:
+                    ylabels.append(y)
+
+
+            ax.set_yticklabels(ylabels)
+        else:
+            xlabels = []
+            for x in ax.get_xticks():
+                if x >= 1000000000:
+                    xlabels.append('{:,.1f}'.format(x / 1000000000) + ' B')
+                elif x >= 1000000:
+                    xlabels.append('{:,.1f}'.format(x / 1000000) + ' M')
+                elif x >= 1000:
+                    xlabels.append('{:,.1f}'.format(x / 1000) + ' k')
+                elif x >= 0:
+                    xlabels.append('{:,.0f}'.format(x))
+                else:
+                    xlabels.append(x)
+
+            ax.set_xticklabels(xlabels)
+
+        if horizontal_bar == False:
+            plt.setp(ax.get_xticklabels(), rotation=30, horizontalalignment='right')
+
+        plt.tight_layout()
+
+        return fig
+
+    @staticmethod
+    def bar_chart_stacked(df_with_selected_cols, groupBy_column_x, factor_y, horizontal_bar=False, hue_column='Month_name'):
+        fig = plt.figure(figsize=(20, 12))
+        # ax = fig.add_subplot()
+
+        if horizontal_bar == False:
+            x_col = Utils.human_readable_names(groupBy_column_x)
+            y_col = Utils.human_readable_names(factor_y)
+        else:
+            x_col = Utils.human_readable_names(factor_y)
+            y_col = Utils.human_readable_names(groupBy_column_x)
+
+        hue_column = Utils.human_readable_names(hue_column)
+
+        ax = sns.barplot(x=x_col, y=y_col, data=df_with_selected_cols, hue=hue_column)
+        # ax.set_xticklabels(ax.get_xticklabels(),rotation=30)
+        ax.get_xaxis().set_minor_locator(matplotlib.ticker.AutoMinorLocator())
+        ax.get_yaxis().set_minor_locator(matplotlib.ticker.AutoMinorLocator())
+
+        lgnd = plt.legend(loc="upper left", bbox_to_anchor=(1, 1), scatterpoints=1, fontsize=20)
+
+        if horizontal_bar == False:
+            ylabels = []
+            for y in ax.get_yticks():
+                if y >= 1000000000:
+                    ylabels.append('{:,.1f}'.format(y / 1000000000) + ' B')
+                elif y >= 1000000:
+                    ylabels.append('{:,.1f}'.format(y / 1000000) + ' M')
+                elif y >= 1000:
+                    ylabels.append('{:,.1f}'.format(y / 1000) + ' k')
+                elif y >= 0:
+                    ylabels.append('{:,.0f}'.format(y))
+                else:
+                    ylabels.append(y)
+
+            ax.set_yticklabels(ylabels)
+        else:
+            xlabels = []
+            for x in ax.get_xticks():
+                if x >= 1000000000:
+                    xlabels.append('{:,.1f}'.format(x / 1000000000) + ' B')
+                elif x >= 1000000:
+                    xlabels.append('{:,.1f}'.format(x / 1000000) + ' M')
+                elif x >= 1000:
+                    xlabels.append('{:,.1f}'.format(x / 1000) + ' k')
+                elif x >= 0:
+                    xlabels.append('{:,.0f}'.format(x))
+                else:
+                    xlabels.append(x)
+
+            ax.set_xticklabels(xlabels)
+
+        if horizontal_bar == False:
+            plt.setp(ax.get_xticklabels(), rotation=30, horizontalalignment='right')
+
+        plt.tight_layout()
+
+        return fig
+
+    @staticmethod
+    def violin_chart(df_with_selected_cols, groupBy_column, factor):
+        scatterplot = sns.violinplot(x=Utils.human_readable_names(groupBy_column),
+                                     y=Utils.human_readable_names(factor),
+                                     data=df_with_selected_cols,
+                                     scale='width',
+                                     inner='quartile'
+                                     )
+
+        # ----------------------------------------------------------------------------------------------------
+        # prettify the plot
+
+        # instanciate the figure
+        # fig = plt.figure(figsize=(20, 12))
+        # ax = fig.add_subplot()
+
+        # get the current figure
+        ax = plt.gca()
+        # get the xticks to iterate over
+        xticks = ax.get_xticks()
+
+        # iterate over every xtick and add a vertical line
+        # to separate different classes
+        for tick in xticks:
+            ax.vlines(tick + 0.5, 0, np.max(df_with_selected_cols[Utils.human_readable_names(factor)]), color="grey",
+                      alpha=.1)
+
+        # rotate the x and y ticks
+        ax.tick_params(axis='x', labelrotation=45, labelsize=20)
+        ax.tick_params(axis='y', labelsize=20)
+
+        ylabels = []
+        for y in scatterplot.get_yticks():
+            if y >= 1000000000:
+                ylabels.append('{:,.1f}'.format(y / 1000000000) + ' B')
+            elif y >= 1000000:
+                ylabels.append('{:,.1f}'.format(y / 1000000) + ' M')
+            elif y >= 1000:
+                ylabels.append('{:,.1f}'.format(y / 1000) + ' k')
+            elif y >= 0:
+                ylabels.append('{:,.0f}'.format(y))
+            else:
+                ylabels.append(y)
+
+        # scatterplot.set_xticklabels(xlabels)
+        scatterplot.set_yticklabels(ylabels)
+
+        # # add x and y label
+        # ax.set_xlabel(human_readable_names("User_Bucket"), fontsize = 14)
+        # ax.set_ylabel(human_readable_names("CPU_Sec"), fontsize = 14)
+
+        # # set title
+        # ax.set_title("Violinplot", fontsize = 14);
+
+        # add an y label
+        ax.set_ylabel("Sum of " + Utils.human_readable_names(factor))
+
+        # add an x label
+        ax.set_xlabel(Utils.human_readable_names(groupBy_column))
+
+        # set a title/
+        ax_title = "" + Utils.human_readable_names(factor) + " across different " + Utils.human_readable_names(groupBy_column)
+        ax.set_title(ax_title)
+
+        ax.get_xaxis().set_minor_locator(matplotlib.ticker.AutoMinorLocator())
+        ax.get_yaxis().set_minor_locator(matplotlib.ticker.AutoMinorLocator())
+
+        # ax.grid(b=True, which='major', color='w', linewidth=1.5)
+        # ax.grid(b=True, which='minor', color='w', linewidth=0.75)
+
+        plt.setp(ax.get_xticklabels(), rotation=30, horizontalalignment='right')
+
+        plt.tight_layout()
+
+        fig = scatterplot.get_figure()
+
+        return fig
+
+    @staticmethod
+    def stacked_histogram(df_with_selected_cols, groupBy_column, factor):
+        gb_df_selected_cols_complete_data = df_with_selected_cols[
+            [Utils.human_readable_names(groupBy_column), Utils.human_readable_names(factor)]].groupby(
+            Utils.human_readable_names(groupBy_column))
+        lx = []
+        ln = []
+
+        # handpicked colors
+        # colors = ["#543005", "#8c510a", "#bf812d", "#80cdc1", "#35978f", "#01665e", "#003c30","#643005", "#9c510a", "#cf812d", "#90cdc1", "#45978f", "#11665e", "#203c30", "#303c30"]
+        colors = ['#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231', '#911eb4', '#46f0f0', '#f032e6', '#bcf60c',
+                  '#fabebe', '#008080', '#e6beff', '#9a6324', '#fffac8', '#800000', '#aaffc3', '#808000', '#ffd8b1',
+                  '#000075', '#808080', '#ffffff', '#000000']
+
+        # iterate over very groupby group and
+        # append their values as a list
+        # THIS IS A CRUCIAL STEP
+        for _, df_ in gb_df_selected_cols_complete_data:
+            lx.append(df_[Utils.human_readable_names(factor)].values.tolist())
+            ln.append(list(set(df_[Utils.human_readable_names(groupBy_column)].values.tolist()))[0])
+
+        colors = colors[0:len(ln)]
+
+        # ----------------------------------------------------------------------------------------------------
+        # instanciate the figure
+        fig = plt.figure(figsize=(20, 12))
+        ax = fig.add_subplot()
+
+        # ----------------------------------------------------------------------------------------------------
+        # plot the data
+
+        # hist returns a tuple of 3 values
+        # let's unpack it
+        n, bins, patches = ax.hist(lx, bins=50, stacked=True, density=False, color=colors)
+
+        # ----------------------------------------------------------------------------------------------------
+        # prettify the plot
+
+        # change x lim
+        # ax.set_ylim(0, 5)
+        ax.set_yscale('log')
+
+        # set the xticks to reflect every third value
+        ax.set_xticks(bins[::3])
+
+        xlabels = []
+        for x in ax.get_xticks():
+            if x >= 1000000000:
+                xlabels.append('{:,.1f}'.format(x / 1000000000) + ' B')
+            elif x >= 1000000:
+                xlabels.append('{:,.1f}'.format(x / 1000000) + ' M')
+            elif x >= 1000:
+                xlabels.append('{:,.1f}'.format(x / 1000) + ' k')
+            elif x >= 0:
+                xlabels.append('{:,.0f}'.format(x))
+            else:
+                xlabels.append(x)
+
+        ylabels = []
+        for y in ax.get_yticks():
+            if y >= 1000000000:
+                ylabels.append('{:,.1f}'.format(y / 1000000000) + ' B')
+            elif y >= 1000000:
+                ylabels.append('{:,.1f}'.format(y / 1000000) + ' M')
+            elif y >= 1000:
+                ylabels.append('{:,.1f}'.format(y / 1000) + ' k')
+            elif y >= 0:
+                ylabels.append('{:,.0f}'.format(y))
+            else:
+                ylabels.append(y)
+
+        ax.set_xticklabels(xlabels)
+        ax.set_yticklabels(ylabels)
+
+        # set a title
+        ax_title = "Stacked Histogram of " + Utils.human_readable_names(factor) + " colored by " + Utils.human_readable_names(
+            groupBy_column)
+        ax.set_title(ax_title)
+
+        plt.setp(ax.get_xticklabels(), rotation=30, horizontalalignment='right')
+
+        # add a custom legend wit class and color
+        # you have to pass a dict
+        ax.legend({class_: color for class_, color in zip(ln, colors)}, loc="upper left", bbox_to_anchor=(1, 1),
+                  scatterpoints=1, fontsize=20)
+
+        # set the y label
+        ax.set_ylabel("Frequency");
+
+        # set the x label
+        ax.set_xlabel(Utils.human_readable_names(factor))
+
+        plt.tight_layout()
+
+        return fig
+
+    @staticmethod
+    def heatmap(data, row_labels, col_labels, ax=None,
+                cbar_kw={}, cbarlabel="", **kwargs):
+        """
+        Create a heatmap from a numpy array and two lists of labels.
+
+        Parameters
+        ----------
+        data
+            A 2D numpy array of shape (N, M).
+        row_labels
+            A list or array of length N with the labels for the rows.
+        col_labels
+            A list or array of length M with the labels for the columns.
+        ax
+            A `matplotlib.axes.Axes` instance to which the heatmap is plotted.  If
+            not provided, use current axes or create a new one.  Optional.
+        cbar_kw
+            A dictionary with arguments to `matplotlib.Figure.colorbar`.  Optional.
+        cbarlabel
+            The label for the colorbar.  Optional.
+        **kwargs
+            All other arguments are forwarded to `imshow`.
+        """
+
+        if not ax:
+            ax = plt.gca()
+
+        # Plot the heatmap
+        im = ax.imshow(data, **kwargs)
+
+        # Create colorbar
+        #     cbar = ax.figure.colorbar(im, ax=ax, **cbar_kw)
+        #     cbar.ax.set_ylabel(cbarlabel, rotation=0, va="bottom")
+
+        # We want to show all ticks...
+        ax.set_xticks(np.arange(data.shape[1]))
+        ax.set_yticks(np.arange(data.shape[0]))
+        # ... and label them with the respective list entries.
+        ax.set_xticklabels(col_labels)
+        ax.set_yticklabels(row_labels)
+
+        # Let the horizontal axes labeling appear on top.
+        ax.tick_params(top=True, bottom=False,
+                       labeltop=True, labelbottom=False)
+
+        # Rotate the tick labels and set their alignment.
+        plt.setp(ax.get_xticklabels(), rotation=0, ha="right",
+                 rotation_mode="anchor")
+
+        plt.setp(ax.get_yticklabels(), rotation=0, ha="right",
+                 rotation_mode="anchor")
+
+        # Turn spines off and create white grid.
+        for edge, spine in ax.spines.items():
+            spine.set_visible(False)
+
+        ax.set_xticks(np.arange(data.shape[1] + 1) - .5, minor=True)
+        ax.set_yticks(np.arange(data.shape[0] + 1) - .5, minor=True)
+        ax.grid(which="minor", color="w", linestyle='-', linewidth=3)
+        ax.tick_params(which="minor", bottom=False, left=False)
+
+        #     return im, cbar
+        return im
+
+    @staticmethod
+    def annotate_heatmap(im, data=None, valfmt="{x:.2f}",
+                         textcolors=["black", "white"],
+                         threshold=None, **textkw):
+        """
+        A function to annotate a heatmap.
+
+        Parameters
+        ----------
+        im
+            The AxesImage to be labeled.
+        data
+            Data used to annotate.  If None, the image's data is used.  Optional.
+        valfmt
+            The format of the annotations inside the heatmap.  This should either
+            use the string format method, e.g. "$ {x:.2f}", or be a
+            `matplotlib.ticker.Formatter`.  Optional.
+        textcolors
+            A list or array of two color specifications.  The first is used for
+            values below a threshold, the second for those above.  Optional.
+        threshold
+            Value in data units according to which the colors from textcolors are
+            applied.  If None (the default) uses the middle of the colormap as
+            separation.  Optional.
+        **kwargs
+            All other arguments are forwarded to each call to `text` used to create
+            the text labels.
+        """
+
+        if not isinstance(data, (list, np.ndarray)):
+            data = im.get_array()
+
+        # Normalize the threshold to the images color range.
+        if threshold is not None:
+            threshold = im.norm(threshold)
+        else:
+            threshold = im.norm(data.max()) / 2.
+
+        # Set default alignment to center, but allow it to be
+        # overwritten by textkw.
+        kw = dict(horizontalalignment="center",
+                  verticalalignment="center")
+        kw.update(textkw)
+
+        # Get the formatter in case a string is supplied
+        if isinstance(valfmt, str):
+            valfmt = matplotlib.ticker.StrMethodFormatter(valfmt)
+
+        # Loop over the data and create a `Text` for each "pixel".
+        # Change the text's color depending on the data.
+        texts = []
+        for i in range(data.shape[0]):
+            for j in range(data.shape[1]):
+                kw.update(color=textcolors[int(im.norm(data[i, j]) > threshold)])
+                text = im.axes.text(j, i, valfmt(data[i, j], None), **kw)
+                type(text)
+                texts.append(text)
+
+        return texts
+
+    @staticmethod
+    def human_readable_heatmap_title(input_text):
+        output_text = ''
+        if input_text == 'Concurrency_Avg':
+            output_text = 'Concurrency, Average'
+        elif input_text == 'Concurrency_80Pctl':
+            output_text = 'Concurrency, 80th Percentile'
+        elif input_text == 'Concurrency_95Pctl':
+            output_text = 'Concurrency, 95th Percentile'
+        elif input_text == 'Concurrency_Peak':
+            output_text = 'Concurrency, Peak'
+        else:
+            output_text = 'Concurrency'
+
+        return output_text
+
+    @staticmethod
+    def heatmap_chart(df_concurrency, concurrency_col):
+        df = df_concurrency[['LogDate', 'LogHour', concurrency_col]]
+
+        # df['LogDate'] = df['LogDate'].dt.date
+
+        df_pivot = df.pivot(index='LogDate', columns='LogHour', values=concurrency_col)
+
+        log_date = df_pivot.index
+
+        log_hour = df_pivot.columns
+
+        Concurrency_values = df_pivot.values
+
+        fig, ax = plt.subplots(figsize=(30, 30))
+        # plt.figure(figsize=(1,1))
+
+        # SMALL_SIZE = 20
+        # MEDIUM_SIZE = 20
+        # BIGGER_SIZE = 20
+        #
+        # plt.rc('font', size=SMALL_SIZE)  # controls default text sizes
+        # plt.rc('axes', titlesize=SMALL_SIZE)  # fontsize of the axes title
+        # plt.rc('axes', labelsize=MEDIUM_SIZE)  # fontsize of the x and y labels
+        # plt.rc('xtick', labelsize=SMALL_SIZE)  # fontsize of the tick labels
+        # plt.rc('ytick', labelsize=SMALL_SIZE)  # fontsize of the tick labels
+        # plt.rc('legend', fontsize=40)  # legend fontsize
+        # plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
+
+        Utils.set_plot_sizes(plt, small=20, medium=20, big=20)
+
+        im = Utils.heatmap(Concurrency_values, log_date, log_hour, ax=ax,
+                     cmap="YlOrRd", cbarlabel=concurrency_col)
+
+        # legend
+        # cbar.set_label('Concurrency Peak', rotation=270, size=35)
+
+        # create an axes on the right side of ax. The width of cax will be 5%
+        # of ax and the padding between cax and ax will be fixed at 0.05 inch.
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size="5%", pad=0.75)
+        # cax.set_label('Concurrency Peak')
+
+        plt.colorbar(im, cax=cax)
+        # plt.title("Concurrency_Peak")
+        #     ax.set_ylabel('Date',size = 30,labelpad =10)
+        ax.set_xlabel('Hour', size=30, labelpad=10)
+        ax.xaxis.set_label_position('top')
+        size = fig.get_size_inches() * fig.dpi
+        #     ax.set_title('Heatmap showing ' + concurrency_list[i], y=-0.05,size=36, pad=20)
+        ax_title = Utils.human_readable_heatmap_title(concurrency_col)
+        ax.set_title(ax_title, loc='left', pad=5, size=36)
+
+        texts = Utils.annotate_heatmap(im, valfmt="{x}")
+
+        plt.tight_layout()
+
+        return fig
+
+    @staticmethod
+    def comparative_line_trend_graph(df_daily_max_modified, date_col, parameter_col, value_col):
+        fig, ax = plt.subplots(figsize=(30, 20))
+        g = sns.lineplot(x=df_daily_max_modified[date_col], y=value_col, data=df_daily_max_modified, hue=parameter_col,
+                         sort=True, linewidth=3)
+        x_dates = df_daily_max_modified[date_col].sort_values().unique()
+        plt.xticks(plt.xticks()[0], x_dates, rotation=30)
+
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(1))
+
+        handles, labels = ax.get_legend_handles_labels()
+        ax.legend(handles=handles[1:], labels=labels[1:], loc="upper left", bbox_to_anchor=(1, 1), scatterpoints=1,
+                  fontsize=20)
+
+        ax.set_title('Comparative Line Trend Graph', y=-0.15, size=36, pad=20)
+
+        # ax.legend(loc="upper left",bbox_to_anchor=(1, 1), scatterpoints=1, fontsize=20)
+
+        plt.tight_layout()
+
+        return fig
+
+
+    @staticmethod
+    def weekday_comparative_line_trend_graph(df_daily_mean_modified, weekday_col, parameter_col, value_col):
+        fig, ax = plt.subplots(figsize=(30, 20))
+        g = sns.lineplot(x=df_daily_mean_modified[weekday_col], y=value_col, data=df_daily_mean_modified,
+                         hue=parameter_col, sort=True, linewidth=3)
+        x_dates = df_daily_mean_modified[weekday_col].unique()
+        plt.xticks(plt.xticks()[0], x_dates, rotation=30)
+
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(1))
+
+        handles, labels = ax.get_legend_handles_labels()
+        ax.legend(handles=handles[1:], labels=labels[1:], loc="upper left", bbox_to_anchor=(1, 1), scatterpoints=1,
+                  fontsize=20)
+
+        ax.set_title('Week-day Comparative Line Trend Graph', y=-0.15, size=36, pad=20)
+
+        plt.tight_layout()
+
+        return fig
+
+
+    @staticmethod
+    def box_plot(df, data_columns_list, x_axis, y_axis):
+        fig, axes = plt.subplots(len(data_columns_list), 1, figsize=(11, 10), sharex=True)
+        for name, ax in zip(data_columns_list, axes):
+            sns.boxplot(data=df, x=x_axis, y=name, ax=ax)
+            ax.set_ylabel(y_axis)
+            ax.set_title(name)
+            # Remove the automatic x-axis label from all but the bottom subplot
+            if ax != axes[-1]:
+                ax.set_xlabel('')
+
+        plt.tight_layout()
+
+        return fig
+
+
+
+
+
     @staticmethod
     def get_cell_value_from_table(cell_content):
         cell_value = ''
@@ -894,8 +1676,16 @@ class Utils(Logger):
                         left = top = Inches(2.0)
                         width = Inches(6.0)
 
-                        rows = num_of_rows_in_ppt
-                        cols = num_of_columns_in_ppt
+                        if rows < num_of_rows_in_ppt:
+                            rows = rows
+                        else:
+                            rows = num_of_rows_in_ppt
+
+                        if cols < num_of_columns_in_ppt:
+                            cols = cols
+                        else:
+                            cols = num_of_columns_in_ppt
+
 
                         #                     num_of_columns_in_ppt = len(shape.table.columns)
                         #                 num_of_rows_in_ppt = len(shape.table.rows)
@@ -950,6 +1740,9 @@ class Utils(Logger):
                                     shape.table.cell(r + 1, c).text = str(cell_value)
                                 except:
                                     shape.table.cell(r + 1, c).text = cell_value.astype(numpy.str)
+
+                                if shape.table.cell(r + 1, c).text == 'None':
+                                    shape.table.cell(r + 1, c).text = ''
 
                                 c += 1
                             r += 1
