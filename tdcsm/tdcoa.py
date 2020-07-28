@@ -61,7 +61,7 @@ class tdcoa:
     systemspath = ''
     filesetpath = ''
     outputpath = ''
-    version = "0.3.9.7.4"
+    version = "0.3.9.7.8"
     skip_dbs = False    # skip ALL dbs connections / executions
     manual_run = False  # skip dbs executions in execute_run() but not upload_to_transcend()
                         # also skips /*{{save:}}*/ special command
@@ -76,7 +76,7 @@ class tdcoa:
     transcend = {}
     settings = {}
 
-    def __init__(self, approot='.', printlog=True, config='config.yaml', secrets='secrets.yaml', filesets='filesets.yaml', systems='source_systems.yaml', refresh_defaults=False):
+    def __init__(self, approot='.', printlog=True, config='config.yaml', secrets='secrets.yaml', filesets='filesets.yaml', systems='source_systems.yaml', refresh_defaults=False, skip_dbs=False):
         self.bufferlog = True
         self.printlog = printlog
         self.approot = os.path.join('.', approot)
@@ -96,12 +96,14 @@ class tdcoa:
         self.utils.log('tdcoa version', self.version)
 
         self.unique_id = dt.datetime.now().strftime("%m%d%Y%H%M")  # unique id to append to table
+        self.motd_url = 'file://' + os.path.abspath(os.path.join(self.approot, 'motd.html'))
 
         # filesets.yaml is validated at download time
 
-        self.reload_config()
+        self.reload_config(skip_dbs=skip_dbs)
         if os.path.exists(self.filesetpath) and os.path.exists(self.systemspath):
             self.update_sourcesystem_yaml()
+
 
     # Function to add Source system yaml file with all the fileset entries in the filesets.yaml file and set active to false
     def update_sourcesystem_yaml(self):
@@ -129,7 +131,8 @@ class tdcoa:
         fh.close()
         self.utils.log('Updated the Sourcesystem yaml file with all the fileset entries in the filesets.yaml file')
 
-    def reload_config(self, configpath='', secretpath='', systemspath='', refresh_defaults=False):
+
+    def reload_config(self, configpath='', secretpath='', systemspath='', refresh_defaults=False, skip_dbs=False):
         """Reloads configuration YAML files (config & secrets) used as
         process driver.  This will also perform any local environment checks,
         such as creating missing folders (download|sql|run|output), change
@@ -262,21 +265,21 @@ class tdcoa:
         # check and set required Settings
         self.utils.log('loading dictionary', 'settings')
         self.settings = configyaml['settings']
+        if skip_dbs: self.settings['skip_dbs'] = 'True'
         self.utils.check_setting(self.settings,
                            required_item_list=['githost', 'gitfileset', 'gitmotd', 'localfilesets',
-                                               'run_non_fileset_folders', 'gui_show_dev_filesets'],
+                                               'run_non_fileset_folders', 'gui_show_dev_filesets',
+                                                'python_call','skip_dbs'],
                            defaults=['https://raw.githubusercontent.com/tdcoa/sql/master/',
                                      'filesets.yaml',
                                      'motd.txt',
                                      '{download}/filesets.yaml',
                                      'True',
-                                     'False'])
+                                     'False',
+                                     'python','False'])
 
-        # add skip_dbs back in as silent (unlisted) option
-        self.skip_dbs = False
-        if 'skip_dbs' in self.settings:
-            if self.settings['skip_dbs'].strip().lower() == 'true':
-                self.skip_dbs = True
+        if self.utils.validate_boolean(self.settings['skip_dbs'],'bool'):
+            self.utils.log('SKIP_DBS == TRUE, emulating all database connections', warning=True)
 
         self.filesetpath = self.settings['localfilesets']
 
@@ -341,29 +344,30 @@ class tdcoa:
         self.utils.log('loading system dictionaries')
         for sysname, sysobject in systemsyaml['systems'].items():
             # if self.utils.dict_active(sysobject, sysname): #<--- no more, really messed up lots of UI work before
-            self.systems.update({sysname: sysobject})
+            self.systems[sysname] = sysobject
+            self.utils.log('LOADING SYSTEM', sysname)
 
             # todo add default dbsversion and collection
             self.utils.check_setting(self.systems[sysname],
                                required_item_list=['active', 'siteid', 'use', 'host', 'username', 'password',
-                                                   'logmech', 'driver', 'encryption','manual_run'],
+                                                   'logmech', 'driver', 'encryption','manual_run','dbsversion','collection'],
                                defaults=['True', 'siteid123', 'unknown', 'customer.host.missing.com',
-                                         'username_missing', 'password_missing', '', 'sqlalchemy', '', 'False'])
+                                         'username_missing', 'password_missing', '', 'sqlalchemy', '', 'False',
+                                         '16.20','pdcr'])
 
-            if 'connectionstring' not in sysobject:
-                if sysobject['logmech'].strip() == '':
-                    logmech = ''
-                else:
-                    logmech = '/?logmech=%s' % sysobject['logmech']
-                sysobject['connectionstring'] = 'teradatasql://%s:%s@%s%s' % (sysobject['username'],
-                                                                              sysobject['password'],
-                                                                              sysobject['host'],
-                                                                              logmech)
-
+            if sysobject['logmech'].strip() == '':
+                logmech = ''
+            else:
+                logmech = '/?logmech=%s' % sysobject['logmech']
+            sysobject['connectionstring'] = 'teradatasql://%s:%s@%s%s' % (sysobject['username'],
+                                                                          sysobject['password'],
+                                                                          sysobject['host'],
+                                                                          logmech)
         self.utils.log('done!')
         self.utils.log('time', str(dt.datetime.now()))
 
-    def download_files(self):
+
+    def download_files(self, motd=True):
         self.utils.log('download_files started', header=True)
         self.utils.log('time', str(dt.datetime.now()))
         githost = self.settings['githost']
@@ -383,8 +387,8 @@ class tdcoa:
             fh.write(filecontent)
 
         # open motd.html in browser
-        file_url = 'file://' + os.path.abspath(os.path.join(self.approot, 'motd.html'))
-        webbrowser.open(file_url)
+        self.motd_url = 'file://' + os.path.abspath(os.path.join(self.approot, 'motd.html'))
+        if motd: webbrowser.open(self.motd_url)
 
         # delete all pre-existing download folders
         # Commented the below code, in order to make the script download only if the files doesn't exist
@@ -857,6 +861,7 @@ class tdcoa:
         self.utils.log('done!')
         self.utils.log('time', str(dt.datetime.now()))
 
+
     def archive_prepared_sql(self, name=''):
         """Manually archives (moves) all folders / files in the 'run' folder, where
         prepared sql is stored after the prepare_sql() function.  This includes the
@@ -896,6 +901,7 @@ class tdcoa:
         self.utils.log('done!')
         self.utils.log('time', str(dt.datetime.now()))
 
+
     def make_output_folder(self, name=''):
         outputpath = os.path.join(self.approot, self.folders['output'],
                                   str(dt.datetime.now())[:-7].replace(' ', '_').replace(':', ''))
@@ -906,6 +912,7 @@ class tdcoa:
 
         return outputpath
 
+
     def execute_run(self, name=''):
         self.utils.log('execute_run started', header=True)
         self.utils.log('time', str(dt.datetime.now()))
@@ -915,6 +922,7 @@ class tdcoa:
         # make output directory for execution output and other collateral
         runpath = os.path.join(self.approot, self.folders['run'])
         outputpath = self.make_output_folder(name)
+        skip_dbs = self.utils.validate_boolean(self.settings['skip_dbs'],'bool')
 
         # create hidden file containing last run's output -- to remain in the root folder
         with open(os.path.join(self.approot, '.last_run_output_path.txt'), 'w') as lastoutput:
@@ -988,7 +996,7 @@ class tdcoa:
                                         conntype=self.systems[sysname]['driver'],
                                         encryption=self.systems[sysname]['encryption'],
                                         system=self.systems[sysname],
-                                        skip = self.skip_dbs)  # <------------------------------- Connect to the database
+                                        skip = skip_dbs)  # <------------------------------- Connect to the database
 
                                     # loop thru all sql files:
                                     for coasqlfile in sorted(coasqlfiles):
@@ -1011,7 +1019,7 @@ class tdcoa:
                                                 sql = sqlcmd.pop('sql', '')
 
 
-                                                df = self.utils.open_sql(conn, sql, skip = self.skip_dbs)  # <--------------------- Run SQL
+                                                df = self.utils.open_sql(conn, sql, skip = skip_dbs)  # <--------------------- Run SQL
                                                 csvfile=''
                                                 csvfile_exists=False
 
@@ -1031,7 +1039,7 @@ class tdcoa:
                                                     # Col names will be merged upon save
                                                     col_names = []
                                                     if conn['type'] not in ('sqlalchemy', 'teradataml'):
-                                                        col_names = self.utils.open_sql(conn, sql, columns=True, skip = self.skip_dbs)
+                                                        col_names = self.utils.open_sql(conn, sql, columns=True, skip = skip_dbs)
 
                                                     # once built, append output folder, SiteID on the front, iterative counter if duplicates
                                                     # csvfile = os.path.join(outputfo, sqlcmd['save'])
@@ -1063,7 +1071,7 @@ class tdcoa:
                                                         vis_file = os.path.join(workpath, sqlcmd['vis'].replace('.csv', '.py'))
                                                         self.utils.log('vis py file', vis_file)
                                                         self.utils.log('running vis file..')
-                                                        os.system('python %s' % vis_file)
+                                                        os.system('%s %s' %(self.settings['python_call'], vis_file))
                                                         self.utils.log('Vis file complete!')
 
                                                 if 'pptx' in sqlcmd:  # insert to pptx file
@@ -1706,10 +1714,13 @@ class tdcoa:
         shutil.move(runlogsrc, runlogdst)
         self.utils.log('make_customer_files Completed', header=True)
 
+
     def upload_to_transcend(self, _outputpath=''):
         self.utils.bufferlogs = True
         self.utils.log('upload_to_transcend started', header=True)
         self.utils.log('time', str(dt.datetime.now()))
+
+        skip_dbs = self.utils.validate_boolean(self.settings['skip_dbs'],'bool')
 
         # process 3 ways to get output path
         if _outputpath != '':  # use supplied path
@@ -1756,7 +1767,7 @@ class tdcoa:
         transcend = self.utils.open_connection(
             'teradataml',
             system=self.transcend,
-            skip = self.skip_dbs)  # <--------------------------------- Connect
+            skip = skip_dbs)  # <--------------------------------- Connect
 
         # Walk the directory structure looking for upload_manifest.json files
         for workpath, subfo, files in os.walk(outputpath):
@@ -1822,13 +1833,13 @@ class tdcoa:
                                     self.utils.log('perm table', entry['schema'] + '.' + entry['table'] + '_%s' % self.unique_id)
 
                                     # create staging table (perm) with unique id
-                                    if not self.skip_dbs:
+                                    if not skip_dbs:
                                         copy_to_sql(dfcsv, entry['table'] + '_%s' % self.unique_id, entry['schema'], if_exists='replace')
                                     self.utils.log('complete', str(dt.datetime.now()))
 
                                     # load to GTT
                                     self.utils.log('\nload to GTT', entry['schema'] + '.' + entry['table'])
-                                    if not self.skip_dbs:
+                                    if not skip_dbs:
                                         transcend['connection'].execute("""
                                         INSERT INTO {db}.{table} SELECT * FROM {db}.{unique_table}
                                         """.format(db=entry['schema'],
@@ -1844,7 +1855,7 @@ class tdcoa:
                                 # 2. call sp on GTT to merge to final table
                                 else:
                                     self.utils.log('write_to_perm', 'False')
-                                    if not self.skip_dbs:
+                                    if not skip_dbs:
                                         copy_to_sql(dfcsv, entry['table'], entry['schema'], if_exists='append')
                                     self.utils.log('complete', str(dt.datetime.now()))
                                     successful_load = True
@@ -1873,7 +1884,7 @@ class tdcoa:
                             if str(entry['call']).strip() != "" and successful_load:
                                 self.utils.log('\nStored Proc', str(entry['call']))
                                 try:
-                                    if not self.skip_dbs:
+                                    if not skip_dbs:
                                         transcend['connection'].execute('call %s ;' % str(entry['call']))
                                     self.utils.log('complete', str(dt.datetime.now()))
 
@@ -1881,7 +1892,7 @@ class tdcoa:
                                     if self.settings['write_to_perm'].lower() == 'true':
                                         self.utils.log('\ndrop unique perm table', entry['schema'] + '.' + entry['table'] + '_%s' % self.unique_id)
 
-                                        if not self.skip_dbs:
+                                        if not skip_dbs:
                                             transcend['connection'].execute("""
                                             DROP TABLE {db}.{unique_table}
                                             """.format(db=entry['schema'],
@@ -1896,6 +1907,10 @@ class tdcoa:
 
         self.utils.log('\ndone!')
         self.utils.log('time', str(dt.datetime.now()))
+
+
+    def display_motd(self):
+        webbrowser.open(self.motd_url)
 
     def yaml_config(self):
         tmp = []
