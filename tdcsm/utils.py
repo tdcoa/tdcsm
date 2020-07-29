@@ -14,77 +14,43 @@ from pptx import Presentation
 from pptx.util import Inches, Pt
 import textwrap
 
+## import statements for visualizations
 
-import datetime as dt
-import os
-import shutil
-import numpy
-
-import pandas as pd
-import sqlalchemy
-# --  Teradata Drivers:
-import teradata  # odbc driver
-from teradataml.context import context as tdml_context
-from teradataml.dataframe import dataframe as tdml_df
-from tdcsm.logging import Logger
-from pptx import Presentation
-from pptx.util import Inches, Pt
-import textwrap
-
-# import statements for visualizations
-import os
-import numpy as np
-
-import pandas as pd
-from pandas.plotting import andrews_curves
-from pandas.plotting import parallel_coordinates
-
-from sklearn.cluster import AgglomerativeClustering
-
-import seaborn as sns
-
+# import os
+# import numpy as np
+# import pandas as pd
+# from pandas.plotting import andrews_curves
+# from pandas.plotting import parallel_coordinates
+# import seaborn as sns
 # matplotlib and related imports
+# import matplotlib.pyplot as plt
+# from matplotlib.path import Path
+# from matplotlib.patches import PathPatch
+# from matplotlib.patches import Patch
+# import matplotlib.patches as patches
+# import datetime
+# import matplotlib.dates as mdates
+# import matplotlib.style as style
+# style.available
+# import matplotlib.ticker as tick
+# from matplotlib.lines import Line2D
+
+
 import matplotlib
-import matplotlib.pyplot as plt
-from matplotlib.path import Path
-from matplotlib.patches import PathPatch
-from matplotlib.patches import Patch
-import matplotlib.patches as patches
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import matplotlib.ticker as ticker
-
-# from scipy.spatial import ConvexHull
-from scipy.signal import find_peaks
-from scipy.stats import sem
-import scipy.cluster.hierarchy as shc
-
-import pandas as pd
 import os
-import datetime
 import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
-import seaborn as sns
-
-import matplotlib.style as style
-# style.available
+import warnings
+warnings.filterwarnings("ignore")
 import matplotlib.font_manager
-
+import seaborn as sns
 import numpy as np
-
-from sklearn.datasets.samples_generator import make_blobs
-from sklearn.cluster import KMeans
+import pandas as pd
+import matplotlib.markers as mrkrs
 
 sns.set(font_scale=1.4)
 sns.set(rc={'figure.figsize': (20, 12)})
-
-import matplotlib.ticker as tick
-from matplotlib.lines import Line2D
-
-import warnings
-warnings.filterwarnings("ignore")
-
-import matplotlib.markers as mrkrs
-
 
 
 class Utils(Logger):
