@@ -540,6 +540,12 @@ class Utils(Logger):
         names_dict = {}
         names_dict['Cnt'] = 'Count'
         names_dict['Sec'] = 'Seconds'
+        names_dict['Avg'] = 'Average'
+        names_dict['80Pctl'] = '80th Percentile'
+        names_dict['95Pctl'] = '95th Percentile'
+        names_dict['Concurrency'] = 'Concurrency,'
+
+
 
 
         out_list = []
@@ -1079,7 +1085,7 @@ class Utils(Logger):
     @staticmethod
     def human_readable_heatmap_title(input_text):
         output_text = ''
-        if input_text == 'Concurrency_Avg':
+        if input_text == 'Concurrency, Average':
             output_text = 'Concurrency, Average'
         elif input_text == 'Concurrency_80Pctl':
             output_text = 'Concurrency, 80th Percentile'
@@ -1142,7 +1148,8 @@ class Utils(Logger):
         ax.xaxis.set_label_position('top')
         size = fig.get_size_inches() * fig.dpi
         #     ax.set_title('Heatmap showing ' + concurrency_list[i], y=-0.05,size=36, pad=20)
-        ax_title = Utils.human_readable_heatmap_title(concurrency_col)
+        # ax_title = Utils.human_readable_heatmap_title(concurrency_col)
+        ax_title = concurrency_col
         ax.set_title(ax_title, loc='left', pad=5, size=36)
 
         texts = Utils.annotate_heatmap(im, valfmt="{x}")
@@ -1173,6 +1180,27 @@ class Utils(Logger):
 
         return fig
 
+    @staticmethod
+    def weekly_mean_comparative_line_trend_graph(df_weekly_mean_modified, date_col, parameter_col, value_col):
+
+        fig, ax = plt.subplots(figsize=(30, 20))
+        g = sns.lineplot(x=df_weekly_mean_modified[date_col], y=value_col, data=df_weekly_mean_modified, hue=parameter_col,
+                         sort=True, linewidth=3)
+        x_dates = df_weekly_mean_modified[date_col].unique()
+        plt.xticks(plt.xticks()[0], x_dates, rotation=30)
+
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(7))
+
+        handles, labels = ax.get_legend_handles_labels()
+        ax.legend(handles=handles[1:], labels=labels[1:])
+
+        ax.set_title('Weekly Comparative Line Trend Graph', y=-0.15, size=36, pad=20)
+
+        lgnd = plt.legend(loc="upper left", bbox_to_anchor=(1, 1), scatterpoints=1, fontsize=20)
+
+        plt.tight_layout()
+
+        return fig
 
     @staticmethod
     def weekday_comparative_line_trend_graph(df_daily_mean_modified, weekday_col, parameter_col, value_col):
@@ -1210,8 +1238,214 @@ class Utils(Logger):
 
         return fig
 
+    @staticmethod
+    def slope_chart(df_daily_mean_modified, user_category_column, feature_column, month_1, month_2,
+                    month_column='Month name', ):
 
+        user_category_column = Utils.human_readable_names(user_category_column)
+        feature_column = Utils.human_readable_names(feature_column)
 
+        df_input_df = df_daily_mean_modified[[month_column, user_category_column, feature_column]]
+
+        df_input_df_pivot = df_input_df.pivot_table(feature_column, [user_category_column], 'Month name')
+        df_input_df_pivot = df_input_df_pivot.fillna(0)
+
+        #     unique_month_list = list(set(list(df_input_df['Month name'])))
+
+        #     unique_month_list = sorted(unique_month_list, key=lambda m: dt.strptime(m, "%B"))
+
+        #     print('unique_month_list: ', unique_month_list)
+
+        #     i = 0
+        #     while i < len(unique_month_list) - 1:
+
+        #         print('i: ', i)
+        #         print('unique_month_list[i]: ',unique_month_list[i] )
+
+        #         month_1 = unique_month_list[i]
+        #         month_2 = unique_month_list[i+1]
+
+        #         print('month_1: ', month_1)
+        #         print('month_2: ', month_2)
+
+        #     df_input_df_pivot = df_input_df_pivot.loc[df_input_df_pivot['Month name'].isin([])]
+
+        month_1 = str(month_1).upper()
+        month_2 = str(month_2).upper()
+
+        #     print(df_input_df_pivot)
+
+        df_month_1_rows = df_input_df.loc[df_input_df['Month name'] == month_1]
+        df_month_1_rows_len = len(df_month_1_rows)
+
+        df_month_2_rows = df_input_df.loc[df_input_df['Month name'] == month_2]
+        df_month_2_rows_len = len(df_month_2_rows)
+
+        if df_month_1_rows_len > 0 and df_month_2_rows_len > 0:
+
+            df_input_df_pivot_1M_above = df_input_df_pivot.loc[
+                (df_input_df_pivot[month_1] >= 1000000) & (df_input_df_pivot[month_2] >= 1000000)]
+
+            df_input_df_pivot_1M_above["color"] = df_input_df_pivot_1M_above.apply(
+                lambda row: "green" if row[month_2] >= row[month_1] else "red", axis=1)
+
+            # ----------------------------------------------------------------------------------------------------
+            # instanciate the figure
+            fig = plt.figure(figsize=(12, 15))
+            ax = fig.add_subplot()
+
+            # ----------------------------------------------------------------------------------------------------
+            # plot the data
+            for cont in df_input_df_pivot_1M_above.index:
+                # prepare the data for plotting
+                # extract each point and the color
+                x_start = df_input_df_pivot_1M_above.columns[1]
+                x_finish = df_input_df_pivot_1M_above.columns[2]
+                y_start = df_input_df_pivot_1M_above[df_input_df_pivot_1M_above.index == cont][month_1]
+                y_finish = df_input_df_pivot_1M_above[df_input_df_pivot_1M_above.index == cont][month_2]
+                color = df_input_df_pivot_1M_above[df_input_df_pivot_1M_above.index == cont]["color"]
+
+                # plot eac point
+                ax.scatter(x_start, y_start, color=color, s=200)
+                ax.scatter(x_finish, y_finish, color=color, s=200 * (y_finish / y_start))
+
+                # connect the starting point and the ending point with a line
+                # check the bouns section for more
+                ax.plot([x_start, x_finish], [float(y_start), float(y_finish)], linestyle="-", color=color.values[0])
+
+                # annotate the value for each continent
+                ax.text(ax.get_xlim()[0] - 0.05, y_start, r'{}: {:,.2f}M'.format(cont, int(y_start) / 1000000),
+                        horizontalalignment='right', verticalalignment='center', fontdict={'size': 18})
+                ax.text(ax.get_xlim()[1] + 0.05, y_finish, r'{}: {:,.2f}M'.format(cont, int(y_finish) / 1000000),
+                        horizontalalignment='left', verticalalignment='center', fontdict={'size': 18})
+
+            #     ax.text(ax.get_xlim()[0] - 0.05, y_start, r'{}:{}'.format(cont, y_start_plot), horizontalalignment = 'right', verticalalignment = 'center', fontdict = {'size':18})
+            #     ax.text(ax.get_xlim()[1] + 0.05, y_finish, r'{}:{}'.format(cont, y_finish_plot), horizontalalignment = 'left', verticalalignment = 'center', fontdict = {'size':18})
+
+            # ----------------------------------------------------------------------------------------------------
+            # prettify the plot
+
+            # get the x and y limits
+            x_lims = ax.get_xlim()
+            y_lims = ax.get_ylim()
+
+            # change the x and y limits programmaticaly
+            ax.set_xlim(x_lims[0] - 1, x_lims[1] + 1);
+
+            # add 2 vertical lines
+            ax.vlines(x_start, 0, y_lims[1], color="black", alpha=0.3, lw=0.7)
+            ax.vlines(x_finish, 0, y_lims[1], color="black", alpha=0.3, lw=0.7)
+
+            # for each vertical line, add text: BEFORE and AFTER to help understand the plot
+            ax.text(x_lims[0], y_lims[1], "BEFORE", horizontalalignment='right', verticalalignment='center')
+            ax.text(x_lims[1], y_lims[1], "AFTER", horizontalalignment='left', verticalalignment='center')
+
+            # set and x and y label
+            ax.set_xlabel("Months")
+            ax.set_ylabel("CPU Usage")
+
+            # add a title
+            ax.set_title("CPU Usage - " + month_1 + " vs " + month_2)
+
+            ylabels = []
+            for y in ax.get_yticks():
+                if y >= 1000000000:
+                    ylabels.append('{:,.1f}'.format(y / 1000000000) + ' B')
+                elif y >= 1000000:
+                    ylabels.append('{:,.1f}'.format(y / 1000000) + ' M')
+                elif y >= 1000:
+                    ylabels.append('{:,.1f}'.format(y / 1000) + ' k')
+                elif y >= 0:
+                    ylabels.append('{:,.0f}'.format(y))
+                else:
+                    ylabels.append(y)
+
+            ax.set_xticklabels([month_1, month_2])
+            ax.set_yticklabels(ylabels)
+
+            # ax.set_yscale('log')
+
+            # remove all the spines of the axes
+            ax.spines["left"].set_color("None")
+            ax.spines["right"].set_color("None")
+            ax.spines["top"].set_color("None")
+            ax.spines["bottom"].set_color("None")
+
+            #     i += 1
+
+            plt.tight_layout()
+
+            return fig
+
+    @staticmethod
+    def pie_chart(df_with_selected_cols, groupBy_column, factor, donut=False):
+
+        df = df_with_selected_cols
+
+        df = df[[groupBy_column, factor]]
+        df = df.groupby([groupBy_column]).sum()
+        df[groupBy_column] = df.index
+
+        group_by_column = groupBy_column
+        factor = factor
+
+        labels = list(df[group_by_column])
+        sizes = list(df[factor])
+
+        colors = ['#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231', '#911eb4', '#46f0f0', '#f032e6', '#bcf60c',
+                  '#fabebe', '#008080', '#e6beff', '#9a6324', '#fffac8', '#800000', '#aaffc3', '#808000', '#ffd8b1',
+                  '#000075', '#808080', '#ffffff', '#000000']
+        # explsion
+        explode = tuple([0.01] * len(list(df['User Department'])))
+
+        # add colors
+        # colors = ['#ff9999','#66b3ff','#99ff99','#ffcc99']
+
+        fig = plt.figure(figsize=(20, 12))
+        ax = fig.add_subplot()
+
+        #     fig1, ax1 = plt.subplots()
+        ax.pie(sizes, explode=explode, colors=colors,
+               shadow=True, startangle=90, textprops={'fontsize': 24})
+
+        if donut == True:
+            # draw circle
+            centre_circle = plt.Circle((0, 0), 0.70, fc='white')
+            # fig = plt.figure(figsize=(20, 12))
+            fig = plt.gcf()
+            fig.gca().add_artist(centre_circle)
+            # Equal aspect ratio ensures that pie is drawn as a circle
+            ax.axis('equal')
+
+            # Equal aspect ratio ensures that pie is drawn as a circle
+        ax.axis('equal')
+
+        lgnd = plt.legend(loc="upper left", bbox_to_anchor=(1, 1), scatterpoints=1, fontsize=20, labels=labels)
+
+        plt.tight_layout()
+
+        return fig
+
+    @staticmethod
+    def bar_compare_monthwise_weekwise(df_with_selected_cols, groupBy_column, groupBy_column_value, factor,
+                                       fig_save_path):
+        plt.figure(figsize=(20, 12))
+
+        df_with_selected_cols = df_with_selected_cols[
+            df_with_selected_cols[groupBy_column] == groupBy_column_value.upper()]
+
+        g = sns.FacetGrid(df_with_selected_cols, col="Month name", size=10, height=4, aspect=.6)
+        g.map(sns.barplot, "Week no", factor)
+
+        plt.savefig(r'' + fig_save_path + '\\top_users.bar_compare_monthwise_weekwise.png',
+                    dpi=100, bbox_inches='tight')
+
+    @staticmethod
+    def process_category_content(df, user_category_list):
+        for user_category in user_category_list:
+            df[user_category] = df[user_category].str.upper()
+            df[user_category] = df[user_category].apply(lambda x: Utils.human_readable_names(x))
+        return df
 
 
     @staticmethod
