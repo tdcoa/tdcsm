@@ -28,7 +28,7 @@ Following two global options can be specified with any sub-commands.
 - `--approot` overrides the default current directory as the application root folder
 - `--secrets` specifies the location of `secrets.yaml` file **relative to** the application folder
 
-## Sub Commands
+## Commands
 
 ### `gui`
 
