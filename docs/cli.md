@@ -1,12 +1,12 @@
 # tdcsm command line interface
 
-In addition to the default *gui* interface, **tdcsm** supports a command line utility, also name `tdcsm`, which can be used to access some of the application functionality. It is important to note that the `tdcsm` cli utility will be available only when the python environment which has *tdcsm* application installed is active, that is, if *tdcsm* package was installed in a python virtual environment, it must be active.
+In addition to the default *gui* interface, **tdcsm** supports a command line utility, also named `tdcsm`, which can be used to access some of the application functionality. It is important to note that the `tdcsm` cli utility will be available only when the python environment which has *tdcsm* application installed is active, that is, if *tdcsm* package was installed in a python virtual environment, it must be active.
 
 ## General Format
 
 General format of `tdcsm` utility is:
 ```sh
-tdcsm [<command> [<options>] [<sub-command> [<options>]]]
+tdcsm [<global-options>] [<command> [<options>] [<sub-command> [<options>]]]
 ```
 
 Examples:
@@ -17,14 +17,13 @@ tdcsm systems list -a
 ```
 
 *Notes:*
-1. *command*, and *sub-command* when applicable, offer manipulating a specific functionality as detailed later
-1. Squre brackets indicate optional items
-1. Angular brackets indicate an actual value must be used instead of the literally typing the text within
-1. A brief help message can be shown using `-h` or `--help` option and is available for the main utility and for all of its  sub-commands.
+1. Square brackets indicate optional items
+1. Angular brackets indicate an actual value must be provided instead of the literally typing the text within
+1. A brief help message can be shown using `-h` or `--help` option and can be used with commands and sub-commands
 
 ## Global Options
 
-Following two global options can be specified with any sub-commands.
+Following global options can be specified and are applicable to all commands.
 - `--approot` overrides the default current directory as the application root folder
 - `--secrets` specifies the location of `secrets.yaml` file **relative to** the application folder
 
@@ -32,25 +31,25 @@ Following two global options can be specified with any sub-commands.
 
 ### `gui`
 
-This command starts a gui session. This is also the default sub-command. That is, typing `tdcsm` without any other parameters is equivalent to `tdcsm gui`
+This command starts a *gui* session. It is also the default command when no command is explicitly specified, that is, `tdcsm` without any other parameters is equivalent to `tdcsm gui`
 
 ### `init`
 
-Initializes a folder by downloading and creating default folders and files. This command is generally used only when starting the *tdcsm* application for the first time.
+Initializes a folder by downloading and creating default folders and files. This command is generally only used once when running the *tdcsm* application for the first time
 
 ### `systems`
 
-work with source systems defined in the `source_systems.yaml` file. It further offers following sub-commands
-- **list**: list with all or named source systems. This is also the default sub-command. It supports two options:
-- `-v`: lists additional information, such as *site-id* and active filesets for each source system
-- `-a`: lists only the active entries
-- **enable**: sets an inactive source-system to active status
-- **disable**: sets an active source-system to inactive status
-- **activate**: activates one or more *filesets* for the given system
-- **deactivate**: deactivates one or more *filesets* for the given system
+Allows listing and modifying some of the attributes of the source systems defined in the `source_systems.yaml` file. It further offers following sub-commands
+1. **list**: list with all or named source systems. This is also the default sub-command. Supported options:
+   - `-v`: lists additional information, such as *site-id* and active *filesets* for each source system
+   - `-a`: lists only the active systems
+1. **enable**: sets an inactive source-system to active status
+1. **disable**: sets an active source-system to inactive status
+1. **activate**: activates one or more *filesets* for the given source-system
+1. **deactivate**: deactivates one or more *filesets* for the given source-system
 
 ### `filesets`
 
-list all or nameed filesets. This command offers following options:
-- `-v`: lists additional information, shows each *gitfile* from the fileset
+Allows listing all or named *filesets*. Supported options:
+- `-v`: lists additional information, shows each *gitfile* that make up the *fileset*
 - `-a`: lists only the active entries
