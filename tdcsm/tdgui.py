@@ -9,7 +9,7 @@ import tdcsm
 
 class coa():
 
-    version = "0.3.9.7.8"
+    version = "0.3.9.7.9"
     debug = False
 
     entryvars = {}
