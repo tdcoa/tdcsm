@@ -1538,10 +1538,34 @@ class tdcoa:
         self.utils.bufferlogs = False
         self.utils.log('unbuffer logs')
 
+
+
         for dirs in os.listdir(runpath):
             if os.path.isdir(os.path.join(runpath,dirs)):
                 shutil.move(os.path.join(runpath,dirs),outputpath)
 
+        manual_files = []
+        for files in os.listdir(outputpath):
+            file_path=os.path.join(outputpath,files)
+            files=os.path.basename(files)
+            filename, extension = os.path.splitext(files)
+            if str(extension).lower() == '.csv':
+                manual_files.append(files)
+                system_name = files.split('.')[0]
+                fileset = files.split('.')[1]
+                system_dir=os.path.join(outputpath,system_name)
+                fileset_dir = os.path.join(system_dir, fileset)
+                if os.path.isdir(fileset_dir):
+                    shutil.copy(file_path, fileset_dir)
+                    os.rename(os.path.join(fileset_dir, files),
+                              os.path.join(fileset_dir, str(files.split('.')[2]) + '.' + str(files.split('.')[3])))
+                    shutil.copy(os.path.join(outputpath,'upload-manifest.json'), os.path.join(fileset_dir, 'upload-manifest.json'))
+                else:
+                    os.mkdir(fileset_dir)
+                    shutil.move(files, fileset_dir)
+        # Move the runlog created by the prepare_sql function
+        os.rename(os.path.join(runpath,'runlog.txt'),os.path.join(runpath,'prepare_sql_runlog.txt'))
+        shutil.move(os.path.join(runpath,'prepare_sql_runlog.txt'), outputpath)
 
 
     def make_customer_files(self, name=''):
