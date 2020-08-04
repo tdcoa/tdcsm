@@ -4,11 +4,6 @@ import shutil
 import numpy
 
 import pandas as pd
-import sqlalchemy
-# --  Teradata Drivers:
-import teradata  # odbc driver
-from teradataml.context import context as tdml_context
-from teradataml.dataframe import dataframe as tdml_df
 from tdcsm.logging import Logger
 from pptx import Presentation
 from pptx.util import Inches, Pt
@@ -340,25 +335,13 @@ class Utils(Logger):
     def close_connection(self, connobject, skip=False):  # TODO
         self.log('CLOSE_CONNECTION called', str(dt.datetime.now()))
         self.log('*** THIS FUNCTION IS NOT YET IMPLEMENTED ***')
-        conntype = connobject['type']
-        conn = connobject['connection']
-        self.log('  connection type', conntype)
 
         if skip:
             self.log('skip dbs setting is true, emulating closure...')
 
         else:
-            # ------------------------------------
-            if conntype == 'teradataml':
-                pass
-
-            # ------------------------------------
-            elif conntype == 'sqlalchemy':
-                pass
-
-            # ------------------------------------
-            else:  # assume odbc connect
-                pass
+            connobject['connection'].close()
+            connobject['connection'] = None
 
         self.log('connection closed', str(dt.datetime.now()))
         return True
@@ -405,59 +388,13 @@ class Utils(Logger):
             self.log('skip dbs setting is true, emulating connection...')
 
         else:
-            # ------------------------------------
-            if conntype == 'teradataml':
-                logmech = 'TD2' if logmech == '' else logmech
-
-                connObject['connection'] = tdml_context.create_context(
-                    host=host,
-                    logmech=logmech,
-                    username=username,
-                    password=password
-                )
-
-            # ------------------------------------
-            elif conntype == 'sqlalchemy':
-                if logmech.strip() != '':
-                    logmech = '/?logmech=%s' % logmech
-
-                # todo investigate why this fails when 'false'
-                if encryption.strip().lower() == 'true':
-                    if logmech.strip() == '':
-                        encryption = '/?encryption=%s' % encryption
-                    else:
-                        encryption = '?encryption=%s' % encryption
-
-                    connstring = 'teradatasql://%s:%s@%s%s%s' % (username, password, host, logmech, encryption)
-
-                else:
-                    connstring = 'teradatasql://%s:%s@%s%s' % (username, password, host, logmech)
-
-                connObject['connection'] = sqlalchemy.create_engine(connstring)
-
-            # ------------------------------------
-            else:  # assume odbc connect
-                self.log('  (odbc driver)')
-                udaExec = teradata.UdaExec(appName='tdcoa',
-                                           version=self.version,
-                                           logConsole=False)
-                connObject['connection'] = udaExec.connect(method='odbc',
-                                                           system=host,
-                                                           username=username,
-                                                           password=password,
-                                                           driver=conntype,
-                                                           authentication=logmech,
-                                                           encryptdata=encryption,
-                                                           column_name='true')
+            from .dbutil import connect
+            connObject['connection'] = connect(**connObject['components'])
 
         self.log('connected!', str(dt.datetime.now()))
         return connObject
 
     def open_sql(self, connobject, sql, skip=False, columns=False):
-        conntype = connobject['type']
-        conn = connobject['connection']
-
-        self.log('connection type', conntype)
         self.log('sql, first 100 characters:\n  %s' % sql[:100].replace('\n', ' ').strip() + '...')
         self.log('sql submitted', str(dt.datetime.now()))
 
@@ -469,36 +406,8 @@ class Utils(Logger):
             df = pd.DataFrame(columns=list('ABCD'))
 
         else:
-            # ------------------------------------
-            if conntype == 'teradataml':
-                df = tdml_df.DataFrame.from_query(sql)
-                df = df.to_pandas()
-
-            # ------------------------------------
-            elif conntype == 'sqlalchemy':
-                df = pd.read_sql(sql, conn)
-
-            # ------------------------------------
-            else:  # assume odbc connect
-
-                if not columns:
-                    try:
-                        df = pd.DataFrame(conn.execute(sql))
-                    except Exception as e:
-                        df = []
-
-                # get column names
-                # df.read_sql does not work properly for odbc connections.
-                # Can directly execute using odbc connection but then there are no column names
-                # This code block retrieves the column names before saving the csv file
-                # Col names will be merged upon save
-                else:
-                    try:
-                        df = []
-                        for row in conn.execute(sql).description:
-                            df.append(row[0])
-                    except Exception as e:
-                        df = []
+            from .dbutil import sql_to_df
+            df = sql_to_df(connobject['connection'], sql)
 
         self.log('sql completed', str(dt.datetime.now()))
         self.log('record count', str(len(df)))

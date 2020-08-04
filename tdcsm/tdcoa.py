@@ -8,9 +8,8 @@ import shutil
 import pandas as pd
 import requests
 import yaml
-from sqlalchemy.exc import OperationalError
-from teradataml import DataFrame
-from teradataml.dataframe.copy_to import copy_to_sql
+from teradatasql import OperationalError
+from .dbutil import df_to_sql, sql_to_df
 import webbrowser
 
 
@@ -1778,7 +1777,7 @@ class tdcoa:
         self.utils.bufferlogs = False
         self.utils.log('unbuffer logs')
 
-        # connect to Transcend using TeradataML lib, for fast bulk uploads
+        # connect to Transcend
         self.utils.log('connecting to transcend')
         self.utils.log('    host', self.transcend['host'])
         self.utils.log('    logmech', self.transcend['logmech'])
@@ -1843,7 +1842,7 @@ class tdcoa:
                                     dfcsv = dfcsv.drop(columns=[col])
                             self.utils.log('final column count', str(len(dfcsv.columns)))
 
-                            # APPEND data to database, via teradataml bulk upload:
+                            # APPEND data to database
                             self.utils.log('\nuploading', str(dt.datetime.now()))
                             try:
                                 # write_to_perm = True
@@ -1858,18 +1857,8 @@ class tdcoa:
 
                                     # create staging table (perm) with unique id
                                     if not skip_dbs:
-                                        copy_to_sql(dfcsv, entry['table'] + '_%s' % self.unique_id, entry['schema'], if_exists='replace')
-                                    self.utils.log('complete', str(dt.datetime.now()))
-
-                                    # load to GTT
-                                    self.utils.log('\nload to GTT', entry['schema'] + '.' + entry['table'])
-                                    if not skip_dbs:
-                                        transcend['connection'].execute("""
-                                        INSERT INTO {db}.{table} SELECT * FROM {db}.{unique_table}
-                                        """.format(db=entry['schema'],
-                                                   table=entry['table'],
-                                                   unique_table=entry['table'] + '_%s' % self.unique_id))
-                                    self.utils.log('complete', str(dt.datetime.now()))
+                                        df_to_sql(transcend['connection'], dfcsv, entry['table'], entry['schema'], copy_sfx=self.unique_id)
+                                    self.utils.log('load to PERM and GTT complete', str(dt.datetime.now()))
                                     successful_load = True
 
                                 # write_to_perm = False
@@ -1880,25 +1869,27 @@ class tdcoa:
                                 else:
                                     self.utils.log('write_to_perm', 'False')
                                     if not skip_dbs:
-                                        copy_to_sql(dfcsv, entry['table'], entry['schema'], if_exists='append')
-                                    self.utils.log('complete', str(dt.datetime.now()))
+                                        df_to_sql(transcend['connection'], dfcsv, entry['table'], entry['schema'])
+                                    self.utils.log('load to GTT complete', str(dt.datetime.now()))
                                     successful_load = True
 
                             except Exception as err:
+                                from textwrap import dedent
+
                                 self.utils.log('\nERROR during UPLOAD', error=True)
                                 self.utils.log(str(err))
                                 self.utils.log('   (error repeated below)')
                                 self.utils.log('\n    first 10 records of what was being uploaded (dataframe):')
                                 self.utils.log(dfcsv[0:10])
                                 self.utils.log('')
-                                sql = ["Select ColumnName, ColumnType, ColumnFormat, ColumnLength, ColumnId",
-                                       "from dbc.columns ", "where databasename = '%s' " % entry['schema'],
-                                       "  and tablename = '%s' " % entry['table']]
-                                # sql.append("order by ColumnID;")
-                                sql = '\n'.join(sql)
+                                sql = dedent(f"""\
+                                    Select ColumnName, ColumnType, ColumnFormat, ColumnLength, ColumnId
+                                    from dbc.columns
+                                    where databasename = '{entry['schema']}'
+                                      and tablename = '{entry['table']}'
+                                    order by ColumnId""")
                                 self.utils.log(sql)
-                                df = DataFrame.from_query(sql)
-                                df = df.sort(['ColumnId'], ascending=[True])
+                                df = sql_to_df(transcend['connection'], sql)
                                 self.utils.log('\n\n    structure of destination table:')
                                 print(df)
                                 self.utils.log('\n')
@@ -1909,7 +1900,8 @@ class tdcoa:
                                 self.utils.log('\nStored Proc', str(entry['call']))
                                 try:
                                     if not skip_dbs:
-                                        transcend['connection'].execute('call %s ;' % str(entry['call']))
+                                        with transcend['connection'].cursor() as csr:
+                                            csr.execute('call %s ;' % str(entry['call']))
                                     self.utils.log('complete', str(dt.datetime.now()))
 
                                     # if write_to_perm == true, drop unique perm table after successful sp call
@@ -1917,9 +1909,10 @@ class tdcoa:
                                         self.utils.log('\ndrop unique perm table', entry['schema'] + '.' + entry['table'] + '_%s' % self.unique_id)
 
                                         if not skip_dbs:
-                                            transcend['connection'].execute("""
-                                            DROP TABLE {db}.{unique_table}
-                                            """.format(db=entry['schema'],
+                                            with transcend['connection'].cursor() as csr:
+                                                csr.execute("""
+                                                DROP TABLE {db}.{unique_table}
+                                                """.format(db=entry['schema'],
                                                        unique_table=entry['table'] + '_%s' % self.unique_id))
 
                                         self.utils.log('complete', str(dt.datetime.now()))

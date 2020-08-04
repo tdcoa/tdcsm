@@ -1,10 +1,10 @@
 HELP on tdcsm (Teradata CSM Tools)
 
-tdcoa: Teradata Consumption Analytics 
+tdcoa: Teradata Consumption Analytics
 ------------------------------
 This library will perform 4 descrete steps:
   (1) DOWNLOAD sql and csv from github respositories,
-  (2) PREPARE sql locally, including variable substitutions and csv merging,  
+  (2) PREPARE sql locally, including variable substitutions and csv merging,
   (3) EXECUTE the prepared sql against customer site ids, and export any
       indicated data sets to csv, then finally
   (4) UPLOAD specifically indicated csv to Transcend, and call named stored procs
@@ -82,8 +82,3 @@ Missing tdcoa -- if you get an error stating you're missing tdcoa, then first, I
 unclear on how you're reading this text.  That aside, open up a command prompt and type:
 pip install tdcoa
 if that gives you errors, then maybe this wasn't meant to be. Call Stephen Hilton.
-
-If you get errors stating you're missing the 'teradata dialect' of sqlalchemy, open
-up a command prompt and type:
-pip install sqlalchemy-teradata
-this will prompt python to install the teradata drivers needed to connect.
