@@ -52,15 +52,31 @@ def install_tdcsm():
 def create_shortcut():
 	from platform import system
 	from pathlib import Path
+	import stat
+	from textwrap import dedent
 
 	print("Creating a desktop shortcut...", end='')
 
 	if system() == "Windows":
-		with open(Path.home() / "Desktop" / "tdcsm-cmd.bat", "w") as fh:
-			fh.write(f"%ComSpec% /K " + str(venv_base() / "Scripts" / "activate.bat") + "\n")
-	else:
-		with open(Path.home() / "Desktop" / "tdcsm-cmd.sh", "w") as fh:
-			fh.write(f"#! /bin/sh\nbash --rcfile <(echo '. ~/.bashrc;. ~/.py/tdcsm/bin/activate')\n")
+		shortcut = Path.home() / "Desktop" / "tdcsm-cmd.bat"
+		with open(shortcut, "w") as fh:
+			fh.write("%ComSpec% /K " + str(venv_base() / "Scripts" / "activate.bat") + "\n")
+
+	elif system() == "Darwin":
+		shortcut = Path.home() / "Desktop" / "tdcsm-cmd.command"
+		with open(shortcut, "w") as fh:
+			fh.write(f"open {venv_bin('activate')}\n")
+
+	elif system() == "Linux":
+		shortcut = Path.home() / "Desktop" / "tdcsm-cmd.sh"
+		with open(shortcut, "w") as fh:
+			fh.write(dedent("""\
+				#! /bin/sh
+				export PATH=$HOME/.py/tdcsm/bin:$PATH
+				exec bash
+				"""))
+
+	shortcut.chmod(shortcut.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
 	print("done", end='')
 
