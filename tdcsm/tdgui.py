@@ -1,4 +1,4 @@
-import subprocess, platform, os, copy, yaml
+import subprocess, platform, os, copy #, yaml
 from datetime import datetime
 from tkinter import *
 from tkinter.ttk import *
@@ -9,7 +9,7 @@ import tdcsm
 
 class coa():
 
-    version = "0.3.9.7.9"
+    version = "0.3.9.8.0"
     debug = False
 
     entryvars = {}
@@ -22,7 +22,7 @@ class coa():
                  'filesets_right':['four','five','six']}
     approot = ''
     secrets = ''
-    motd = True
+    motd = False
 
 
     def __init__(self, approot='', secrets=''):
@@ -314,17 +314,17 @@ class coa():
                 msg = msg.replace(secret, '%s%s%s' % (secret[:1], '*' * (len(secret) - 2), secret[-1:]))
         return str(msg)
 
-    def yaml_write(self, dict2write={}, filepath=''):
-        with open(filepath, 'w') as fh:
-            fh.write(yaml.dump(dict2write))
-
-    def yaml_read(self, filepath=''):
-        if os.path.isfile(filepath):
-            with open(filepath, 'r') as fh:
-                txt = fh.read()
-        else:
-            txt = 'no_such_file: "%s"' %filepath
-        return yaml.load(txt)
+    # def yaml_write(self, dict2write={}, filepath=''):
+    #     with open(filepath, 'w') as fh:
+    #         fh.write(yaml.dump(dict2write))
+    #
+    # def yaml_read(self, filepath=''):
+    #     if os.path.isfile(filepath):
+    #         with open(filepath, 'r') as fh:
+    #             txt = fh.read()
+    #     else:
+    #         txt = 'no_such_file: "%s"' %filepath
+    #     return yaml.load(txt)
 
 # =================== END: HELPER FUNCTIONS ==============================
 
@@ -428,7 +428,6 @@ class coa():
         else:
             self.entryvars['skip_dbs_toggle'].set(value=0)
 
-
     def run_external(self, coa_function='execute_run()'):
         # --> stupid langGO error  >:^(
         # internal langGo processes throws wicked errors when called from inside TK
@@ -474,6 +473,7 @@ class coa():
                 print('secret: ', self.coa.secretpath)
                 print('system: ', self.coa.systemspath)
                 print('fileset: ', self.coa.filesetpath)
+                self.reset_gui_variables(reset=True)
                 self.button_click('tv_systems_left') # this 'click' will refresh both left and right treeviews
                 self.button_click('tv_filesets_left')
             elif name == 'approot':
@@ -485,14 +485,14 @@ class coa():
             elif name == 'prepare_sql':
                 self.coa.prepare_sql()
             elif name == 'execute_run':
-                self.systems_save2disk()
+                # self.systems_save2disk()
                 # self.run_external('execute_run')
                 self.coa.execute_run()
                 self.upload_get_lastrun_folder()
             elif name == 'make_customer_files':
                 self.coa.make_customer_files()
             elif name == 'upload_to_transcend':
-                self.systems_save2disk()
+                # self.systems_save2disk()
                 # self.run_external('upload_to_transcend')
                 self.coa.upload_to_transcend()
             elif name == 'motd':
@@ -539,7 +539,7 @@ class coa():
 
         except Exception as err:   # TODO: I know, bad practice... if anything goes wrong, just reload_config() - fixes most issues
             print('\nERROR: \n%s\n' %str(err))
-            self.button_click('reload_config')
+            #self.button_click('reload_config')
 
 
 # =================== END: PROGRAM BEHAVIOR ==============================

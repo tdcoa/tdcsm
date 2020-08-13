@@ -1,3 +1,5 @@
 cd "$(dirname "$0")"
 echo LOADING, PLEASE WAIT...
-python3 -c "from tdcsm.tdgui import coa;c=coa(approot='../coa/1Dev')"
+# python3 -c "from tdcsm.tdgui import coa;c=coa(approot='../coa/1Dev')"
+
+while true; do echo -n "Running Tutorial"; python3 -c "from tdcsm.tdgui import coa;c=coa(approot='/opt/git/coa/1Dev', secrets='/opt/git/coa/!secrets.yaml')"; done
