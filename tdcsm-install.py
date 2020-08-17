@@ -57,23 +57,26 @@ def create_shortcut():
 
 	print("Creating a desktop shortcut...", end='')
 
+	(Path.home() / 'tdcsm').mkdir(exist_ok=True)
+
 	if system() == "Windows":
 		shortcut = Path.home() / "Desktop" / "tdcsm-cmd.bat"
 		with open(shortcut, "w") as fh:
+			fh.write(dedent(f"""\
+				set "PATH={Path.home() / '.py' / 'tdcsm' / 'bin'};%PATH%"
+				cd "{Path.home() / 'tdcsm'}"
+				tdcsm gui
+				"""))
 			fh.write("%ComSpec% /K " + str(venv_base() / "Scripts" / "activate.bat") + "\n")
 
-	elif system() == "Darwin":
-		shortcut = Path.home() / "Desktop" / "tdcsm-cmd.command"
-		with open(shortcut, "w") as fh:
-			fh.write(f"open {venv_bin('activate')}\n")
-
-	elif system() == "Linux":
+	else:
 		shortcut = Path.home() / "Desktop" / "tdcsm-cmd.sh"
 		with open(shortcut, "w") as fh:
-			fh.write(dedent("""\
+			fh.write(dedent(f"""\
 				#! /bin/sh
-				export PATH=$HOME/.py/tdcsm/bin:$PATH
-				exec bash
+				export PATH="{Path.home() / '.py' / 'tdcsm' / 'bin'}:$PATH"
+				cd "{Path.home() / 'tdcsm'}"
+				tdcsm gui
 				"""))
 
 	shortcut.chmod(shortcut.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
