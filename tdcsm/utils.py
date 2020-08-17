@@ -183,6 +183,37 @@ class Utils(Logger):
 
         return sql
 
+    @staticmethod
+    def validate_all_filepaths(filepaths=[], mustbe_file=False, throw_errors=False):
+        rtn = True
+        for filepath in filepaths:
+            if not os.path.exists(filepath):
+                rtn = False
+                break
+            if mustbe_file and not os.path.isfile(filepath):
+                rtn = False
+                break
+        if throw_errors and rtn==False:
+            msg = "not not all filepaths provided are valid"
+            self.log(msg, error=True)
+            raise ValueError(msg)
+        return rtn
+
+    @staticmethod
+    def cast_list(parm):
+        """Ensures the parm is a list.  If it comes in as a string, turn into a list.
+        Either way, returns a list."""
+        rtn = []
+        if type(parm)==str:
+            rtn.append(parm)
+        elif type(parm)==list:
+            rtn = parm
+        else:
+            msg = "must be list or string,\n you supplied %s" %type(filepaths)
+            self.log(msg, error=True)
+            raise ValueError(msg)
+        return rtn
+
     def check_setting(self, settings_dict=None, required_item_list=None, defaults=None, printwarning=True):
         if settings_dict is None:
             settings_dict = {}

@@ -22,36 +22,6 @@ from tdcsm.utils import Utils  # includes Logger class
 
 
 class tdcoa:
-    """DESCRIPTION:
-    tdcsm.tdcoa is a collection of high-level operations to fully automate
-    the collection of consumption analytics of a Teradata platform.  This
-    class focuses on automating four major steps:
-        1 - DOWNLOAD sets of files (sql, csv)
-        2 - PREPARE those files to be executed
-        3 - EXECUTE files against target system (on target VPN)
-        4 - UPLOAD results to a central repository (on "Transcend" VPN)
-
-    More detail on each step is available via help() per step function below.
-    The only initial requirement is Python 3.6 or higher, and access /login to
-    the required Teradata systems.
-
-    GETTING STARTED:
-    From a command line:
-      pip install tdcsm
-
-    To pickup the most recent updates, it is recommended you
-      pip install tdcsm --upgrade
-
-    EXAMPLE USAGE:
-    The entire process, at it's simpliest, looks like  this:
-      python
-      >>> from tdcsm.tdcoa import tdcoa
-      >>> c = tdcoa()
-      >>> c.download_files()
-      >>> c.prepare_sql()
-      >>> c.execute_run()          # target system VPN
-      >>> c.upload_to_transcend()  # transcend VPN
-    """
 
     # paths
     approot = '.'
@@ -1933,7 +1903,6 @@ class tdcoa:
             for setname, setobject in  sysobject['filesets'].items():
                 setobject['active'] = 'False'
 
-
     def display_motd(self):
         webbrowser.open(self.motd_url)
 
@@ -1999,3 +1968,68 @@ class tdcoa:
         tmp.append('        startdate:  "Current_Date - 45"')
         tmp.append('        enddate:    "Current_Date - 1"')
         return '\n'.join(tmp)
+
+    def iterate_coa_sqls(self, filepaths, filecommands={}, sqlcommands={}):
+        """iterates over one-or-more supplied file, accepting a dictionary
+        of special commands and associated functions to call if found.
+         - filepath: location of file(s), can be string or list
+            example: ['./file1.sql','../dir/file2.sql']
+         - filecommands: dictionary of special commands and functions to run per file
+            example: {'execute': self.run_sql }
+        - sqlcommands: dictionary of special commands and functions to run per sql
+            example: {'save': self.coasql_save_csv }
+
+        In above example, any sql statement in either two files provided that contain
+        special command /*{{save:___}}*/ will be pushed to self.coasql_save_csv
+        for further processing.  coasql_* functions must accept and return a dictionary
+        of parameters, allowing values to be passed and modified in a logic chain."""
+
+        # pre-flight checks:
+        filepaths = self.utils.cast_list(filepaths)
+        self.utils.validate_all_filepaths(filepaths, mustbe_file = True, throw_errors = True)
+
+        # iterate files
+        for filepath in filepaths:
+            with open(filepath, 'r') as fh:
+                sqls_text = fh.read()
+            sqls = sqls_text.split(";")
+            newsqls = []
+            parms = {'filepath':filepath, 'index':0, 'postwork_per_file':{}}
+            parms['phase'] = 'prework'
+
+            # iterate sqls
+            for sql in sqls:
+                parms['phase'] = 'execute'
+                parms['special_commands'] = self.utils.get_special_commands(sql)
+                parms['sql_orig'] = sql
+                parms['sql_format'] = self.utils.format_sql(sql)
+                parms['sql_scmd'] = sqlcmds['sql']
+                parms['index'] +=1
+
+                # iterate special sqlcommands
+                for cmdname, cmdfunc in sqlcommands.items():
+                    if cmdname in parms['special_commands'] or cmdname in global_cmds:
+                        parms = cmdfunc(parms)
+
+            # post work per file
+            parms['phase'] = 'postwork'
+            for postname, postfunc in parms['queued_postwork'].items():
+                parms = postfunc(parms)
+
+
+
+    def coasql_assist_bteq(self, parms):
+        """ """
+        if parms['phase'] = 'postwork':
+            parms['bteq_sql'] = ['.logon host/user:pwd'] + parms['bteq_sql']
+            parms['bteq_sql'].append('closing logic')
+            parms['bteq_filetext'] = '\n'.join(parms['bteq_sql'])
+            parms['bteq_filepath'] = parms['filepath'].replace('.sql','.btq')
+            with open(parms['bteq_filepath'], 'w') as fh:
+                fh.write(parms['bteq_filetext'])
+        else:
+            if 'bteq_sql' not in parms: parms['bteq_sql'] = []
+            parms['bteq_sql'].append(parms['sql_format'])
+            if 'save' in parms['special_commands']:
+                parms['bteq_sql'].append('csv output logic here')
+            parms['queued_postwork']['assist_bteq'] = self.coasql_assist_bteq
