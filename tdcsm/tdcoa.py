@@ -1926,6 +1926,14 @@ class tdcoa:
         self.utils.log('time', str(dt.datetime.now()))
 
 
+    def deactivate_all(self):
+        """Sets all systems and system-filesets to False"""
+        for sysname, sysobject  in  self.systems.items():
+            sysobject['active'] = 'False'
+            for setname, setobject in  sysobject['filesets'].items():
+                setobject['active'] = 'False'
+
+
     def display_motd(self):
         webbrowser.open(self.motd_url)
 
