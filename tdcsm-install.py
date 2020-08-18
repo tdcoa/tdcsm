@@ -63,18 +63,18 @@ def create_shortcut():
 		shortcut = Path.home() / "Desktop" / "tdcsm-cmd.bat"
 		with open(shortcut, "w") as fh:
 			fh.write(dedent(f"""\
-				set "PATH={Path.home() / '.py' / 'tdcsm' / 'bin'};%PATH%"
+				@echo off
+				set "PATH={venv_bin().parent};%PATH%"
 				cd "{Path.home() / 'tdcsm'}"
 				tdcsm gui
 				"""))
-			fh.write("%ComSpec% /K " + str(venv_base() / "Scripts" / "activate.bat") + "\n")
 
 	else:
 		shortcut = Path.home() / "Desktop" / "tdcsm-cmd.sh"
 		with open(shortcut, "w") as fh:
 			fh.write(dedent(f"""\
 				#! /bin/sh
-				export PATH="{Path.home() / '.py' / 'tdcsm' / 'bin'}:$PATH"
+				export PATH="{venv_bin().parent}:$PATH"
 				cd "{Path.home() / 'tdcsm'}"
 				tdcsm gui
 				"""))
