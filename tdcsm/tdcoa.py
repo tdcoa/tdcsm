@@ -22,36 +22,6 @@ from tdcsm.utils import Utils  # includes Logger class
 
 
 class tdcoa:
-    """DESCRIPTION:
-    tdcsm.tdcoa is a collection of high-level operations to fully automate
-    the collection of consumption analytics of a Teradata platform.  This
-    class focuses on automating four major steps:
-        1 - DOWNLOAD sets of files (sql, csv)
-        2 - PREPARE those files to be executed
-        3 - EXECUTE files against target system (on target VPN)
-        4 - UPLOAD results to a central repository (on "Transcend" VPN)
-
-    More detail on each step is available via help() per step function below.
-    The only initial requirement is Python 3.6 or higher, and access /login to
-    the required Teradata systems.
-
-    GETTING STARTED:
-    From a command line:
-      pip install tdcsm
-
-    To pickup the most recent updates, it is recommended you
-      pip install tdcsm --upgrade
-
-    EXAMPLE USAGE:
-    The entire process, at it's simpliest, looks like  this:
-      python
-      >>> from tdcsm.tdcoa import tdcoa
-      >>> c = tdcoa()
-      >>> c.download_files()
-      >>> c.prepare_sql()
-      >>> c.execute_run()          # target system VPN
-      >>> c.upload_to_transcend()  # transcend VPN
-    """
 
     # paths
     approot = '.'
@@ -60,7 +30,7 @@ class tdcoa:
     systemspath = ''
     filesetpath = ''
     outputpath = ''
-    version = "0.3.9.7.9"
+    version = "0.3.9.8.0"
     skip_dbs = False    # skip ALL dbs connections / executions
     manual_run = False  # skip dbs executions in execute_run() but not upload_to_transcend()
                         # also skips /*{{save:}}*/ special command
@@ -901,16 +871,21 @@ class tdcoa:
         self.utils.log('time', str(dt.datetime.now()))
 
 
-    def make_output_folder(self, name=''):
+    def make_output_folder(self, name='', make_hidden_file=False):
         outputpath = os.path.join(self.approot, self.folders['output'],
                                   str(dt.datetime.now())[:-7].replace(' ', '_').replace(':', ''))
-        if name.strip() != '':
-            name = '-%s' % str(re.sub('[^0-9a-zA-Z]+', '_', name.strip()))
+        if name.strip() != '': name = '-%s' % str(re.sub('[^0-9a-zA-Z]+', '_', name.strip()))
         outputpath = outputpath + name
+        self.utils.log('make output folder', outputpath)
         os.makedirs(outputpath)
 
-        return outputpath
+        if make_hidden_file:
+            self.utils.log('save location of last-run output folder to hidden file')
+            with open(os.path.join(self.approot, '.last_run_output_path.txt'), 'w') as lastoutput:
+                # relative path in case of system change (i.e. switching laptops)
+                lastoutput.write(outputpath[outputpath.find(self.folders['output']):])
 
+        return outputpath
 
     def execute_run(self, name=''):
         self.utils.log('execute_run started', header=True)
@@ -1566,7 +1541,6 @@ class tdcoa:
         os.rename(os.path.join(runpath,'runlog.txt'),os.path.join(runpath,'prepare_sql_runlog.txt'))
         shutil.move(os.path.join(runpath,'prepare_sql_runlog.txt'), outputpath)
 
-
     def make_customer_files(self, name=''):
         self.utils.log('make_customer_files started', header=True)
         self.utils.log('time', str(dt.datetime.now()))
@@ -1736,7 +1710,6 @@ class tdcoa:
         runlogdst = os.path.join(outputpath, 'runlog.txt')
         shutil.move(runlogsrc, runlogdst)
         self.utils.log('make_customer_files Completed', header=True)
-
 
     def upload_to_transcend(self, _outputpath=''):
         self.utils.bufferlogs = True
@@ -1925,6 +1898,12 @@ class tdcoa:
         self.utils.log('\ndone!')
         self.utils.log('time', str(dt.datetime.now()))
 
+    def deactivate_all(self):
+        """Sets all systems and system-filesets to False"""
+        for sysname, sysobject  in  self.systems.items():
+            sysobject['active'] = 'False'
+            for setname, setobject in  sysobject['filesets'].items():
+                setobject['active'] = 'False'
 
     def display_motd(self):
         webbrowser.open(self.motd_url)
@@ -1991,3 +1970,129 @@ class tdcoa:
         tmp.append('        startdate:  "Current_Date - 45"')
         tmp.append('        enddate:    "Current_Date - 1"')
         return '\n'.join(tmp)
+
+# ------------- everything below here is new /
+# ------------- trying to get "make_customer_files" more dynamic
+    def make_customer_files2(self, name=''):
+        """read all *.coa.sql files from run folder, modify to better suit a
+        manual run, then write to output folder."""
+        self.utils.log('make_customer_files2 started', header=True)
+        self.utils.log('time', str(dt.datetime.now()))
+
+        # make output directory
+        runpath = os.path.join(self.approot, self.folders['run'])
+        outputpath = self.make_output_folder(name, make_hidden_file=True)
+
+        # iterate all system /fileset subfolders for source/destination filepaths
+        filepaths={}
+        for root, dirs, files in os.walk(runpath):
+            for filename in files:
+                srcpath = os.path.join(root, filename)
+                dstpath = os.path.join(root.replace(runpath,outputpath), filename)
+
+                # create dest folder if missing, then move file:
+                if not os.path.exists(os.path.dirname(dstpath)): os.makedirs(os.path.dirname(dstpath))
+                shutil.move(srcpath, dstpath)
+
+                # add to our dictionary of work to-do, if .coa.sql file:
+                if filename.endswith('.coa.sql'):
+                    filepaths[dstpath] = dstpath.replace('.coa.sql','.coa.bteq')
+
+        # call iteration on files / sql statements
+        cmds = {}
+        cmds['bteq'] = self.coasql_assist_bteq
+        # cmds['pyfile'] = self.coasql_assist_pyfile  # <--future
+        self.iterate_coa_sqls(filepaths=filepaths,  everysql_commands=cmds)
+
+    def iterate_coa_sqls(self, filepaths, everysql_commands={}, iffound_commands={}):
+        """iterates over one-or-more supplied file, accepting a dictionary
+        of special commands and associated functions to call if found.
+
+        Parameters:
+         - filepath: dictionary location of file-in and file-out
+            example: {'./file1.in.sql':'../dir/file1.out.sql'}
+            if a string or list is provided, file-in and file-out are assumed identical
+         - everysql_commands: dictionary of commands / functions to run per sql,
+           but for every statement in the file
+            example: {'execute': self.run_sql }
+         - iffound_commands: dictionary of commands / functions to run per sql,
+           but only when triggered by a matching special command
+            example: {'save': self.coasql_save_csv }
+
+        In above example, any sql statement in either two files provided that contain
+        special command /*{{save:___}}*/ will be pushed to self.coasql_save_csv
+        for further processing.  coasql_* functions must accept and return a dictionary
+        of parameters, allowing values to be passed and modified in a logic chain."""
+
+        # pre-flight checks:
+        self.utils.log('iterate_coa_sqls started', 'files passed in: %i' %len(filepaths))
+        filepaths = self.utils.cast_dict(filepaths)
+        self.utils.validate_all_filepaths(self.utils.cast_list(filepaths, dict_convert='keys'), mustbe_file = True, throw_errors = True)
+        if filepaths=={}: self.utils.log('no valid files were supplied', warning=True)
+
+        # iterate files
+        for filepath_in, filepath_out in filepaths.items():
+            self.utils.log('processing file', filepath_in.replace(self.approot,'.'), header=True)
+            with open(filepath_in, 'r') as fh:
+                sqls_text = fh.read()
+            sqls = sqls_text.split(";")
+            self.utils.log('file contains %i sql statements' %len(sqls))
+            parms = {'filepath_in':filepath_in, 'filepath_out':filepath_out, 'index':0, 'sql':{}, 'postwork':{}}
+
+            # iterate sqls
+            for sql in sqls:
+                parms['index'] +=1
+                self.utils.log('processing sql number #%i' %parms['index'])
+                parms['phase'] = 'execute'
+                parms['special_commands'] = self.utils.get_special_commands(sql)
+                parms['sql']['original'] = sql
+                parms['sql']['formatted'] = self.utils.format_sql(sql)
+                parms['sql']['special_command_out'] = parms['special_commands']['sql']
+
+                # do everysql_commands:
+                for cmdname, cmdfunc in everysql_commands.items():
+                    parms = cmdfunc(parms)
+
+                # do iffound_commands:
+                for cmdname, cmdfunc in iffound_commands.items():
+                    if cmdname in parms['special_commands']:
+                        parms = cmdfunc(parms)
+
+            # post work per file
+            parms['phase'] = 'postwork'
+            for postname, postfunc in parms['postwork'].items():
+                parms = postfunc(parms)
+
+    def coasql_assist_bteq(self, parms):
+        """turns sql into bteq commands.  If parms['phase']=='postwork' the processed
+        will add prefix/suffix commands and save the .coa.bteq file."""
+        if 'bteq_sql' not in parms: parms['bteq_sql'] = []
+
+        if parms['phase'] == 'postwork':
+            # wrap bteq with begin/end logic, and save file:
+            prefix = ['-'*30]
+            prefix.append('-- add credentials below, all else should run & export automatically\n' + '-'*30)
+            prefix.append('.logon host/username,password')
+            prefix.append(".titledashes off")
+            prefix.append(".separator '|'")
+            prefix.append(".width 1048575")
+            parms['bteq_sql'] = prefix + parms['bteq_sql']
+            parms['bteq_sql'].append('.export reset')
+            parms['bteq_filetext'] = '\n\n'.join(parms['bteq_sql'])
+            self.utils.log('file complete, saving...', parms['filepath_out'])
+            with open(parms['filepath_out'], 'w') as fh:
+                fh.write(parms['bteq_filetext'])
+            self.utils.log('complete!')
+
+        else: # still processing sql statements:
+            self.utils.log(' translating to bteq...')
+            if 'save' in parms['special_commands']:
+                parms['bteq_sql'].append('.export reset')
+                parms['bteq_sql'].append('.export report file=%s,close' %str(parms['special_commands']['save']))
+                self.utils.log(' adding export commands')
+
+            parms['bteq_sql'].append(parms['sql']['formatted'])
+
+        # register postwork function, so this is called after file is complete
+        parms['postwork']['assist_bteq'] = self.coasql_assist_bteq
+        return parms

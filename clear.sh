@@ -1,3 +1,6 @@
+#!/usr/bin/env bash
+
+cd /opt/git/tdcsm
 
 rm -r 0_override
 rm -r 1_download

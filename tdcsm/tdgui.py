@@ -1,4 +1,4 @@
-import subprocess, platform, os, copy, yaml
+import subprocess, platform, os, copy #, yaml
 from datetime import datetime
 from tkinter import *
 from tkinter.ttk import *
@@ -9,12 +9,13 @@ import tdcsm
 
 class coa():
 
-    version = "0.3.9.7.9"
+    version = "0.3.9.8.0"
     debug = False
 
     entryvars = {}
     defaults = {}
-    images = {'banner':{'file':'pic_TDCOA_Banner.gif', 'X':700, 'Y':27, 'scale':1, 'object':None, 'alttext':'Teradata CSM Automation'}
+    appsize = '600x660' # width x height
+    images = {'banner':{'file':'pic_TDCOA_Banner.gif', 'X':700, 'Y':27, 'scale':0.8, 'object':None, 'alttext':'Teradata CSM Automation'}
               ,'logo' :{'file':'pic_TDCOAdot.gif', 'X':330, 'Y':55, 'scale':0.5, 'object':None, 'alttext':'Teradata'}}
     sampleTx2 = {'systems_left':['one','two','three'],
                  'systems_right':['four','five','six'],
@@ -22,7 +23,7 @@ class coa():
                  'filesets_right':['four','five','six']}
     approot = ''
     secrets = ''
-    motd = True
+    motd = False
 
 
     def __init__(self, approot='', secrets=''):
@@ -34,7 +35,7 @@ class coa():
             self.localos='Win'
         else:
             self.localos='Mac'
-        self.run()
+        self.run_gui()
 
     def set_defaults(self, **kwargs):
         ev = self.entryvars
@@ -58,7 +59,12 @@ class coa():
 # =================== BEGIN: MAKE NEW GUI OBJECT COLLECTIONS ==============================
     def define_styles(self, app=None):
         Style(app).theme_use('clam') #clam, alt, default, classic, aqua
-        colors = {'quickrun':'#FBFE33', 'config':'#FFB2F7', 'download':'#7EFDFF', 'execute':'#FEBF25',  'upload':'#FE2525', 'help':'#D7DCBA'}
+        colors = {  'config'   :'#FBFE33',
+                    'normalrun':'#FFB2F7',
+                    'assistedrun':'#7EFDFF',
+                    'execute'  :'#FEBF25',
+                    'upload'   :'#FE2525',
+                    'help'     :'#D7DCBA'}
         font = 'Open Sans'
         Style(app).configure("TButton"    ,foreground="#ffffff", background="#646464", font=(font, '12')  )
         Style(app).configure("TFrame"     ,foreground="#ffffff", background="#000000", font=(font, '12')  )
@@ -66,37 +72,17 @@ class coa():
         Style(app).configure("TLabel"     ,foreground="#ffffff", background="#000000", font=(font, '12')  )
         Style(app).configure("title.TLabel",foreground="#ffffff", background="#000000", font=(font,'24', 'bold')  )
 
-        Style(app).configure("quickrun-normal.TFrame"       ,foreground="#000000", background=colors['quickrun'], font=(font, '12')  )
-        Style(app).configure("quickrun-normal.TButton"      ,foreground="#000000", background="#B1B804", font=(font, '12')  )
-        Style(app).map("quickrun-normal.TButton", background=[("disabled","#B1B804")])
-        Style(app).configure("quickrun-important.TButton"   ,foreground="#000000", background="#E7B525", font=(font, '12', 'bold')  )
-        Style(app).configure("quickrun-normal.TCheckbutton" ,foreground="#000000", background=colors['quickrun'])
-        Style(app).configure("quickrun-separator.TFrame"    ,foreground="#000000", background=colors['quickrun'], font=(font, '12')  )
-        Style(app).configure("quickrun-normal.TLabel"       ,foreground="#000000", background=colors['quickrun'], font=(font, '12')  )
-        Style(app).configure("quickrun-bold.TLabel"         ,foreground="#000000", background=colors['quickrun'], font=(font, '12', 'bold')  )
-        Style(app).configure("quickrun-header.TLabel"       ,foreground="#000000", background=colors['quickrun'], font=(font, '24', 'bold')  )
-        Style(app).configure("quickrun-normal.Treeview"     ,foreground="#000000", background="#FDFEDD", font=(font, '12')  )
-        Style(app).configure("quickrun-normal.TEntry"       ,foreground="#000000", fieldbackground="#FDFEDD", font=(font, '12')  )
-
-        Style(app).configure("config-normal.TFrame"         ,foreground="#000000", background=colors['config'], font=(font, '12')  )
-        Style(app).configure("config-normal.TLabel"         ,foreground="#000000", background=colors['config'], font=(font, '12')  )
-        Style(app).configure("config-bold.TLabel"           ,foreground="#000000", background=colors['config'], font=(font, '12', 'bold')  )
-
-        Style(app).configure("download-normal.TFrame"       ,foreground="#000000", background=colors['download'], font=(font, '12')  )
-        Style(app).configure("download-normal.TLabel"       ,foreground="#000000", background=colors['download'], font=(font, '12')  )
-        Style(app).configure("download-bold.TLabel"         ,foreground="#000000", background=colors['download'], font=(font, '12', 'bold')  )
-
-        Style(app).configure("execute-normal.TFrame"        ,foreground="#000000", background=colors['execute'], font=(font, '12')  )
-        Style(app).configure("execute-normal.TLabel"        ,foreground="#000000", background=colors['execute'], font=(font, '12')  )
-        Style(app).configure("execute-bold.TLabel"          ,foreground="#000000", background=colors['execute'], font=(font, '12', 'bold')  )
-
-        Style(app).configure("upload-normal.TFrame"         ,foreground="#000000", background=colors['upload'], font=(font, '12')  )
-        Style(app).configure("upload-normal.TLabel"         ,foreground="#000000", background=colors['upload'], font=(font, '12')  )
-        Style(app).configure("upload-bold.TLabel"           ,foreground="#000000", background=colors['upload'], font=(font, '12', 'bold')  )
-
-        Style(app).configure("help-normal.TFrame"           ,foreground="#000000", background=colors['help'], font=(font, '12')  )
-        Style(app).configure("help-normal.TLabel"           ,foreground="#000000", background=colors['help'], font=(font, '12')  )
-        Style(app).configure("help-bold.TLabel"             ,foreground="#000000", background=colors['help'], font=(font, '12', 'bold')  )
+        for name, hex in colors.items():
+            Style(app).configure("%s-normal.TFrame"       %name, foreground="#000000",   background=colors[name], font=(font, '12')  )
+            Style(app).configure("%s-normal.TButton"      %name, foreground="#000000",   background=self.shade(colors[name]), font=(font, '12')  )
+            Style(app).map(      "%s-normal.TButton"      %name, background=[("disabled",self.shade(colors[name],0.4))])
+            Style(app).configure("%s-normal.TCheckbutton" %name, foreground="#000000",   background=colors[name])
+            Style(app).configure("%s-separator.TFrame"    %name, foreground="#000000",   background=colors[name], font=(font, '12')  )
+            Style(app).configure("%s-normal.TLabel"       %name, foreground="#000000",   background=colors[name], font=(font, '12')  )
+            Style(app).configure("%s-bold.TLabel"         %name, foreground="#000000",   background=colors[name], font=(font, '12', 'bold')  )
+            Style(app).configure("%s-header.TLabel"       %name, foreground="#000000",   background=colors[name], font=(font, '24', 'bold')  )
+            Style(app).configure("%s-normal.Treeview"     %name, foreground="#000000",   background=self.tint(colors[name],0.8), font=(font, '12')  )
+            Style(app).configure("%s-normal.TEntry"       %name, foreground="#000000",   fieldbackground=self.tint(colors[name],0.7), font=(font, '12')  )
 
     def newframe_LEB(self, parent, labeltext='not set', btntext='not set', btncommand='test', style = 'default', lbl_width=12, btn_width=6):
         if btncommand not in self.entryvars: self.entryvars[btncommand] = StringVar()
@@ -112,10 +98,13 @@ class coa():
         if self.debug: print('created LEB: %s' %labeltext)
         return  f
 
-    def newframe_CLB(self, parent, labeltext='', btntext = 'not set', btncommand='test', checkcommand=print('check command'), style = 'default'):
+    def newframe_CLB(self, parent, labeltext='', btntext = 'not set', btncommand='test', checkcommand=print('check command'), style = 'default', show_chkbox=True):
         f = Frame(parent, padding=1, style=str('%s.TFrame' %style))
         if btncommand not in self.entryvars: self.entryvars[btncommand] = IntVar(value=0)
-        c = Checkbutton(f, variable=self.entryvars[btncommand], command=checkcommand, style=str('%s.TCheckbutton' %style))
+        if show_chkbox:
+            c = Checkbutton(f, variable=self.entryvars[btncommand], command=checkcommand, style=str('%s.TCheckbutton' %style))
+        else:
+            c = Label(f, text="     ", anchor=W, style=str('%s.TLabel' %style)) # widt of missing checkbox
         if labeltext != '': l = Label(f, text=labeltext, anchor=E, style=str('%s.TLabel' %style))
         b = Button(f,text=btntext, command=lambda:self.button_click(btncommand, state=self.entryvars[btncommand].get()), style=str('%s.TButton' %style))
         c.pack(side=LEFT, expand=False)
@@ -141,14 +130,14 @@ class coa():
         return b
 
     def newframe_Tx2(self, parent, treetext='not set', treelabel_left='left tree', treelabel_right='right tree', width=10, treeheight=5, style = 'default'):
-        f = Frame(parent,padding=3, style=str('%s.TFrame' %style))
-        Label(parent, text=treetext, anchor=CENTER, style=str('%s.TLabel' %style)).pack(side=TOP, fill=BOTH, expand=False)
-        leftname  = 'tv_%s_left'  %treetext.replace(' ','_').lower().strip()
-        rightname = 'tv_%s_right' %treetext.replace(' ','_').lower().strip()
+        f = Frame(parent, padding=6, style=str('%s.TFrame' %style))
+        Label(f, padding=0, text=treetext, anchor=S, style=str('%s.TLabel' %style)).pack(side=TOP, expand=False)
+        leftname  = 'tv_%s_left'  %treetext.replace(' ','_').replace('(','').replace(')','').lower().strip()
+        rightname = 'tv_%s_right' %treetext.replace(' ','_').replace('(','').replace(')','').lower().strip()
         tL = Treeview(f, height=treeheight, style=str('%s.Treeview' %style))
         tR = Treeview(f, height=treeheight, style=str('%s.Treeview' %style))
-        tL.column("#0", width=100, minwidth=75)
-        tR.column("#0", width=100, minwidth=75)
+        tL.column("#0", width=width) #, minwidth=int(width*0.9))
+        tR.column("#0", width=width) #, minwidth=int(width*0.9))
         tL.heading("#0",text=treelabel_left,  anchor=W)
         tR.heading("#0",text=treelabel_right, anchor=W)
         tL.bind("<<TreeviewSelect>>", lambda event: self.button_click(name=leftname , selected=tL.item(tL.focus())['text'] ))
@@ -167,7 +156,7 @@ class coa():
         s = Frame(parent, borderwidth=width, style='%s-sep.TFrame' %style)
         s.pack(fill=X, expand=True)
 
-    def newImage(self, parent, image_name='', img_width=100, img_height=100):
+    def newImage(self, parent, image_name=''):
         i = self.images[image_name]
         x = int(i['X']*i['scale'])
         y = int(i['Y']*i['scale'])
@@ -281,22 +270,39 @@ class coa():
     @staticmethod
     def validate_boolean(sbool, returntype = 'string'):
         """accepts a string-as-boolean, and depending on returntype[:3], returns
-          - 'str'  == well-formed bool as string (default)
+          - 'str' == well-formed bool as string (default)
           - 'boo' == boolean value itself
+          - 'int' == 0 or 1 per boolean standard
         Special note: this is the first step in transitioning YAML from string-as-boolean to pure boolean: isolate the change as-is.
         Once we've wrapped all instances here, we can change the default behavior once and test results."""
         if str(sbool).strip().lower() == 'true':
             if returntype[:3] == 'str': return 'True'
             if returntype[:3] == 'boo': return  True
+            if returntype[:3] == 'int': return  1
         elif str(sbool).strip().lower() == 'false':
             if returntype[:3] == 'str': return 'False'
             if returntype[:3] == 'boo': return  False
+            if returntype[:3] == 'int': return  0
 
     @staticmethod
     def safepath(strpath=''):
         """Converts a pre-existing string-path to windows-safe path.
         This is probably really easy, this is just a wrapper for said logic"""
         return str(strpath).replace('/', os.sep).replace(r':\U', r':\\U').strip()
+
+    @staticmethod
+    def shade(hexvalue="", pct=0.25):
+        """takes one hex color value and returns a shaded/darkened hex color value."""
+        h = hexvalue[1:] if hexvalue[:1]=="#" else hexvalue[:6]
+        [r,g,b] = tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
+        return '#{:02x}{:02x}{:02x}'.format( int(r*(1-pct)), int(g*(1-pct)), int(b*(1-pct)) )
+
+    @staticmethod
+    def tint(hexvalue="", pct=0.25):
+        """takes one hex color value and returns a tinted/lightened hex color value."""
+        h = hexvalue[1:] if hexvalue[:1]=="#" else hexvalue[:6]
+        [r,g,b] = tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
+        return '#{:02x}{:02x}{:02x}'.format( int(r+((255-r)*pct)), int(g+((255-g)*pct)), int(b+((255-b)*pct)) )
 
     def print_dict(self, dicttoprint={}, name='', lvl=0, secretdict={}):
         if lvl==0: print('\n%s\n%s\n%s' %('-'*30, str(name).upper(), '-'*30))
@@ -314,17 +320,17 @@ class coa():
                 msg = msg.replace(secret, '%s%s%s' % (secret[:1], '*' * (len(secret) - 2), secret[-1:]))
         return str(msg)
 
-    def yaml_write(self, dict2write={}, filepath=''):
-        with open(filepath, 'w') as fh:
-            fh.write(yaml.dump(dict2write))
-
-    def yaml_read(self, filepath=''):
-        if os.path.isfile(filepath):
-            with open(filepath, 'r') as fh:
-                txt = fh.read()
-        else:
-            txt = 'no_such_file: "%s"' %filepath
-        return yaml.load(txt)
+    # def yaml_write(self, dict2write={}, filepath=''):
+    #     with open(filepath, 'w') as fh:
+    #         fh.write(yaml.dump(dict2write))
+    #
+    # def yaml_read(self, filepath=''):
+    #     if os.path.isfile(filepath):
+    #         with open(filepath, 'r') as fh:
+    #             txt = fh.read()
+    #     else:
+    #         txt = 'no_such_file: "%s"' %filepath
+    #     return yaml.load(txt)
 
 # =================== END: HELPER FUNCTIONS ==============================
 
@@ -370,7 +376,7 @@ class coa():
         print('NOT FOUND:', lastrunfile)
         return '<missing>'
 
-    def toggle_all_chk_quickrun(self):
+    def toggle_all_chk_normalrun(self):
         ev = self.entryvars
         if  ev['download_files'].get() == 1 \
         and ev['prepare_sql'].get() == 1 \
@@ -387,8 +393,43 @@ class coa():
             ev['download_files'].set(1)
             ev['prepare_sql'].set(1)
             ev['execute_run'].set(1)
+            ev['make_customer_files'].set(0)
             ev['upload_to_transcend'].set(1)
             ev['run_all_checked'].set(1)
+        print('--- check status: ')
+        print('  download_files = ' + str(ev['download_files'].get()))
+        print('  prepare_sql = ' + str(ev['prepare_sql'].get()))
+        print('  execute_run = ' + str(ev['execute_run'].get()))
+        print('  make_customer_files = ' + str(ev['make_customer_files'].get()))
+        print('  upload_to_transcend = ' + str(ev['upload_to_transcend'].get()))
+        print('  run_all_checked = ' + str(ev['run_all_checked'].get()))
+
+    def toggle_all_chk_assistedrun(self):
+        ev = self.entryvars
+        if  ev['download_files'].get() == 1 \
+        and ev['prepare_sql'].get() == 1 \
+        and ev['make_customer_files'].get() == 1 :
+            # if all boxes checked, then uncheck:
+            ev['download_files'].set(0)
+            ev['prepare_sql'].set(0)
+            ev['execute_run'].set(0)
+            ev['make_customer_files'].set(0)
+            ev['upload_to_transcend'].set(0)
+            ev['run_all_checked'].set(0)
+        else:   # otherwise, check all:
+            ev['download_files'].set(1)
+            ev['prepare_sql'].set(1)
+            ev['make_customer_files'].set(1)
+            ev['execute_run'].set(0)
+            ev['upload_to_transcend'].set(0)
+            ev['run_all_checked'].set(1)
+        print('--- check status: ')
+        print('  download_files = ' + str(ev['download_files'].get()))
+        print('  prepare_sql = ' + str(ev['prepare_sql'].get()))
+        print('  execute_run = ' + str(ev['execute_run'].get()))
+        print('  make_customer_files = ' + str(ev['make_customer_files'].get()))
+        print('  upload_to_transcend = ' + str(ev['upload_to_transcend'].get()))
+        print('  run_all_checked = ' + str(ev['run_all_checked'].get()))
 
     def systems_save2disk(self):
         # --> stupid langGO error  >:^(
@@ -410,24 +451,6 @@ class coa():
         self.yaml_write(sysAll, syspath)
         self.button_click('reload_config')
         return True
-
-    def reset_gui_variables(self, reset=False):
-        """resets and validates in-memory systems object, including
-          - validating all 'active' flags are well-formed
-          - moving all Systems and FileSets to inactive, if reset=True """
-        for sysname, sysobject  in  self.coa.systems.items():
-            # validate, and optionally make all system inactive
-            sysobject['active'] = 'False' if reset else self.validate_boolean(sysobject['active'])
-            # validate, and optionally make all filesets inactive
-            for setname, setobject in  sysobject['filesets'].items():
-                setobject['active'] = 'False' if reset else self.validate_boolean(setobject['active'])
-
-        # sync skip_dbs flag with coa.settings
-        if self.validate_boolean(self.coa.settings['skip_dbs'],'bool'):
-            self.entryvars['skip_dbs_toggle'].set(value=1)
-        else:
-            self.entryvars['skip_dbs_toggle'].set(value=0)
-
 
     def run_external(self, coa_function='execute_run()'):
         # --> stupid langGO error  >:^(
@@ -474,6 +497,8 @@ class coa():
                 print('secret: ', self.coa.secretpath)
                 print('system: ', self.coa.systemspath)
                 print('fileset: ', self.coa.filesetpath)
+                self.coa.deactivate_all()
+                self.entryvars['skip_dbs_toggle'].set(value=self.validate_boolean(self.coa.settings['skip_dbs'],'int'))
                 self.button_click('tv_systems_left') # this 'click' will refresh both left and right treeviews
                 self.button_click('tv_filesets_left')
             elif name == 'approot':
@@ -485,15 +510,15 @@ class coa():
             elif name == 'prepare_sql':
                 self.coa.prepare_sql()
             elif name == 'execute_run':
-                self.systems_save2disk()
-                # self.run_external('execute_run')
                 self.coa.execute_run()
                 self.upload_get_lastrun_folder()
             elif name == 'make_customer_files':
-                self.coa.make_customer_files()
+                self.upload_get_lastrun_folder()
+                self.coa.make_customer_files2()
+                self.upload_get_lastrun_folder()
+            elif name == 'process_data':
+                print('SORRY, THIS IS NOT IMPLEMENTED YET')
             elif name == 'upload_to_transcend':
-                self.systems_save2disk()
-                # self.run_external('upload_to_transcend')
                 self.coa.upload_to_transcend()
             elif name == 'motd':
                 self.coa.display_motd()
@@ -505,16 +530,21 @@ class coa():
                 if self.entryvar('execute_run')         ==1: self.button_click('execute_run')
                 if self.entryvar('make_customer_files') ==1: self.button_click('make_customer_files')
                 if self.entryvar('upload_to_transcend') ==1: self.button_click('upload_to_transcend')
+            elif name == 'run_all_checked_assist':
+                if self.entryvar('download_files')      ==1: self.button_click('download_files')
+                if self.entryvar('prepare_sql')         ==1: self.button_click('prepare_sql')
+                if self.entryvar('make_customer_files') ==1: self.button_click('make_customer_files')
             elif name in ['config','systems','filesets']:
                 self.open_text_file(kwargs['entrytext'], self.entryvar('approot'))
-            elif name in ['tv_systems_left','tv_systems_right']:
+            elif name in ['tv_systems_left','tv_systems_right','tv_systems_assisted_left','tv_systems_assisted_right']:
                 if 'selected' in kwargs.keys(): # if item was "selected" kwargs will return which item (else refresh without change)
                     active = 'True'
                     if name[-4:] == 'left':  active = 'False'
                     self.coa.systems[kwargs['selected']]['active'] = active
                 d = self.split_dict(self.coa.systems, 'active', default='True', addifmissing=['True','False'])
                 self.reload_Tx2('systems', leftlist = d['True'].keys(), rightlist = d['False'].keys())
-            elif name in ['tv_filesets_left','tv_filesets_right']:
+                self.reload_Tx2('systems_assisted', leftlist = d['True'].keys(), rightlist = d['False'].keys())
+            elif name in ['tv_filesets_left','tv_filesets_right','tv_filesets_assisted_left','tv_filesets_assisted_right']:
                 if 'selected' in kwargs.keys():  # if item was "selected" kwargs will return which item (else refresh without change)
                     active = 'True'
                     if name[-4:] == 'left':  active = 'False'
@@ -526,6 +556,7 @@ class coa():
                 else:
                     exclude = self.split_dict(self.coa.filesets, 'show_in_gui', default='True' )['False'].keys()
                 self.reload_Tx2('filesets', leftlist = d['True'].keys(), rightlist = d['False'].keys(), exclude=exclude)
+                self.reload_Tx2('filesets_assisted', leftlist = d['True'].keys(), rightlist = d['False'].keys(), exclude=exclude)
             elif name == 'skip_dbs_toggle':
                 self.coa.settings['skip_dbs'] = bool(kwargs['state'] == 1)
             elif name == 'print_systems':
@@ -539,8 +570,7 @@ class coa():
 
         except Exception as err:   # TODO: I know, bad practice... if anything goes wrong, just reload_config() - fixes most issues
             print('\nERROR: \n%s\n' %str(err))
-            self.button_click('reload_config')
-
+            #self.button_click('reload_config')
 
 # =================== END: PROGRAM BEHAVIOR ==============================
 
@@ -548,7 +578,7 @@ class coa():
 
 
 # -------------------- ASSEMBLE GUI FROM ABOVE COMPONENTS ------------------------
-    def run(self):
+    def run_gui(self):
         print('GUI RUN: Setup')
 
         # SETUP APPLICATION, app, appframe, title
@@ -559,7 +589,7 @@ class coa():
         self.set_defaults()
         app.wm_title(self.title)
         app.title(self.title)
-        app.geometry('720x800')
+        app.geometry(self.appsize)
 
         #-------------- Page Setup ------------------
         appframe = Frame(app, style="TFrame"); appframe.pack(fill=BOTH, expand=True)
@@ -569,71 +599,96 @@ class coa():
         tabcontrol = Notebook(appframe, padding=5)
         tabcontrol.pack(fill=BOTH, expand=True, anchor=NW)
 
-        Button(appframe, text="Close", command=lambda:self.close(), width=18).pack(side=RIGHT)
-        Button(appframe, text="MOTD", command=lambda:self.button_click("motd"), width=7).pack(side=RIGHT)
+        Button(appframe, text="Close",          width=10, command=lambda:self.close()).pack(padx=3, side=RIGHT)
+        Button(appframe, text="MOTD",           width=7,  command=lambda:self.button_click("motd")).pack(padx=3, side=RIGHT)
+        Button(appframe, text="Reload Configs", width=14, command=lambda:self.button_click("reload_config")).pack(padx=3, side=RIGHT)
         #Label(appframe, style="TLabel", text='version "%s"' %self.version).pack(anchor='center')
         self.newImage(appframe, image_name='logo').pack(side=LEFT)
 
-        tabQuickrun = Frame(tabcontrol, style="quickrun-normal.TFrame"); tabQuickrun.pack(fill=X, expand=True, anchor='n')
-        tabConfig   = Frame(tabcontrol, style="default-normal.TFrame") ;   tabConfig.pack(fill=X, expand=True)
-        tabDownload = Frame(tabcontrol, style="default-normal.TFrame") ; tabDownload.pack(fill=X, expand=True)
-        tabExecute  = Frame(tabcontrol, style="default-normal.TFrame") ;  tabExecute.pack(fill=X, expand=True)
-        tabUpload   = Frame(tabcontrol, style="default-normal.TFrame") ;   tabUpload.pack(fill=X, expand=True)
+        tabConfig   = Frame(tabcontrol, style="config-normal.TFrame"); tabConfig.pack(fill=X, expand=True, anchor='n')
+        tabcontrol.add(tabConfig,  text='Config Files')
+        tabNormalrun   = Frame(tabcontrol, style="normalrun-normal.TFrame"); tabNormalrun.pack(fill=X, expand=True, anchor='n')
+        tabcontrol.add(tabNormalrun,  text='Normal Run')
+        tabAssistedrun  = Frame(tabcontrol, style="assistedrun-normal.TFrame") ; tabAssistedrun.pack(fill=X, expand=True)
+        tabcontrol.add(tabAssistedrun, text='Assisted Run')
+        # tabDownload = Frame(tabcontrol, style="default-normal.TFrame") ; tabDownload.pack(fill=X, expand=True)
+        # tabcontrol.add(tabDownload, text='Download')
+        # tabExecute  = Frame(tabcontrol, style="default-normal.TFrame") ;  tabExecute.pack(fill=X, expand=True)
+        # tabcontrol.add(tabExecute,  text='Execute')
+        # tabUpload   = Frame(tabcontrol, style="default-normal.TFrame") ;   tabUpload.pack(fill=X, expand=True)
+        # tabcontrol.add(tabUpload,   text='Upload')
         tabHelp     = Frame(tabcontrol, style="default-normal.TFrame") ;     tabHelp.pack(fill=X, expand=True)
-        tabcontrol.add(tabQuickrun, text='Quick Run')
-        tabcontrol.add(tabConfig,   text='Config')
-        tabcontrol.add(tabDownload, text='Download')
-        tabcontrol.add(tabExecute,  text='Execute')
-        tabcontrol.add(tabUpload,   text='Upload')
         tabcontrol.add(tabHelp,     text='Help')
-
-        #-------------- TAB: QUICK RUN ------------------
-        frmQuickrun_N  = Frame(tabQuickrun, padding=5, style="quickrun-normal.TFrame"); frmQuickrun_N.pack(fill=BOTH, expand=True, anchor=N)
-        Label(frmQuickrun_N, text='   Step 1: Check your Config Files:', style='quickrun-bold.TLabel').pack(fill=X, anchor=N)
-        self.newframe_LEB(frmQuickrun_N, labeltext=' AppRoot Path:', btntext='Open Folder', btn_width=10, btncommand='approot' , style='quickrun-normal').pack(fill=X,  expand=True)
-        self.newframe_LEB(frmQuickrun_N, labeltext='  Config File:', btntext='Open File'  , btn_width=10, btncommand='config'  , style='quickrun-normal').pack(fill=X,  expand=True)
-        self.newframe_LEB(frmQuickrun_N, labeltext=' Systems File:', btntext='Open File'  , btn_width=10, btncommand='systems' , style='quickrun-normal').pack(fill=X,  expand=True)
-        self.newframe_LEB(frmQuickrun_N, labeltext=' Secrets File:', btntext=''           , btn_width=10, btncommand='secrets' , style='quickrun-normal').pack(fill=X,  expand=True)
-        self.newframe_LEB(frmQuickrun_N, labeltext='FileSets File:', btntext='Open File'  , btn_width=10, btncommand='filesets', style='quickrun-normal').pack(fill=X, expand=True)
-        self.newbutton(frmQuickrun_N, btntext='Reload Configs', btncommand='reload_config', btnwidth=25, side=BOTTOM, style = 'quickrun-normal')
-
-        frmQuickrun_S  = Frame(tabQuickrun, padding=5); frmQuickrun_S.pack(side=BOTTOM, fill=BOTH, expand=True, anchor=S)
-
-        frmQuickrun_SW  = Frame(frmQuickrun_S, padding=5, style="quickrun-normal.TFrame"); frmQuickrun_SW.pack(side=LEFT, fill=BOTH, expand=True, anchor=N)
-        Label(frmQuickrun_SW, text='   Step 2: Select Systems and FileSets:', style='quickrun-bold.TLabel').pack(fill=X, anchor=N)
-        self.newframe_Tx2(frmQuickrun_SW, treetext='SYSTEMS',  treelabel_left='Active', treelabel_right='Inactive', width=25, treeheight=5, style = 'quickrun-normal').pack(fill=X, expand=True)
-        self.newframe_Tx2(frmQuickrun_SW, treetext='FILESETS', treelabel_left='Active', treelabel_right='Inactive', width=25, treeheight=7, style = 'quickrun-normal').pack(fill=X, expand=True)
-
-        frmQuickrun_SE  = Frame(frmQuickrun_S, padding=5, style="quickrun-normal.TFrame"); frmQuickrun_SE.pack(side=RIGHT, fill=BOTH, expand=True, anchor=N)
-        Label(frmQuickrun_SE, text='   Step 3: Run the Process:', style='quickrun-bold.TLabel').pack(fill=X, anchor=N)
-        #self.newframe_CLB(frmQuickrun_SE, btntext='Reload Configs',      btncommand='reload_configs',      style='quickrun-normal').pack(fill=X, expand=True)
-        self.newframe_CLB(frmQuickrun_SE, btntext='Download Files',      btncommand='download_files',      style='quickrun-normal').pack(fill=X, expand=True)
-        self.newframe_CLB(frmQuickrun_SE, btntext='Prepare SQL',         btncommand='prepare_sql',         style='quickrun-normal').pack(fill=X, expand=True)
-        self.separator(frmQuickrun_SE, style='quickrun-normal', width=8)
-        self.newframe_CLB(frmQuickrun_SE, btntext='Execute Run',         btncommand='execute_run',         style='quickrun-normal').pack(fill=X, expand=True)
-        self.newframe_CLB(frmQuickrun_SE, btntext='Make Customer Files', btncommand='make_customer_files', style='quickrun-normal', labeltext='No Access?').pack(fill=X, expand=True)
-        self.separator(frmQuickrun_SE, style='quickrun-normal', width=8)
-        self.newframe_LEB(frmQuickrun_SE, labeltext='Output Folder:', btntext='Open', btncommand='last_output_folder', lbl_width=15, style='quickrun-normal').pack(fill=X, expand=True)
-        self.newframe_CLB(frmQuickrun_SE, btntext='Upload to Transcend', btncommand='upload_to_transcend', style='quickrun-normal').pack(fill=X, expand=True)
-        self.separator(frmQuickrun_SE, style='quickrun-normal', width=8)
-        self.newframe_CLB(frmQuickrun_SE, btntext='Run All Checked', btncommand='run_all_checked', style='quickrun-normal', labeltext='<-- check all', checkcommand=self.toggle_all_chk_quickrun ).pack(fill=X, expand=True)
 
 
         #-------------- TAB: CONFIG ------------------
-        frmConfig  = Frame(tabConfig, padding=5, style="config-normal.TFrame"); frmConfig.pack(fill=BOTH, expand=True, anchor=N)
-        Label(frmConfig, text='COMING SOON!', style='config-bold.TLabel').pack(fill=X, anchor=N)
+        frmConfig       = Frame(tabConfig, padding=5, style="config-normal.TFrame"); frmConfig.pack(fill=BOTH, expand=True, anchor=N)
+        frmConfigFiles  = Frame(frmConfig, padding=5, style="config-normal.TFrame"); frmConfigFiles.pack(fill=BOTH, expand=True, anchor=N)
+        Label(frmConfigFiles, text='   Step 1: Check your Config Files:', style='config-bold.TLabel').pack(fill=X, anchor=N)
+        self.newframe_LEB(frmConfigFiles, labeltext=' AppRoot Path:', btntext='Open Folder', btn_width=10, btncommand='approot' , style='config-normal').pack(fill=X)
+        self.newframe_LEB(frmConfigFiles, labeltext='  Config File:', btntext='Open File'  , btn_width=10, btncommand='config'  , style='config-normal').pack(fill=X)
+        self.newframe_LEB(frmConfigFiles, labeltext=' Systems File:', btntext='Open File'  , btn_width=10, btncommand='systems' , style='config-normal').pack(fill=X)
+        self.newframe_LEB(frmConfigFiles, labeltext=' Secrets File:', btntext=''           , btn_width=10, btncommand='secrets' , style='config-normal').pack(fill=X)
+        self.newframe_LEB(frmConfigFiles, labeltext='FileSets File:', btntext='Open File'  , btn_width=10, btncommand='filesets', style='config-normal').pack(fill=X)
 
-        #-------------- TAB: DOWNLOAD ------------------
-        frmDownload  = Frame(tabDownload, padding=5, style="download-normal.TFrame"); frmDownload.pack(fill=BOTH, expand=True, anchor=N)
-        Label(frmDownload, text='COMING SOON!', style='download-bold.TLabel').pack(fill=X, anchor=N)
 
-        #-------------- TAB: EXECUTE ------------------
-        frmExecute  = Frame(tabExecute, padding=5, style="execute-normal.TFrame"); frmExecute.pack(fill=BOTH, expand=True, anchor=N)
-        Label(frmExecute, text='COMING SOON!', style='execute-bold.TLabel').pack(fill=X, anchor=N)
+        #-------------- TAB: NORMAL RUN ------------------
+        frmNormalrun_N  = Frame(tabNormalrun, style="normalrun-normal.TFrame"); frmNormalrun_N.pack(side=TOP,    padx=5,  fill=BOTH, expand=True, anchor=N)
+        Label(frmNormalrun_N, text='   Step 2: Select Systems and FileSets:', style='normalrun-bold.TLabel').pack(fill=X, anchor=N)
+        self.newframe_Tx2(frmNormalrun_N, treetext='SYSTEMS',  treelabel_left='Active', treelabel_right='Inactive', width=120, treeheight=5, style = 'normalrun-normal').pack(side=LEFT , fill=BOTH, expand=True)
+        self.newframe_Tx2(frmNormalrun_N, treetext='FILESETS', treelabel_left='Active', treelabel_right='Inactive', width=150, treeheight=5, style = 'normalrun-normal').pack(side=RIGHT, fill=BOTH, expand=True)
 
-        #-------------- TAB: UPLOAD ------------------
-        frmUpload  = Frame(tabUpload, padding=5, style="upload-normal.TFrame"); frmUpload.pack(fill=BOTH, expand=True, anchor=N)
-        Label(frmUpload, text='COMING SOON!', style='upload-bold.TLabel').pack(fill=X, anchor=N)
+        frmNormalrun_S  = Frame(tabNormalrun, style="normalrun-normal.TFrame"); frmNormalrun_S.pack(side=BOTTOM, padx=15, fill=BOTH, expand=True, anchor=S)
+        Label(frmNormalrun_S, text='   Step 3: NORMAL RUN - YOU HAVE ACCESS TO THE CUSTOMER SYSTEM DIRECTLY:', style='normalrun-bold.TLabel').pack(fill=X, anchor=N)
+
+        frmNormalrun_S1  = Frame(frmNormalrun_S, padding=5, style="normalrun-normal.TFrame"); frmNormalrun_S1.pack(side=TOP, fill=X, expand=True, anchor=N)
+        self.separator(frmNormalrun_S, style='normalrun-normal', width=8)
+        frmNormalrun_S2  = Frame(frmNormalrun_S, padding=5, style="normalrun-normal.TFrame"); frmNormalrun_S2.pack(side=TOP, fill=X, expand=True, anchor=N)
+        self.separator(frmNormalrun_S, style='normalrun-normal', width=8)
+        frmNormalrun_S3  = Frame(frmNormalrun_S, padding=5, style="normalrun-normal.TFrame"); frmNormalrun_S3.pack(side=TOP, fill=X, expand=True, anchor=N)
+        self.separator(frmNormalrun_S, style='normalrun-normal', width=8)
+        frmNormalrun_S4  = Frame(frmNormalrun_S, padding=5, style="normalrun-normal.TFrame"); frmNormalrun_S4.pack(side=TOP, fill=X, expand=True, anchor=N)
+
+        Label(frmNormalrun_S1, text='Open\nInternet:     ', style='normalrun-bold.TLabel').pack(side=LEFT, anchor=W)
+        self.newframe_CLB(frmNormalrun_S1, btntext='Download Files',      btncommand='download_files',      style='normalrun-normal').pack(fill=X, expand=True)
+        self.newframe_CLB(frmNormalrun_S1, btntext='Prepare SQL',         btncommand='prepare_sql',         style='normalrun-normal').pack(fill=X, expand=True)
+        Label(frmNormalrun_S2, text='Customer  \nVPN:', style='normalrun-bold.TLabel').pack(side=LEFT, anchor=W)
+        self.newframe_CLB(frmNormalrun_S2, btntext='Execute Run',         btncommand='execute_run',         style='normalrun-normal').pack(fill=X, expand=True)
+        Label(frmNormalrun_S3, text='Teradata  \nVPN:', style='normalrun-bold.TLabel').pack(side=LEFT, anchor=W)
+        self.newframe_LEB(frmNormalrun_S3, labeltext='Output Folder:', btntext='Open', btncommand='last_output_folder', lbl_width=15, style='normalrun-normal').pack(fill=X, expand=True)
+        self.newframe_CLB(frmNormalrun_S3, btntext='Upload to Transcend', btncommand='upload_to_transcend', style='normalrun-normal').pack(fill=X, expand=True)
+        self.newframe_CLB(frmNormalrun_S4, btntext='Run All Checked', btncommand='run_all_checked', style='normalrun-normal', labeltext=' Check All\n<---------', checkcommand=self.toggle_all_chk_normalrun ).pack(fill=X)
+
+
+
+        #-------------- TAB: ASSISTED RUN ------------------
+        frmAssistedrun_N  = Frame(tabAssistedrun, style="assistedrun-normal.TFrame"); frmAssistedrun_N.pack(side=TOP,    padx=5,  fill=BOTH, expand=True, anchor=N)
+        Label(frmAssistedrun_N, text='   Step 2: Select Systems and FileSets:', style='assistedrun-bold.TLabel').pack(fill=X, anchor=N)
+        self.newframe_Tx2(frmAssistedrun_N, treetext='SYSTEMS (Assisted)',  treelabel_left='Active', treelabel_right='Inactive', width=120, treeheight=5, style = 'assistedrun-normal').pack(side=LEFT , fill=BOTH, expand=True)
+        self.newframe_Tx2(frmAssistedrun_N, treetext='FILESETS (Assisted)', treelabel_left='Active', treelabel_right='Inactive', width=150, treeheight=5, style = 'assistedrun-normal').pack(side=RIGHT, fill=BOTH, expand=True)
+
+        frmAssistedrun_S  = Frame(tabAssistedrun, style="assistedrun-normal.TFrame"); frmAssistedrun_S.pack(side=BOTTOM, padx=15, fill=BOTH, expand=True, anchor=S)
+        Label(frmAssistedrun_S, text='   Step 3: ASSISTED RUN - YOU SEND FILES TO CUSTOMER CONTACT FOR EXECUTION:', style='assistedrun-bold.TLabel').pack(fill=X, anchor=N)
+
+        frmAssistedrun_S1  = Frame(frmAssistedrun_S, padding=5, style="assistedrun-normal.TFrame"); frmAssistedrun_S1.pack(side=TOP, fill=X, expand=True, anchor=N)
+        self.separator(frmAssistedrun_S, style='normalrun-normal', width=8)
+        frmAssistedrun_S2  = Frame(frmAssistedrun_S, padding=5, style="assistedrun-normal.TFrame"); frmAssistedrun_S2.pack(side=TOP, fill=X, expand=True, anchor=N)
+        self.separator(frmAssistedrun_S, style='normalrun-normal', width=8)
+        frmAssistedrun_S3  = Frame(frmAssistedrun_S, padding=5, style="assistedrun-normal.TFrame"); frmAssistedrun_S3.pack(side=TOP, fill=X, expand=True, anchor=N)
+        self.separator(frmAssistedrun_S, style='normalrun-normal', width=8)
+        frmAssistedrun_S4  = Frame(frmAssistedrun_S, padding=5, style="assistedrun-normal.TFrame"); frmAssistedrun_S4.pack(side=TOP, fill=X, expand=True, anchor=N)
+
+        Label(frmAssistedrun_S1, text='Open\nInternet:     ', style='assistedrun-bold.TLabel').pack(side=LEFT, anchor=W)
+        self.newframe_CLB(frmAssistedrun_S1, btntext='Download Files',      btncommand='download_files',      style='assistedrun-normal').pack(fill=X, expand=True)
+        Label(frmAssistedrun_S2, text='No\nInternet      \nNeeded:', style='assistedrun-bold.TLabel').pack(side=LEFT, anchor=W)
+        self.newframe_CLB(frmAssistedrun_S2, btntext='Prepare SQL',         btncommand='prepare_sql',         style='assistedrun-normal').pack(fill=X, expand=True)
+        self.newframe_CLB(frmAssistedrun_S2, btntext='Make Customer Files', btncommand='make_customer_files', style='assistedrun-normal').pack(fill=X, expand=True)
+        self.newframe_LEB(frmAssistedrun_S2, labeltext='Output Folder:', btntext='Open', btncommand='last_output_folder', lbl_width=15, style='assistedrun-normal').pack(fill=X, expand=True)
+        self.newframe_CLB(frmAssistedrun_S2, show_chkbox=False,  btntext='Process Return Data',  btncommand='process_data',        style='assistedrun-normal').pack(fill=X, expand=True)
+        Label(frmAssistedrun_S3, text='Teradata   \nVPN:', style='assistedrun-bold.TLabel').pack(side=LEFT, anchor=W)
+        self.newframe_CLB(frmAssistedrun_S3, show_chkbox=False,  btntext='Upload to Transcend', btncommand='upload_to_transcend', style='assistedrun-normal').pack(fill=X, expand=True)
+        self.newframe_CLB(frmAssistedrun_S4, btntext='Run All Checked', btncommand='run_all_checked_assist', style='assistedrun-normal', labeltext=' Check All\n<---------', checkcommand=self.toggle_all_chk_assistedrun ).pack(fill=X)
+
 
         #-------------- TAB: HELP ------------------
         frmHelp  = Frame(tabHelp, padding=5, style="help-normal.TFrame"); frmHelp.pack(fill=BOTH, expand=True, anchor=N)
@@ -656,9 +711,13 @@ class coa():
         print('secrets: ' + self.entryvar('secrets') )
 
         self.coa = tdcoa(approot = self.entryvar('approot'), secrets = self.entryvar('secrets'))
-        self.reset_gui_variables(reset=True)
-        self.button_click('tv_systems_left') # this 'click' will refresh both left and right treeviews
+        self.coa.deactivate_all()
+        # these 'clicks' will refresh both left and right treeviews
+        self.button_click('tv_systems_left')
         self.button_click('tv_filesets_left')
+        self.button_click('tv_systems_assisted_left')
+        self.button_click('tv_filesets_assisted_left')
+
         self.upload_get_lastrun_folder()
 
         # update our secrets file if default was different than coa.settings value (chicken/egg problem)
@@ -668,6 +727,9 @@ class coa():
             self.entryvars['secrets'].set(self.first_file_that_exists(secrets_from_settings, secrets_from_default))
             self.coa.secrets = self.entryvars['secrets'].get()
             self.coa.reload_config()
+            self.coa.deactivate_all()
+        # sync skip_dbs flag with coa.settings
+        self.entryvars['skip_dbs_toggle'].set(value=self.validate_boolean(self.coa.settings['skip_dbs'],'int'))
 
         Label(frmHelp_N, text='Version of tdcsm = %s' %self.coa.version, style='help-bold.TLabel').pack(fill=X, anchor=N)
         Label(frmHelp_N, text='Version of tdgui = %s' %self.version, style='help-bold.TLabel').pack(fill=X, anchor=N)
