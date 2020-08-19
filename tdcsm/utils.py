@@ -183,9 +183,9 @@ class Utils(Logger):
 
         return sql
 
-    @staticmethod
-    def validate_all_filepaths(filepaths=[], mustbe_file=False, throw_errors=False):
+    def validate_all_filepaths(self, filepaths=[], mustbe_file=False, throw_errors=False):
         rtn = True
+        self.log('validating %i filepaths' %len(filepaths))
         for filepath in filepaths:
             if not os.path.exists(filepath):
                 rtn = False
@@ -194,22 +194,46 @@ class Utils(Logger):
                 rtn = False
                 break
         if throw_errors and rtn==False:
-            msg = "not not all filepaths provided are valid"
+            msg = "not all filepaths provided are valid"
             self.log(msg, error=True)
             raise ValueError(msg)
         return rtn
 
-    @staticmethod
-    def cast_list(parm):
-        """Ensures the parm is a list.  If it comes in as a string, turn into a list.
-        Either way, returns a list."""
-        rtn = []
+    def cast_list(self, parm, dict_convert='keys'):
+        """Ensures the parm is a list. If a string, turn into a list.
+        If a dict, choose whether to convert [keys|values|both|none].
+        In all cases, return a list."""
         if type(parm)==str:
             rtn.append(parm)
         elif type(parm)==list:
             rtn = parm
+        elif type(parm)==dict:
+            rtn=[] # none returns empty list
+            if dict_convert=='keys':   rtn = list(parm)
+            if dict_convert=='values': rtn = list(parm.values())
+            if dict_convert=='both':
+                for n,v in parm.items():
+                    rtn.append(n)
+                    rtn.append(v)
         else:
             msg = "must be list or string,\n you supplied %s" %type(filepaths)
+            self.log(msg, error=True)
+            raise ValueError(msg)
+        return rtn
+
+    def cast_dict(self, parm):
+        """Ensures the parm is a dict.  If it comes in as a string or list,
+        turn into a dict where key = value.  Always returns a dict."""
+        if type(parm)==str:
+            rtn={parm:parm}
+        elif type(parm)==list:
+            r={}
+            for p in parm:
+                r[p]=p
+        elif type(parm)==dict:
+            rtn = parm
+        else:
+            msg = "must be dict, list, or string,\n you supplied %s" %type(filepaths)
             self.log(msg, error=True)
             raise ValueError(msg)
         return rtn
@@ -248,7 +272,6 @@ class Utils(Logger):
         cmds = {}
         sqltext = sql
         replace_with = '/* %s */' % replace_with if replace_with != '' else replace_with
-
         self.log('  parsing for special sql commands')
 
         # first, get a unique dict of sql commands to iterate:
@@ -264,7 +287,6 @@ class Utils(Logger):
                 cmdval = ''
 
             self.log('   special command found', '%s = %s' % (cmdkey, cmdval))
-
             cmds[cmdkey] = {}
             cmds[cmdkey]['name'] = cmdkey
             cmds[cmdkey]['value'] = cmdval
@@ -276,10 +298,9 @@ class Utils(Logger):
 
             if cmdkey in keys_to_skip:
                 cmds[cmdkey]['skip'] = True
-
+                self.log('   %s found in keys_to_skip, skipping...' % cmdkey)
             else:
                 cmds[cmdkey]['skip'] = False
-                self.log('   %s found in keys_to_skip, skipping...' % cmdkey)
 
             sqltext = sqltext.replace(cmdstr, '')
 
@@ -287,7 +308,6 @@ class Utils(Logger):
         finalsql = sql
         rtn = {}
         for cmd, cmdobj in cmds.items():
-
             # add non-skipped special cmds
             if not cmdobj['skip']:
                 rtn[cmd] = cmdobj['value']
@@ -444,9 +464,6 @@ class Utils(Logger):
         self.log('record count', str(len(df)))
         return df
 
-
-
-
     @staticmethod
     def set_plot_sizes(plt, small = 20, medium = 30, big = 40):
         """
@@ -499,7 +516,6 @@ class Utils(Logger):
 
         output_str = ' '.join(out_list)
         return output_str
-
 
     @staticmethod
     def scatter_plot(df_with_selected_cols, style_column, factor_x, factor_y, hue_column, markers, bucket_unique_list):

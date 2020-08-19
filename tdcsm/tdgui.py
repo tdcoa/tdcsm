@@ -514,7 +514,10 @@ class coa():
                 self.upload_get_lastrun_folder()
             elif name == 'make_customer_files':
                 self.upload_get_lastrun_folder()
-                self.coa.make_customer_files()
+                self.coa.make_customer_files2()
+                self.upload_get_lastrun_folder()
+            elif name == 'process_data':
+                print('SORRY, THIS IS NOT IMPLEMENTED YET')
             elif name == 'upload_to_transcend':
                 self.coa.upload_to_transcend()
             elif name == 'motd':
