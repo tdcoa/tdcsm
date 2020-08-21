@@ -1049,11 +1049,13 @@ class tdcoa:
                                                         self.utils.log('Vis file complete!')
 
                                                 if 'pptx' in sqlcmd:  # insert to pptx file
+                                                    from .pptx import replace_placeholders
+
                                                     self.utils.log('\npptx cmd', 'found')
-                                                    pptx_file = os.path.join(workpath, sqlcmd['pptx'])
-                                                    self.utils.log('pptx file', pptx_file)
+                                                    pptx_file = Path(workpath) / sqlcmd['pptx']
+                                                    self.utils.log('pptx file', str(pptx_file))
                                                     self.utils.log('inserting to pptx file..')
-                                                    self.utils.insert_to_pptx(pptx_file, workpath)
+                                                    replace_placeholders(pptx_file, Path(workpath))
                                                     self.utils.log('pptx file complete!')
 
                                                 if 'load' in sqlcmd:  # add to manifest
@@ -1460,11 +1462,13 @@ class tdcoa:
                                                         self.utils.log('Vis file complete!')
 
                                                 if 'pptx' in sqlcmd:  # insert to pptx file
+                                                    from .pptx import replace_placeholders
+
                                                     self.utils.log('\npptx cmd', 'found')
-                                                    pptx_file = os.path.join(workpath, sqlcmd['pptx'])
-                                                    self.utils.log('pptx file', pptx_file)
+                                                    pptx_file = Path(workpath) / sqlcmd['pptx']
+                                                    self.utils.log('pptx file', str(pptx_file))
                                                     self.utils.log('inserting to pptx file..')
-                                                    self.utils.insert_to_pptx(pptx_file, workpath)
+                                                    replace_placeholders(pptx_file, Path(workpath))
                                                     self.utils.log('pptx file complete!')
 
 
