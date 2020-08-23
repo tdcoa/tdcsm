@@ -12,14 +12,15 @@ class Logger:
         self.logpath = ''
         self.secrets = {}
 
-    def log(self, msgleft='', msgright='', header=False, error=False, warning=False):
+    def log(self, msgleft='', msgright='', header=False, error=False, warning=False,  indent=0):
+        logspc = self.logspace - indent
         delim = '' if msgright == '' else ':'
-        msg = '%s%s' % (str(msgleft + delim).ljust(self.logspace), msgright)
+        msg = '%s%s%s' % (' '*indent, str(msgleft + delim).ljust(logspc), msgright)
 
         if error:
-            msg = '%s\nERROR:\n%s\n%s' % ('-=' * self.logspace, msg, '-=' * self.logspace)
+            msg = '%s\nERROR:\n%s\n%s' % ('-=' * logspc, msg, '-=' * logspc)
         if warning:
-            msg = '%s\nWARNING:\n%s\n%s' % ('-' * self.logspace, msg, '-' * self.logspace)
+            msg = '%s\nWARNING:\n%s\n%s' % ('-' * logspc, msg, '-' * logspc)
 
         # prevent secrets from appearing in log:
         for nm, secret in self.secrets.items():
