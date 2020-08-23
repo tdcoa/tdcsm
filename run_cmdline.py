@@ -87,7 +87,7 @@ while True:
     elif x == '2': c.prepare_sql()
     elif x == '3': c.execute_run()
     elif x == '4': c.upload_to_transcend()
-    elif x == '5': c.make_customer_files()
+    elif x == '5': c.make_customer_files2()
     elif x == '9':
         c.reload_config()
         c.skip_dbs = skip_dbs

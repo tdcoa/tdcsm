@@ -8,6 +8,7 @@ import shutil
 import pandas as pd
 import requests
 import yaml
+import csv
 from teradatasql import OperationalError
 from .dbutil import df_to_sql, sql_to_df
 import webbrowser
@@ -22,36 +23,6 @@ from tdcsm.utils import Utils  # includes Logger class
 
 
 class tdcoa:
-    """DESCRIPTION:
-    tdcsm.tdcoa is a collection of high-level operations to fully automate
-    the collection of consumption analytics of a Teradata platform.  This
-    class focuses on automating four major steps:
-        1 - DOWNLOAD sets of files (sql, csv)
-        2 - PREPARE those files to be executed
-        3 - EXECUTE files against target system (on target VPN)
-        4 - UPLOAD results to a central repository (on "Transcend" VPN)
-
-    More detail on each step is available via help() per step function below.
-    The only initial requirement is Python 3.6 or higher, and access /login to
-    the required Teradata systems.
-
-    GETTING STARTED:
-    From a command line:
-      pip install tdcsm
-
-    To pickup the most recent updates, it is recommended you
-      pip install tdcsm --upgrade
-
-    EXAMPLE USAGE:
-    The entire process, at it's simpliest, looks like  this:
-      python
-      >>> from tdcsm.tdcoa import tdcoa
-      >>> c = tdcoa()
-      >>> c.download_files()
-      >>> c.prepare_sql()
-      >>> c.execute_run()          # target system VPN
-      >>> c.upload_to_transcend()  # transcend VPN
-    """
 
     # paths
     approot = '.'
@@ -60,7 +31,7 @@ class tdcoa:
     systemspath = ''
     filesetpath = ''
     outputpath = ''
-    version = "0.3.9.7.9"
+    version = "0.4.0.0.1"
     skip_dbs = False    # skip ALL dbs connections / executions
     manual_run = False  # skip dbs executions in execute_run() but not upload_to_transcend()
                         # also skips /*{{save:}}*/ special command
@@ -130,8 +101,7 @@ class tdcoa:
         fh.close()
         self.utils.log('Updated the Sourcesystem yaml file with all the fileset entries in the filesets.yaml file')
 
-
-    def reload_config(self, configpath='', secretpath='', systemspath='', refresh_defaults=False, skip_dbs=False):
+    def reload_config(self, configpath='', secretpath='', systemspath='', refresh_defaults=False, skip_dbs=False, skip_git=False):
         """Reloads configuration YAML files (config & secrets) used as
         process driver.  This will also perform any local environment checks,
         such as creating missing folders (download|sql|run|output), change
@@ -301,12 +271,12 @@ class tdcoa:
             self.settings['localfilesets'] = os.path.join(self.folders['download'], 'filesets.yaml')
         self.filesetpath = os.path.join(self.approot, self.settings['localfilesets'])
 
-        # download filesets.yaml every instantiation (now that download folder exists)
-        if os.path.isfile(self.filesetpath):
-            try:
-                os.remove(self.filesetpath)
-            except FileNotFoundError as e:
-                pass
+        # # download filesets.yaml every instantiation (now that download folder exists)
+        # if os.path.isfile(self.filesetpath):
+        #     try:
+        #         os.remove(self.filesetpath)
+        #     except FileNotFoundError as e:
+        #         pass
 
         githost = self.settings['githost']
         if githost[-1:] != '/':
@@ -315,12 +285,19 @@ class tdcoa:
         giturl = githost + self.settings['gitfileset']
         self.utils.log('downloading "filesets.yaml" from github')
         self.utils.log('  requesting url', giturl)
-        filecontent = requests.get(giturl).content.decode('utf-8')
-        savepath = os.path.join(self.approot, self.settings['localfilesets'])
-        self.utils.log('saving filesets.yaml', savepath)
-        with open(savepath, 'w') as fh:
-            fh.write(filecontent)
-        self.utils.log('filesets.yaml saved')
+        if skip_git:
+            self.utils.log('filesets.yaml download skipped, using cached local copy', warning=True)
+        else:
+            try:
+                filecontent = requests.get(giturl).content.decode('utf-8')
+                savepath = os.path.join(self.approot, self.settings['localfilesets'])
+                self.utils.log('saving filesets.yaml', savepath)
+                with open(savepath, 'w') as fh:
+                    fh.write(filecontent)
+                    self.utils.log('filesets.yaml saved')
+            except Exception as ex:
+                self.utils.log('filesets.yaml could not be downloaded, using cached local copy', warning=True)
+                self.utils.log('Error: %s' %str(ex), indent=2)
 
         # load filesets dictionary (active only)
         self.utils.log('loading dictionary', 'filesets (active only)')
@@ -365,6 +342,17 @@ class tdcoa:
         self.utils.log('done!')
         self.utils.log('time', str(dt.datetime.now()))
 
+        self.bteq_sep = '|'
+        bp=[]
+        bp.append('---------------------------------------------------------------------')
+        bp.append('--- add credentials below, all else should run & export automatically')
+        bp.append('.SET MAXERROR 1')
+        bp.append('.logon host/username,password')
+        bp.append('.titledashes off')
+        bp.append(".separator '%s'" %self.bteq_sep)
+        bp.append('.width 1048575')
+        bp.append('---------------------------------------------------------------------')
+        self.bteq_prefix = '\n'.join(bp)
 
     def download_files(self, motd=True):
         self.utils.log('download_files started', header=True)
@@ -487,9 +475,6 @@ class tdcoa:
         self.utils.log('\ndone!')
         self.utils.log('time', str(dt.datetime.now()))
 
-        # self.copy_download_to_sql()  #<-- moved to the beginning of prepare_sql()
-        #   otherwise, changes to sql in 1_download can never perpetuate downstream
-
     def copy_download_to_sql(self, overwrite=False):
         self.utils.log('copy_download_to_sql started', header=True)
         self.utils.log('copy files from download folder (by fileset) to sql folder (by system)')
@@ -544,7 +529,6 @@ class tdcoa:
 
         self.utils.log('\ndone!')
         self.utils.log('time', str(dt.datetime.now()))
-
 
     def apply_override(self, override_folder='', target_folder=''):
         self.utils.log('applying file override')
@@ -616,7 +600,6 @@ class tdcoa:
         if reloadconfig:
             self.reload_config()
         self.utils.log('\napply override complete!')
-
 
     def prepare_sql(self, sqlfolder='', override_folder=''):
         self.copy_download_to_sql()  # moved from end of download_files() to here
@@ -860,7 +843,6 @@ class tdcoa:
         self.utils.log('done!')
         self.utils.log('time', str(dt.datetime.now()))
 
-
     def archive_prepared_sql(self, name=''):
         """Manually archives (moves) all folders / files in the 'run' folder, where
         prepared sql is stored after the prepare_sql() function.  This includes the
@@ -900,17 +882,21 @@ class tdcoa:
         self.utils.log('done!')
         self.utils.log('time', str(dt.datetime.now()))
 
+    def make_output_folder(self, foldername='', make_hidden_file=False, indent=0):
+        # Build final folder name/path:
+        name = str(dt.datetime.now())[:-7].replace(' ', '_').replace(':', '').strip()
+        if foldername.strip() != '': name = '%s--%s' %(name, str(re.sub('[^0-9a-zA-Z]+', '_', foldername.strip())))
+        outputpath = os.path.join(self.approot, self.folders['output'], name)
+        self.utils.log('Defined output folder', outputpath)
+        if not os.path.exists(outputpath):  os.makedirs(outputpath)
 
-    def make_output_folder(self, name=''):
-        outputpath = os.path.join(self.approot, self.folders['output'],
-                                  str(dt.datetime.now())[:-7].replace(' ', '_').replace(':', ''))
-        if name.strip() != '':
-            name = '-%s' % str(re.sub('[^0-9a-zA-Z]+', '_', name.strip()))
-        outputpath = outputpath + name
-        os.makedirs(outputpath)
+        if make_hidden_file:
+            self.utils.log('save location of last-run output folder to hidden file', indent=indent)
+            with open(os.path.join(self.approot, '.last_run_output_path.txt'), 'w') as lastoutput:
+                # relative path in case of system change (i.e. switching laptops)
+                lastoutput.write(outputpath[outputpath.find(self.folders['output']):])
 
         return outputpath
-
 
     def execute_run(self, name=''):
         self.utils.log('execute_run started', header=True)
@@ -1074,11 +1060,13 @@ class tdcoa:
                                                         self.utils.log('Vis file complete!')
 
                                                 if 'pptx' in sqlcmd:  # insert to pptx file
+                                                    from .pptx import replace_placeholders
+
                                                     self.utils.log('\npptx cmd', 'found')
-                                                    pptx_file = os.path.join(workpath, sqlcmd['pptx'])
-                                                    self.utils.log('pptx file', pptx_file)
+                                                    pptx_file = Path(workpath) / sqlcmd['pptx']
+                                                    self.utils.log('pptx file', str(pptx_file))
                                                     self.utils.log('inserting to pptx file..')
-                                                    self.utils.insert_to_pptx(pptx_file, workpath)
+                                                    replace_placeholders(pptx_file, Path(workpath))
                                                     self.utils.log('pptx file complete!')
 
                                                 if 'load' in sqlcmd:  # add to manifest
@@ -1485,11 +1473,13 @@ class tdcoa:
                                                         self.utils.log('Vis file complete!')
 
                                                 if 'pptx' in sqlcmd:  # insert to pptx file
+                                                    from .pptx import replace_placeholders
+
                                                     self.utils.log('\npptx cmd', 'found')
-                                                    pptx_file = os.path.join(workpath, sqlcmd['pptx'])
-                                                    self.utils.log('pptx file', pptx_file)
+                                                    pptx_file = Path(workpath) / sqlcmd['pptx']
+                                                    self.utils.log('pptx file', str(pptx_file))
                                                     self.utils.log('inserting to pptx file..')
-                                                    self.utils.insert_to_pptx(pptx_file, workpath)
+                                                    replace_placeholders(pptx_file, Path(workpath))
                                                     self.utils.log('pptx file complete!')
 
 
@@ -1566,11 +1556,11 @@ class tdcoa:
         os.rename(os.path.join(runpath,'runlog.txt'),os.path.join(runpath,'prepare_sql_runlog.txt'))
         shutil.move(os.path.join(runpath,'prepare_sql_runlog.txt'), outputpath)
 
-
     def make_customer_files(self, name=''):
         self.utils.log('make_customer_files started', header=True)
         self.utils.log('time', str(dt.datetime.now()))
 
+        self.bteq_prefix
         # at this point, we make the assumption that everything in the "run" directory is valid
 
         # make output directory for execution output and other collateral
@@ -1736,7 +1726,6 @@ class tdcoa:
         runlogdst = os.path.join(outputpath, 'runlog.txt')
         shutil.move(runlogsrc, runlogdst)
         self.utils.log('make_customer_files Completed', header=True)
-
 
     def upload_to_transcend(self, _outputpath=''):
         self.utils.bufferlogs = True
@@ -1925,6 +1914,12 @@ class tdcoa:
         self.utils.log('\ndone!')
         self.utils.log('time', str(dt.datetime.now()))
 
+    def deactivate_all(self):
+        """Sets all systems and system-filesets to False"""
+        for sysname, sysobject  in  self.systems.items():
+            sysobject['active'] = 'False'
+            for setname, setobject in  sysobject['filesets'].items():
+                setobject['active'] = 'False'
 
     def display_motd(self):
         webbrowser.open(self.motd_url)
@@ -1991,3 +1986,352 @@ class tdcoa:
         tmp.append('        startdate:  "Current_Date - 45"')
         tmp.append('        enddate:    "Current_Date - 1"')
         return '\n'.join(tmp)
+
+# ------------- everything below here is new /
+# ------------- trying to reduce repetitive "file iteration" code
+    def make_customer_files2(self, name=''):
+        self.utils.log('generating manual customer files', header=True)
+        info = os.path.join(self.approot, self.folders['run'])
+        outfo = self.make_output_folder('assisted_run', make_hidden_file=True)
+
+        self.iterate_coa('generate bteq file',       info, outfo, {'all_make_bteq': self.coasql_assist_bteq}, file_filter_regex="\.coa\.sql$", sqlfile=True)
+        self.iterate_coa('move run files to output', info, outfo, {'move_files': self.coafile_move})  # default is all files, sqlfile=False
+        self.iterate_coa('combine .coa files',      outfo, outfo, {'combine_files': self.coafile_combine},    file_filter_regex="\.coa\.(bteq|sql)$")
+
+    def process_return_data2(self, folderpath):
+        self.utils.log('processing completed run files: %s' %folderpath, header=True)
+        info = outfo = folderpath
+
+        funcs = {'convert_psv_to_csv': self.coafile_convert_psv2csv}
+        self.iterate_coa('convert any psv to csv', info, outfo, funcs, file_filter_regex="\.(csv|psv)$")
+
+        funcs = {'delete_json_manifests': self.coafile_delete}
+        self.iterate_coa('remove any json manifests', info, outfo, funcs, file_filter_regex="manifest\.json$")
+
+        funcs = {'vis':  self.coasql_visualize,
+                 'pptx': self.coasql_pptx,
+                 'load': self.coasql_make_uploadmanifest}
+        self.iterate_coa('process special commands', info, outfo, funcs, file_filter_regex="\.coa\.sql$", sqlfile=True)
+
+# ------------- iteration engine:
+    def iterate_coa(self, proc_name='', folderpath_in='', folderpath_out='', functions={'do nothing': lambda *args: args[0]}, file_filter_regex='(.*?)', sqlfile=False):
+        """iterate the folder_in path, recursively, pattern match files, and execute supplied function.
+        """
+
+        # define fully qualified in/out paths (well, down to approot level)
+        self.utils.log('iteration started!', proc_name, header=True)
+        fin  = folderpath_in  if folderpath_in  !='' else os.path.join(self.approot, self.folders['run'])
+        fout = folderpath_out if folderpath_out !='' else fin
+        self.utils.log('folder in:  %s' %fin, '\nfolder out: %s' %fout)
+        self.utils.log('regex qualifier for files: %s' %file_filter_regex)
+        self.utils.log('%i functions to be applied at %s level %s' %(len(functions), 'SQL' if sqlfile else 'FILE', tuple(functions.keys()) ))
+
+
+        # iterate all subfolders and files (aka /fin/System/FileSet)
+        self.utils.log('\nfiles:')
+
+        for root, dirs, files in os.walk(fin):
+            for filename in sorted(files):
+                ind = 2
+                srcpath = os.path.join(root, filename)
+                dstpath = os.path.join(root.replace(fin,fout), filename)
+                fileset = os.path.dirname(srcpath).split(os.sep)[-1]
+                system  = os.path.dirname(srcpath).split(os.sep)[-2]
+                if system not in self.systems: break  # must be in a real system
+                self.utils.log('%s' %filename, indent=ind)
+                ind += 2
+
+                # only process if files match supplied regex pattern:
+                if len(re.findall(file_filter_regex, srcpath)) == 0:   # NOT FOUND
+                    self.utils.log('filter NOT satisfied', file_filter_regex, indent=ind)
+                else:  # FOUND:
+                    self.utils.log('filter IS satisfied', file_filter_regex, indent=ind)
+                    self.utils.log('filepath in',  srcpath, indent=ind)
+                    self.utils.log('filepath out', dstpath, indent=ind)
+
+                    # create dest folder if missing:
+                    if not os.path.exists(os.path.dirname(dstpath)):
+                        self.utils.log('creating filepath out', os.path.dirname(dstpath), indent=ind)
+                        os.makedirs(os.path.dirname(dstpath))
+
+                    # throw a few assumptions in the trunk, and let's go!
+                    trunk = {'filepath_in':srcpath, 'filepath_out':dstpath, 'filename':filename,
+                             'folderpath_in':os.path.dirname(srcpath), 'folderpath_out':os.path.dirname(dstpath),
+                             'fileset':fileset, 'system':system, 'index':0, 'phase':'execute', 'postwork':{}, 'sql':{}}
+
+                    # EXECUTE functions against entire file:
+                    if not sqlfile:
+                        for nm, func in functions.items():
+                            trunk['function_name'] = nm
+                            trunk['log_indent'] = ind
+                            trunk = func(trunk)
+                            self.utils.log('done!', indent=ind)
+
+                    # Split sqlfile on ';' and EXECUTE function against each sql statement
+                    elif sqlfile:
+                        with open(srcpath, 'r') as fh:
+                            sqls_text = fh.read()
+                        sqls = sqls_text.split(";")
+                        self.utils.log('sql file contains %i statements' %len(sqls), indent=ind)
+                        trunk['sql'] = {}
+                        trunk['index'] = 0
+                        trunk['phase'] = 'execute'
+
+                        # iterate sqls
+                        for sql in sqls:
+                            trunk['index'] +=1
+                            self.utils.log('processing sql #%i' %trunk['index'], indent=6)
+                            ind=8
+                            trunk['special_commands'] = self.utils.get_special_commands(sql, indent=ind)
+                            trunk['sql']['original'] = sql
+                            trunk['sql']['formatted'] = self.utils.format_sql(sql)
+                            trunk['sql']['special_command_out'] = trunk['special_commands']['sql']
+                            trunk['log_indent'] = ind+2
+
+                            # for any "all" functions, or any special commands, execute:
+                            for name, func in functions.items():
+                                if name in trunk['special_commands'] or name[:3]=='all':
+                                    trunk['function_name'] = name
+                                    self.utils.log('qualifies for function: %s' %name, indent=ind)
+                                    trunk = func(trunk)
+
+                        # post work per file -- added to the trunk as needed by above func()
+                        trunk['phase'] = 'postwork'
+                        for postname, postfunc in trunk['postwork'].items():
+                            trunk = postfunc(trunk)
+
+# ------------- subprocesses designed to be plugged into the above engine
+    def coasql_do_nothing(self, trunk):
+        """literally, does nothing.  just a stub for testing/future work."""
+        self.utils.log('subfunction called', trunk['function_name'], indent=trunk['log_indent'])
+        return trunk
+
+    def coafile_combine(self, trunk):
+        """Combines all files supplied into one master file, by extension type.
+        i.e., all .sql files will be one file, all .bteq files another.
+        Combined master file will be named "!System_Fileset.ext"
+        Note: special handling exists for bteq files, to ensure only one "bteq_prefix"
+        section exists per master file, regardless of how many sub-bteq files there are"""
+        self.utils.log('subfunction called', trunk['function_name'], indent=trunk['log_indent'])
+
+        fileext = str(trunk['filepath_in'].split('.')[-1]).lower().strip()
+        combinedfile = '!_%s_%s.combined.%s' %(trunk['system'], trunk['fileset'], fileext)
+        combinedpath = os.path.join(trunk['folderpath_out'], combinedfile)
+        combinedtext = ''
+
+        self.utils.log('reading file content %s into file %s' %(trunk['filename'], combinedfile), indent=trunk['log_indent'])
+        with open(trunk['filepath_in'], 'r') as fh:
+            filetext =  fh.read()
+
+        # determine if file is BTEQ, and if so, ensure only one logon credential on top:
+        if self.bteq_prefix in filetext or fileext in ['btq','bteq']:
+            filetext = filetext.replace(self.bteq_prefix, '')
+
+            if not os.path.isfile(combinedpath):
+                with open(combinedpath, 'w') as fh:
+                    fh.write(self.bteq_prefix)
+
+        # at this point, filetype doesn't matter... always append to master
+        with open(combinedpath, 'a') as fh:
+            fh.write(filetext)
+
+        return trunk
+
+    def coafile_move(self, trunk):
+        self.utils.log('subfunction called', trunk['function_name'], indent=trunk['log_indent'])
+        shutil.move(trunk['filepath_in'], trunk['filepath_out'])
+        self.utils.log('file moved from', trunk['filepath_in'], indent=trunk['log_indent']+2)
+        self.utils.log('file moved to',  trunk['filepath_out'], indent=trunk['log_indent']+2)
+        trunk['filepath_in'] = trunk['filepath_out']
+        return trunk
+
+    def coafile_delete(self, trunk):
+        self.utils.log('subfunction called', trunk['function_name'], indent=trunk['log_indent'])
+        try:
+            self.utils.log('deleting file', trunk['filepath_in'], indent=trunk['log_indent']+2)
+            os.remove(trunk['filepath_in'])
+            self.utils.log('file deleted ', trunk['filepath_in'], indent=trunk['log_indent']+2)
+        except Exception as ex:
+            self.utils.log(ex, error=True, indent=trunk['log_indent']+2)
+        return trunk
+
+    def coafile_convert_psv2csv(self, trunk):
+        """Tests csv files for pipe-delimited (for bteq), and if true, convert to comma delimited"""
+        self.utils.log('subfunction called', trunk['function_name'], indent=trunk['log_indent'])
+
+        # open file and determine whether .csv or .psv:
+        self.utils.log('opening file', trunk['filepath_in'], indent=trunk['log_indent']+2)
+        filetext = open(trunk['filepath_in'],'r').read()
+        sep = ',' if filetext.count(',') > filetext.count('|') else '|'
+        filetext = None # be kind
+        self.utils.log('file delimiter determined as', sep, indent=trunk['log_indent']+4)
+
+        if sep != ',':
+            df = pd.read_csv(trunk['filepath_in'], sep=sep)
+            df = df.applymap(lambda x: x.strip() if isinstance(x, str) else x) # trim whitespace from data
+            df = df.rename(columns=lambda x: x.strip()) # trim whitespace from column headers
+            df = df.where(pd.notnull(df), None) # handle nulls
+            self.utils.log('records found', str(len(df)), indent=trunk['log_indent']+4)
+            self.utils.log('columns', str(list(df.columns)), indent=trunk['log_indent']+4)
+            if trunk['filepath_in'][-4:] == '.psv': trunk['filepath_in'] = trunk['filepath_in'][-4:] + '.csv'
+            df.to_csv(trunk['filepath_in'], quotechar='"', quoting=csv.QUOTE_NONNUMERIC)
+            self.utils.log('file converted to .csv', indent=trunk['log_indent']+4)
+        else:
+            self.utils.log('file already .csv, no change', indent=trunk['log_indent']+4)
+
+        return trunk
+
+    def coasql_assist_bteq(self, trunk):
+        """turns sql into bteq commands.  If trunk['phase']=='postwork' the processed
+        will add prefix/suffix commands and save the .coa.bteq file."""
+        self.utils.log('subfunction called', trunk['function_name'], indent=trunk['log_indent'])
+        if 'bteq_sql' not in trunk: trunk['bteq_sql'] = []
+
+        if trunk['phase'] == 'postwork':
+            # wrap bteq with begin/end logic, and save file:
+            trunk['bteq_sql'].insert(0, '-----> file: %s \n' %os.path.basename(trunk['filepath_in']) )
+            trunk['bteq_sql'].insert(0, self.bteq_prefix)
+            trunk['bteq_sql'].append('.export reset')
+            trunk['bteq_filepath'] = trunk['filepath_out'].replace('.coa.sql','.coa.bteq')
+            self.utils.log('file complete, saving...', trunk['bteq_filepath'], indent=trunk['log_indent'])
+            with open(trunk['bteq_filepath'], 'w') as fh:
+                fh.write('\n\n'.join(trunk['bteq_sql']))
+            self.utils.log('complete!', indent=trunk['log_indent'])
+
+        else: # still processing sql statements:
+            self.utils.log('translating to bteq...', indent=trunk['log_indent'])
+            if 'save' in trunk['special_commands']:
+                trunk['bteq_sql'].append('.export reset')
+                trunk['bteq_sql'].append('.export report file="%s" , close' %str(trunk['special_commands']['save']))
+                self.utils.log('adding export commands', indent=trunk['log_indent'])
+
+            trunk['bteq_sql'].append(trunk['sql']['formatted'])
+
+        # register postwork function, so this is called after file is complete
+        trunk['postwork']['assist_bteq'] = self.coasql_assist_bteq
+        return trunk
+
+    def coasql_visualize(self, trunk):
+        """runs any external python script, specifically for visualizations"""
+        self.utils.log('subfunction called', trunk['function_name'], indent=trunk['log_indent'])
+        pypath = os.path.join(trunk['folderpath_in'], trunk['special_commands']['vis'].replace('.csv','.py'))
+        self.utils.log('executing visualization', indent=trunk['log_indent']+2)
+        self.utils.log('on file', trunk['special_commands']['vis'], indent=trunk['log_indent']+4)
+        self.utils.log('using script', pypath, indent=trunk['log_indent']+4)
+        os.system('%s %s' %(self.settings['python_call'], pypath))
+        return trunk
+
+    def coasql_pptx(self, trunk):
+        """process any visualizations"""
+        self.utils.log('subfunction called', trunk['function_name'], indent=trunk['log_indent'])
+        pptxpath = os.path.join(trunk['folderpath_in'], trunk['special_commands']['pptx'])
+        self.utils.log('performing powerpoint substitutions on %s' %pptxpath, indent=trunk['log_indent']+2)
+        self.utils.insert_to_pptx(pptxpath, trunk['folderpath_in'])
+        return trunk
+
+    def coasql_make_uploadmanifest(self, trunk):
+        """creates upload_manifest.json (hopefully a legacy process soon)"""
+        self.utils.log('subfunction called', 'make upload manifest', indent=trunk['log_indent'])
+        s = l = c = ''
+        umfile = 'upload-manifest.json'
+        umpath = os.path.join(trunk['folderpath_out'], umfile)
+
+        # POSTWORK: perform all substitutions (file level)
+        if trunk['phase'] == 'postwork':
+            subs = [self.transcend, self.substitutions, self.settings, self.systems[trunk['system']], self.filesets[trunk['fileset']], self.systems[trunk['system']]['filesets'][trunk['fileset']] ]
+
+            self.utils.log('applying substitutions to upload manifest file', indent=trunk['log_indent']+4)
+            with open(umpath, 'r+') as fh:
+                umtext = fh.read()
+                for sub in subs:
+                    umtext = self.utils.substitute(umtext, sub)
+                fh.seek(0)
+                fh.write(umtext)
+                fh.truncate()
+
+        else: # not post-work, (per sql level):
+            if 'save' in trunk['special_commands']: s = trunk['special_commands']['save']
+            if 'load' in trunk['special_commands']: l = trunk['special_commands']['load']
+            if 'call' in trunk['special_commands']: c = trunk['special_commands']['call']
+            line = '\n{ "file": "%s",\n  "table": "%s",\n  "call": "%s"}' %(s,l,c)
+
+            # no file = new run = lay in preable + line
+            if not os.path.isfile(umpath):
+                with open(umpath, 'w') as fh:
+                    fh.write('{"entries":[\n %s \n]}' %line)
+                self.utils.log('created new upload manifest file', indent=trunk['log_indent']+4)
+
+            else: # file exists, just add comma + line (json close happens in postwork)
+                with open(umpath, 'r') as fh:
+                    lines = fh.readlines()
+                if lines[-1].strip() == ']}': lines = lines[:-1]
+                lines.append(',' + line)
+                lines.append('\n]}')
+                with open(umpath, 'w') as fh:
+                    fh.write(''.join(lines))
+
+            self.utils.log('added to upload manifest', line.replace('\n',''), indent=trunk['log_indent']+4)
+            trunk['postwork']['upload_manifest'] = self.coasql_make_uploadmanifest # register for postwork
+        return trunk
+
+
+
+
+
+# ------------- subprocesses - stubs and partial work
+    def coasql_upload(self, trunk):
+        """process any visualizations"""
+        self.utils.log('subfunction called', trunk['function_name'], indent=trunk['log_indent'])
+        return trunk
+
+    def coasql_execute_sql(self, trunk):
+        self.utils.log('subfunction called', trunk['function_name'], indent=trunk['log_indent'])
+        return trunk
+
+    def coasql_save_csv(self, trunk):
+        self.utils.log('subfunction called', trunk['function_name'], indent=trunk['log_indent'])
+        return trunk
+
+    def coasql_load(self, trunk):
+        """when handed a sql statement that qualifes for loading, loads to Transcend."""
+        self.utils.log('subfunction called', trunk['function_name'], indent=trunk['log_indent'])
+
+        # find name of .csv to load:
+        csvfilepath = os.path.join(trunk['folderpath_in'], trunk['special_commands']['save'])
+        self.utils.log('csvfile',csvfilepath, indent=trunk['log_indent'])
+        if not os.path.isfile(csvfile):
+            self.utils.log('cannot find file', csvfilepath, warning=True)
+            return trunk
+
+        # build connection object
+        if 'connection' not in trunk or trunk['connection'] is None:
+            trunk['connection'] = self.utils.open_connection(
+                conntype=self.systems[trunk['system']]['driver'],
+                encryption=self.systems[trunk['system']]['encryption'],
+                system=self.systems[trunk['system']],
+                skip = skip_dbs)  # <------------------------------- Connect to the database
+
+        self.utils.log('UPLOADING file', os.path.basename(csvfilepath), indent=trunk['log_indent']+2)
+        self.utils.log('     TO system', trunk['system'], indent=trunk['log_indent']+2)
+
+        # open csv as dataframe
+        dfcsv = pd.read_csv(csvfilepath)
+        dfcsv = dfcsv.where(pd.notnull(dfcsv), None)
+        self.utils.log('records found', str(len(dfcsv)))
+
+        # strip out any unnamed columns
+        for col in dfcsv.columns:
+            if col[:8] == 'Unnamed:':
+                self.utils.log('unnamed column dropped', col)
+                self.utils.log('  (usually the pandas index as a column, "Unnamed: 0")')
+                dfcsv = dfcsv.drop(columns=[col])
+        self.utils.log('final column count', str(len(dfcsv.columns)))
+
+
+
+
+        return trunk
+
+    def coasql_call(self, trunk):
+        self.utils.log('subfunction called', trunk['function_name'], indent=trunk['log_indent'])
+        return trunk
