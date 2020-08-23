@@ -9,7 +9,7 @@ import tdcsm
 
 class coa():
 
-    version = "0.3.9.8.0"
+    version = "0.4.0.0.1"
     debug = False
 
     entryvars = {}
@@ -24,6 +24,8 @@ class coa():
     approot = ''
     secrets = ''
     motd = False
+    skip_git = False
+    show_hidden_filesets = False
 
 
     def __init__(self, approot='', secrets=''):
@@ -200,27 +202,48 @@ class coa():
         print( split_dict(pets, delim_key='active'))
             {'True': {  'spot': {'active': 'True', 'type': 'dog'},
                         'jane': {'active': 'True', 'type': 'cat'}},
-             'False': { 'lucky': {'active': 'False', 'type': 'cat', 'legs': '3'}}}
+             'False': { 'lucky': {'active': 'False', 'type': 'cat', 'legs': '3'
+                                  ,'fleas':{'bobby': {'active':'False'},
+                                            'susie': {'active':'False'},
+                                            'bitey': {'active':'True'} }}}}
 
         print('By type key')
         print( split_dict(pets, delim_key='type'))
-            {'dog': {   'spot': {'active': 'True', 'type': 'dog'}},
-             'cat': {   'jane': {'active': 'True', 'type': 'cat'},
-                        'lucky': {'active': 'False', 'type': 'cat', 'legs': '3'}}}
+            {'dog': {  'spot': {'active': 'True', 'type': 'dog'}},
+             'cat': {  'jane': {'active': 'True', 'type': 'cat'},
+                       'lucky': {'active': 'False', 'type': 'cat', 'legs': '3'
+                                  ,'fleas':{'bobby': {'active':'False'},
+                                            'susie': {'active':'False'},
+                                            'bitey': {'active':'True'} }}}}
 
         # can also add default values, if delim_key is not found:
         print('By leg count, with default')
         print( split_dict(pets, delim_key='legs', default='4' ))
-            {'1':   {   'spot': {'active': 'True', 'type': 'dog'}},
-             '0.5': {   'jane': {'active': 'True', 'type': 'cat'},
-                        'lucky': {'active': 'False', 'type': 'cat', 'legs': '3'}}}
+            {'4': {  'spot': {'active': 'True', 'type': 'dog'}
+                     'jane': {'active': 'True', 'type': 'cat'}},
+             '3': {  'lucky': {'active': 'False', 'type': 'cat', 'legs': '3'
+                               ,'fleas':{'bobby': {'active':'False'},
+                                         'susie': {'active':'False'},
+                                         'bitey': {'active':'True'} }}}}
 
         # can also use child dictionaries, instead of supplied dictionary:
         print('For fleas sub-dictionary, if found')
-        print( split_dict(pets, delim_key='active', use_subdict='fleas' ))
-            {'1':   {   'spot': {'active': 'True', 'type': 'dog'}},
-             '0.5': {   'jane': {'active': 'True', 'type': 'cat'},
-                        'lucky': {'active': 'False', 'type': 'cat', 'legs': '3'}}}
+        print( split_dict(pets, delim_key='active', use_subdict='fleas', default='False'))
+            {'False': { 'bobby': {'active': 'False'},
+                        'susie': {'active': 'False'}},
+             'True':  { 'bitey': {'active': 'True'}}}
+
+        # can also gaurantee keys in the return set, even if there is no data:
+        print('ensure you always have 4 pet types, even if empty')
+        print( split_dict(pets, delim_key='type', addifmissing=['cat','dog','bird','gerbil']))
+            {'dog': {  'spot': {'active': 'True', 'type': 'dog'}},
+             'cat': {  'jane': {'active': 'True', 'type': 'cat'},
+                       'lucky': {'active': 'False', 'type': 'cat', 'legs': '3'
+                                  ,'fleas':{'bobby': {'active':'False'},
+                                            'susie': {'active':'False'},
+                                            'bitey': {'active':'True'} }}}
+             'bird': {}
+             'gerbil': {} }
         """
         rtn = {}
 
@@ -361,20 +384,27 @@ class coa():
                     self.entryvars[nm].insert('','end',text=str(itm))
 
     def upload_get_lastrun_folder (self, lastrunfile='.last_run_output_path.txt'):
-        lastrunfile = os.path.join(self.entryvar('approot'), lastrunfile)
-        if os.path.exists(lastrunfile):
-            print('FOUND', lastrunfile)
-            with open(lastrunfile,'r') as fh:
-                outputfo = str(fh.read())
-            print(outputfo)
-            lastrunfolder = os.path.join(self.entryvar('approot'), outputfo)
-            print(lastrunfolder)
-            if os.path.exists(lastrunfolder):
-                if  'last_output_folder' in self.entryvars:
-                    self.entryvars['last_output_folder'].set(outputfo)
-                return outputfo
-        print('NOT FOUND:', lastrunfile)
-        return '<missing>'
+        lastrunfilepath = os.path.join(self.entryvar('approot'), lastrunfile)
+        print("updating 'Output Folder' textbox...")
+        # open up breadcrumb file, extract folder location, and return if exists
+        if os.path.exists(lastrunfilepath):
+            print('breadcrumb found:', lastrunfilepath)
+            with open(lastrunfilepath,'r') as fh:
+                lastrunfolder = str(fh.read())
+            lastrunpath = os.path.join(self.entryvar('approot'), lastrunfolder)
+
+        # if above breadcrumb method fails, default to the most recent output folder found
+        if not os.path.exists(lastrunpath):
+            outputdir = sorted(os.listdir(os.path.join(self.entryvar('approot'), self.coa.folders['output'])))
+            print('breadcrumb not valid, retrieving most recent dated folder:', outputdir[-1])
+            lastrunfolder = 'empty_folder' if len(outputdir)==0 else outputdir[-1]
+            lastrunfolder = os.path.join(self.coa.folders['output'], lastrunfolder)
+            lastrunpath = os.path.join(self.entryvar('approot'), lastrunfolder)
+            if not os.path.exists(lastrunpath): os.makedirs(lastrunpath) # just in case the entire output folder is empty
+
+        print('output folder assigned:', lastrunpath)
+        self.entryvars['last_output_folder'].set(lastrunfolder)
+        return lastrunpath
 
     def toggle_all_chk_normalrun(self):
         ev = self.entryvars
@@ -491,7 +521,7 @@ class coa():
                 self.coa.secretpath   = os.path.join(self.coa.approot, self.entryvar('secrets'))
                 self.coa.systemspath  = os.path.join(self.coa.approot, self.entryvar('systems'))
                 self.coa.filesetpath  = os.path.join(self.coa.approot, self.entryvar('filesets'))
-                self.coa.reload_config(skip_dbs=self.skip_dbs())
+                self.coa.reload_config(skip_dbs=self.skip_dbs(), skip_git=self.skip_git)
                 print('approot: ', self.coa.approot)
                 print('config: ', self.coa.configpath)
                 print('secret: ', self.coa.secretpath)
@@ -499,6 +529,7 @@ class coa():
                 print('fileset: ', self.coa.filesetpath)
                 self.coa.deactivate_all()
                 self.entryvars['skip_dbs_toggle'].set(value=self.validate_boolean(self.coa.settings['skip_dbs'],'int'))
+                self.upload_get_lastrun_folder()
                 self.button_click('tv_systems_left') # this 'click' will refresh both left and right treeviews
                 self.button_click('tv_filesets_left')
             elif name == 'approot':
@@ -513,12 +544,13 @@ class coa():
                 self.coa.execute_run()
                 self.upload_get_lastrun_folder()
             elif name == 'make_customer_files':
-                self.upload_get_lastrun_folder()
                 self.coa.make_customer_files2()
                 self.upload_get_lastrun_folder()
             elif name == 'process_data':
-                print('SORRY, THIS IS NOT IMPLEMENTED YET')
+                self.coa.process_return_data2(os.path.join(self.coa.approot, self.entryvar('last_output_folder')))
             elif name == 'upload_to_transcend':
+                with open(os.path.join(self.entryvar('approot'), '.last_run_output_path.txt'), 'w') as fh:
+                    fh.write(self.entryvar('last_output_folder'))
                 self.coa.upload_to_transcend()
             elif name == 'motd':
                 self.coa.display_motd()
@@ -538,20 +570,20 @@ class coa():
                 self.open_text_file(kwargs['entrytext'], self.entryvar('approot'))
             elif name in ['tv_systems_left','tv_systems_right','tv_systems_assisted_left','tv_systems_assisted_right']:
                 if 'selected' in kwargs.keys(): # if item was "selected" kwargs will return which item (else refresh without change)
-                    active = 'True'
-                    if name[-4:] == 'left':  active = 'False'
+                    active = 'False' if name[-4:] == 'left' else 'True'
                     self.coa.systems[kwargs['selected']]['active'] = active
                 d = self.split_dict(self.coa.systems, 'active', default='True', addifmissing=['True','False'])
                 self.reload_Tx2('systems', leftlist = d['True'].keys(), rightlist = d['False'].keys())
                 self.reload_Tx2('systems_assisted', leftlist = d['True'].keys(), rightlist = d['False'].keys())
             elif name in ['tv_filesets_left','tv_filesets_right','tv_filesets_assisted_left','tv_filesets_assisted_right']:
                 if 'selected' in kwargs.keys():  # if item was "selected" kwargs will return which item (else refresh without change)
-                    active = 'True'
-                    if name[-4:] == 'left':  active = 'False'
+                    active = 'False' if name[-4:] == 'left' else 'True'
                     for system in self.coa.systems.keys():  # iterate thru all systems, to update the right system.fileset object
                         self.coa.systems[system]['filesets'][kwargs['selected']]['active'] = active
                 d = self.split_dict(self.coa.systems, 'active', 'filesets', default='True', addifmissing=['True','False'])
                 if 'gui_show_dev_filesets' in self.coa.settings and self.coa.settings['gui_show_dev_filesets'] == 'True':
+                    exclude = []
+                elif self.show_hidden_filesets:
                     exclude = []
                 else:
                     exclude = self.split_dict(self.coa.filesets, 'show_in_gui', default='True' )['False'].keys()
@@ -559,6 +591,10 @@ class coa():
                 self.reload_Tx2('filesets_assisted', leftlist = d['True'].keys(), rightlist = d['False'].keys(), exclude=exclude)
             elif name == 'skip_dbs_toggle':
                 self.coa.settings['skip_dbs'] = bool(kwargs['state'] == 1)
+            elif name == 'skip_git_toggle':
+                self.skip_git = bool(kwargs['state'] == 1)
+            elif name == 'show_hiddenfilesets_toggle':
+                self.show_hidden_filesets = bool(kwargs['state'] == 1)
             elif name == 'print_systems':
                 self.print_dict(self.coa.systems, 'systems', 0, self.coa.secrets)
             elif name == 'print_filesets':
@@ -567,8 +603,15 @@ class coa():
                 self.print_dict(self.coa.substitutions, 'substitutions', 0, self.coa.secrets)
                 self.print_dict(self.coa.transcend, 'transcend', 0, self.coa.secrets)
                 self.print_dict(self.coa.settings, 'settings', 0, self.coa.secrets)
+            elif name == 'print_entryvars':
+                for nm, obj in sorted(self.entryvars.items()):
+                    try:
+                        print('%s%s%s'  %(' ', str(nm+':').ljust(30), str(obj.get()) ))
+                    except Exception as err:
+                        pass # just skip things that don't print neatly
 
-        except Exception as err:   # TODO: I know, bad practice... if anything goes wrong, just reload_config() - fixes most issues
+
+        except Exception as err:   # TODO: I know, bad practice...
             print('\nERROR: \n%s\n' %str(err))
             #self.button_click('reload_config')
 
@@ -623,8 +666,15 @@ class coa():
 
         #-------------- TAB: CONFIG ------------------
         frmConfig       = Frame(tabConfig, padding=5, style="config-normal.TFrame"); frmConfig.pack(fill=BOTH, expand=True, anchor=N)
+        txt = []
+        txt.append("Welcome to the COA thick-client.  Use this tool to collect data from customer systems, generate visualizations and presentations, and upload datasets to Transcend for further analysis.")
+        txt.append("If you have DIRECT LOGIN ACCESS to your customer's system, use the NORMAL RUN tab.")
+        txt.append("If you DO NOT have login credentials to your customer's system, use the ASSISTED RUN tab.")
+        txt.append("All users should start by opening and editing the config files, found below.  For more help on file contents, please see our SharePoint User's Guide.")
+        Label(frmConfig, text='\n\n'.join(txt), style='config-bold.TLabel', wraplength=450, justify="left").pack(fill=X, anchor=N, pady=30)
+        Label(frmConfig, text='   Step 1: Check your Config Files:', style='config-bold.TLabel').pack(fill=X, anchor=N)
+
         frmConfigFiles  = Frame(frmConfig, padding=5, style="config-normal.TFrame"); frmConfigFiles.pack(fill=BOTH, expand=True, anchor=N)
-        Label(frmConfigFiles, text='   Step 1: Check your Config Files:', style='config-bold.TLabel').pack(fill=X, anchor=N)
         self.newframe_LEB(frmConfigFiles, labeltext=' AppRoot Path:', btntext='Open Folder', btn_width=10, btncommand='approot' , style='config-normal').pack(fill=X)
         self.newframe_LEB(frmConfigFiles, labeltext='  Config File:', btntext='Open File'  , btn_width=10, btncommand='config'  , style='config-normal').pack(fill=X)
         self.newframe_LEB(frmConfigFiles, labeltext=' Systems File:', btntext='Open File'  , btn_width=10, btncommand='systems' , style='config-normal').pack(fill=X)
@@ -693,14 +743,17 @@ class coa():
         #-------------- TAB: HELP ------------------
         frmHelp  = Frame(tabHelp, padding=5, style="help-normal.TFrame"); frmHelp.pack(fill=BOTH, expand=True, anchor=N)
         frmHelp_N  = Frame(frmHelp, padding=5, style="help-normal.TFrame"); frmHelp_N.pack(side=TOP, fill=BOTH, expand=True, anchor=N)
-        Label(frmHelp_N, text='MORE COMING SOON!', style='help-bold.TLabel').pack(fill=X, anchor=N)
+        Label(frmHelp_N, text='This page contains mostly debugging information right now... MORE COMING SOON!', style='help-bold.TLabel').pack(fill=X, anchor=N)
         frmHelp_E  = Frame(frmHelp, padding=5, style="help-normal.TFrame"); frmHelp_E.pack(side=RIGHT, fill=X, expand=False, anchor=E)
         self.newframe_LC(frmHelp_E, labeltext='Skip_DBS Flag (debugging)', checkcommand='skip_dbs_toggle', style='help-normal').pack(anchor=S)
+        self.newframe_LC(frmHelp_E, labeltext='Skip_Git Flag (debugging)', checkcommand='skip_git_toggle', style='help-normal').pack(anchor=S)
+        self.newframe_LC(frmHelp_E, labeltext='Show Hidden Filesets (debugging)', checkcommand='show_hiddenfilesets_toggle', style='help-normal').pack(anchor=S)
         frmHelp_W  = Frame(frmHelp, padding=5, style="help-normal.TFrame"); frmHelp_W.pack(side=LEFT, expand=False, anchor=W)
         Label(frmHelp_W, text='Print Dictionary:', style='help-bold.TLabel').pack(fill=X, anchor=N)
         self.newbutton(frmHelp_W, btntext = 'Systems',  btncommand='print_systems',  btnwidth=15, style = 'help-normal', side=TOP)
         self.newbutton(frmHelp_W, btntext = 'Config',   btncommand='print_config',   btnwidth=15, style = 'help-normal', side=TOP)
         self.newbutton(frmHelp_W, btntext = 'FileSets', btncommand='print_filesets', btnwidth=15, style = 'help-normal', side=TOP)
+        self.newbutton(frmHelp_W, btntext = 'GUI Elements', btncommand='print_entryvars', btnwidth=15, style = 'help-normal', side=TOP)
 
 
 
@@ -726,8 +779,11 @@ class coa():
         if secrets_from_default != secrets_from_settings:
             self.entryvars['secrets'].set(self.first_file_that_exists(secrets_from_settings, secrets_from_default))
             self.coa.secrets = self.entryvars['secrets'].get()
-            self.coa.reload_config()
+            self.coa.reload_config(skip_git = True)
             self.coa.deactivate_all()
+            self.button_click('tv_filesets_left')
+            self.button_click('tv_filesets_assisted_left')
+
         # sync skip_dbs flag with coa.settings
         self.entryvars['skip_dbs_toggle'].set(value=self.validate_boolean(self.coa.settings['skip_dbs'],'int'))
 

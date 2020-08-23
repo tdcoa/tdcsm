@@ -263,7 +263,7 @@ class Utils(Logger):
                                                     msgsuffix)
                 if printwarning: self.log(msg, warning=True)
 
-    def get_special_commands(self, sql, replace_with='', keys_to_skip=None):
+    def get_special_commands(self, sql, replace_with='', keys_to_skip=None, indent=0):
         if keys_to_skip is None:
             keys_to_skip = []
 
@@ -272,7 +272,7 @@ class Utils(Logger):
         cmds = {}
         sqltext = sql
         replace_with = '/* %s */' % replace_with if replace_with != '' else replace_with
-        self.log('  parsing for special sql commands')
+        self.log('  parsing for special sql commands', indent=indent)
 
         # first, get a unique dict of sql commands to iterate:
         while cmdstart in sqltext and cmdend in sqltext:
@@ -286,7 +286,7 @@ class Utils(Logger):
             else:
                 cmdval = ''
 
-            self.log('   special command found', '%s = %s' % (cmdkey, cmdval))
+            self.log('   special command found', '%s = %s' % (cmdkey, cmdval), indent=indent+2)
             cmds[cmdkey] = {}
             cmds[cmdkey]['name'] = cmdkey
             cmds[cmdkey]['value'] = cmdval
@@ -298,7 +298,7 @@ class Utils(Logger):
 
             if cmdkey in keys_to_skip:
                 cmds[cmdkey]['skip'] = True
-                self.log('   %s found in keys_to_skip, skipping...' % cmdkey)
+                self.log('   %s found in keys_to_skip, skipping...' % cmdkey, indent=indent+2)
             else:
                 cmds[cmdkey]['skip'] = False
 
