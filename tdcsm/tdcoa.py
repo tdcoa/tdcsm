@@ -31,7 +31,7 @@ class tdcoa:
     systemspath = ''
     filesetpath = ''
     outputpath = ''
-    version = "0.4.0.0.1"
+    version = "0.4.0.0.3"
     skip_dbs = False    # skip ALL dbs connections / executions
     manual_run = False  # skip dbs executions in execute_run() but not upload_to_transcend()
                         # also skips /*{{save:}}*/ special command
@@ -2223,10 +2223,13 @@ class tdcoa:
 
     def coasql_pptx(self, trunk):
         """process any visualizations"""
+        from .pptx import replace_placeholders
         self.utils.log('subfunction called', trunk['function_name'], indent=trunk['log_indent'])
         pptxpath = os.path.join(trunk['folderpath_in'], trunk['special_commands']['pptx'])
         self.utils.log('performing powerpoint substitutions on %s' %pptxpath, indent=trunk['log_indent']+2)
-        self.utils.insert_to_pptx(pptxpath, trunk['folderpath_in'])
+        pptx_file = Path(pptxpath)
+        replace_placeholders(pptx_file, Path(trunk['folderpath_out']))
+        self.utils.log('pptx file complete!', indent=trunk['log_indent']+2)
         return trunk
 
     def coasql_make_uploadmanifest(self, trunk):
