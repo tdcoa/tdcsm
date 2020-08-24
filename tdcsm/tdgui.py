@@ -9,12 +9,12 @@ import tdcsm
 
 class coa():
 
-    version = "0.4.0.0.5"
+    version = "0.4.0.0.6"
     debug = False
 
     entryvars = {}
     defaults = {}
-    appsize = '600x660' # width x height
+    appsize = '600x750' # width x height
     images = {'banner':{'file':'pic_TDCOA_Banner.gif', 'X':700, 'Y':27, 'scale':0.8, 'object':None, 'alttext':'Teradata CSM Automation'}
               ,'logo' :{'file':'pic_TDCOAdot.gif', 'X':330, 'Y':55, 'scale':0.5, 'object':None, 'alttext':'Teradata'}}
     sampleTx2 = {'systems_left':['one','two','three'],
