@@ -9,7 +9,7 @@ import tdcsm
 
 class coa():
 
-    version = "0.4.0.0.4"
+    version = "0.4.0.0.5"
     debug = False
 
     entryvars = {}
@@ -395,8 +395,8 @@ class coa():
 
         else:  # if above breadcrumb method fails, default to the most recent output folder found
             outputdir = sorted(os.listdir(os.path.join(self.entryvar('approot'), self.coa.folders['output'])))
-            print('breadcrumb not valid, retrieving most recent dated folder:', outputdir[-1])
             lastrunfolder = 'empty_folder' if len(outputdir)==0 else outputdir[-1]
+            print('breadcrumb not valid, retrieving most recent dated folder:', lastrunfolder)
             lastrunfolder = os.path.join(self.coa.folders['output'], lastrunfolder)
             lastrunpath = os.path.join(self.entryvar('approot'), lastrunfolder)
             if not os.path.exists(lastrunpath): os.makedirs(lastrunpath) # just in case the entire output folder is empty
