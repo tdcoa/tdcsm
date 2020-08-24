@@ -520,6 +520,7 @@ class coa():
                 self.coa.secretpath   = os.path.join(self.coa.approot, self.entryvar('secrets'))
                 self.coa.systemspath  = os.path.join(self.coa.approot, self.entryvar('systems'))
                 self.coa.filesetpath  = os.path.join(self.coa.approot, self.entryvar('filesets'))
+                self.coa.update_sourcesystem_yaml()
                 self.coa.reload_config(skip_dbs=self.skip_dbs(), skip_git=self.skip_git)
                 print('approot: ', self.coa.approot)
                 print('config: ', self.coa.configpath)
