@@ -60,6 +60,7 @@ class PicPlaceHolder(Placeholder):
 	tag: ClassVar[str] = 'pic'
 
 	def replace(self, datapath: Path) -> None:
+		logger.debug("Replacing: %s", self.datafile)
 		self.container.add_picture(
 			str(datapath / self.datafile),
 			left=self.shape.left,
@@ -82,6 +83,7 @@ class ColPlaceHolder(Placeholder):
 	colnum: int
 
 	def replace(self, datapath: Path) -> None:
+		logger.debug("Replacing: %s[%d]", self.datafile, self.colnum)
 		data = (r[cast(int, self.loc)] for r in load_csv(datapath / self.datafile))
 		cells = (r.cells[self.loc] for r in self.shape.table.rows)
 
@@ -114,12 +116,15 @@ class ValPlaceHolder(Placeholder):
 			raise ValueError(f'Invalid cell#[{self.rownum}:{self.colnum}] in {datapath / self.datafile}')
 
 		pat = cast(str, self.loc)
-		for para in self.shape.text_frame.paragraphs:
+		logger.debug("Replacing: %s", pat)
+		for e, para in enumerate(self.shape.text_frame.paragraphs):
 			fnm, fsz, fbd, fil = para.font.name, para.font.size, para.font.bold, para.font.italic
 			for r in para.runs:
-				fnm, fsz, fbd, fil = r.font.name, r.font.size, r.font.bold, r.font.italic
+				if r.font.name is not None:
+					fnm, fsz, fbd, fil = r.font.name, r.font.size, r.font.bold, r.font.italic
 				break
 			if pat in para.text:
+				logger.debug("Paragraph# %d, Font Name: %s, Size: %s, Bold: %s, Ital: %s", e, fnm, str(fsz), fbd, fil)
 				para.text = para.text.replace(pat, data)
 				para.font.name, para.font.size, para.font.bold, para.font.italic = fnm, fsz, fbd, fil
 				return
