@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="tdcsm",
-    version="0.3.9.8.0",
+    version="0.4.0.0.4",
     author="Stephen Hilton",
     author_email="Stephen@FamilyHilton.com",
     description="Teradata tools for CSMs",
@@ -33,6 +33,6 @@ setuptools.setup(
     entry_points={
         'console_scripts': ['tdcsm=tdcsm.cli:main']
     },
-    python_requires=">=3.6",
+    python_requires=">=3.8",
     include_package_data=True
 )
