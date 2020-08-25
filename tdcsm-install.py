@@ -70,7 +70,8 @@ def create_shortcut():
 				"""))
 
 	else:
-		shortcut = Path.home() / "Desktop" / "tdcsm-cmd.sh"
+		sfx = 'command' if system() == 'Darwin' else 'sh'
+		shortcut = Path.home() / "Desktop" / f"tdcsm-cmd.{sfx}"
 		with open(shortcut, "w") as fh:
 			fh.write(dedent(f"""\
 				#! /bin/sh
