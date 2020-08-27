@@ -1,4 +1,5 @@
 import subprocess, platform, os, copy #, yaml
+import sys
 from datetime import datetime
 from tkinter import *
 from tkinter.ttk import *
@@ -500,7 +501,7 @@ class coa():
             if coacmd[:2] != 'c.': coacmd = 'c.%s' %coacmd
             if coacmd[-1:] != ')': coacmd = '%s()' %coacmd
             cmd.append(coacmd)
-            cmd = '%s -c "%s"' %(self.coa.settings['python_call'], ' '.join(cmd))
+            cmd = '%s -c "%s"' %(sys.executable, ' '.join(cmd))
             print(cmd)
             os.system(cmd)
 
