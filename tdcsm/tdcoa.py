@@ -10,6 +10,7 @@ import requests
 import yaml
 import csv
 import sys
+import subprocess
 from teradatasql import OperationalError
 from .dbutil import df_to_sql, sql_to_df
 import webbrowser
@@ -1057,7 +1058,7 @@ class tdcoa:
                                                         vis_file = os.path.join(workpath, sqlcmd['vis'].replace('.csv', '.py'))
                                                         self.utils.log('vis py file', vis_file)
                                                         self.utils.log('running vis file..')
-                                                        os.system('%s %s' %(sys.executable, vis_file))
+                                                        subprocess.run([sys.executable, vis_file])
                                                         self.utils.log('Vis file complete!')
 
                                                 if 'pptx' in sqlcmd:  # insert to pptx file
@@ -2219,7 +2220,7 @@ class tdcoa:
         self.utils.log('executing visualization', indent=trunk['log_indent']+2)
         self.utils.log('on file', trunk['special_commands']['vis'], indent=trunk['log_indent']+4)
         self.utils.log('using script', pypath, indent=trunk['log_indent']+4)
-        os.system('%s %s' %(sys.executable, pypath))
+        subprocess.run([sys.executable, pypath])
         return trunk
 
     def coasql_pptx(self, trunk):
