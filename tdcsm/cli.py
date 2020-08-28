@@ -117,18 +117,13 @@ def show_filesets(name: List[str], verbose: bool, active: bool) -> None:
 		tabulate([make_row(k, p) for k, p in filesets.items()], ["System", "Active", "Version"])
 
 
-def run_sets(action: str) -> None:
+def run_sets(action: Sequence[str]) -> None:
 	"run an action, can be all which runs all actions"
 	app = tdcoa(str(apppath), secrets)
 
-	if action in ['download', 'all']:
-		app.download_files()
-	if action in ['prepare', 'all']:
-		app.prepare_sql()
-	if action in ['execute', 'all']:
-		app.execute_run()
-	if action in ['upload', 'all']:
-		app.upload_to_transcend()
+	for a, fn in [('download', app.download_files), ('prepare', app.prepare_sql), ('execute', app.execute_run), ('upload', app.upload_to_transcend)]:
+		if a in action:
+			fn()
 
 
 def first_time() -> None:
@@ -212,7 +207,7 @@ def main(argv: Sequence[str] = None) -> None:
 
 	p = subp.add_parser('run', help='Run actions against filesets')
 	p.set_defaults(cmd=run_sets)
-	p.add_argument('action', choices=['download', 'prepare', 'execute', 'upload', 'all'], help='actions to run')
+	p.add_argument('action', nargs='+', choices=['download', 'prepare', 'execute', 'upload'], help='actions to run')
 
 	run(**vars(parser.parse_args(argv)))
 
