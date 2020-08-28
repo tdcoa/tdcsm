@@ -444,21 +444,10 @@ class tdcoa:
                                         self.utils.log('    %s' % giturl)
                                         response = requests.get(giturl)
                                         if response.status_code == 200:
-
-                                            # save logic for non binary write files
-                                            if any(x in file_dict['gitfile'] for x in self.settings['text_format_extensions']):
-                                                filecontent = response.text
-                                                self.utils.log('    saving file to', savefile)
-                                                with open(savefile, 'w') as fh:
-                                                    fh.write(filecontent)
-
-                                            # save logic for binary write files
-                                            else:
-                                                filecontent = response.content
-                                                self.utils.log('    saving file to', savefile)
-                                                with open(savefile, 'wb') as fh:
-                                                    fh.write(filecontent)
-
+                                            filecontent = response.content
+                                            self.utils.log('    saving file to', savefile)
+                                            with open(savefile, 'wb') as fh:
+                                                fh.write(filecontent)
                                         else:
                                             self.utils.log('Status Code: ' + str(
                                                 response.status_code) + '\nText: ' + response.text, error=True)
