@@ -10,7 +10,7 @@ import tdcsm
 
 class coa():
 
-    version = "0.4.0.1.1"
+    version = "0.4.0.1.2"
     debug = False
 
     entryvars = {}
@@ -38,11 +38,11 @@ class coa():
         if secrets != '': self.defaults['secrets'] = secrets
         if platform.system()[:3]=='Win':
             self.localos='Win'
-            self.appwidth = self.appwidth * 1.2
-            self.appheight = self.appheight * 1.2
+            self.appwidth  = int(self.appwidth  * 1.2)
+            self.appheight = int(self.appheight * 1.2)
         else:
             self.localos='Mac'
-        self.appsize = str(self.appwidth) + 'x' + str(self.appheight)
+        self.appsize = str(int(self.appwidth)) + 'x' + str(int(self.appheight))
         self.images = {'banner':{'file':'pic_TDCOA_Banner.gif', 'X':700, 'Y':27, 'scale':(self.appwidth - 20) / 700, 'object':None, 'alttext':'Teradata CSM Automation'}
                        ,'logo' :{'file':'pic_TDCOAdot.gif',     'X':330, 'Y':55, 'scale':0.5, 'object':None, 'alttext':'Teradata'}}
         self.run_gui()
