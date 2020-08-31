@@ -9,6 +9,8 @@ import pandas as pd
 import requests
 import yaml
 import csv
+import sys
+import subprocess
 from teradatasql import OperationalError
 from .dbutil import df_to_sql, sql_to_df
 import webbrowser
@@ -238,7 +240,7 @@ class tdcoa:
         self.utils.check_setting(self.settings,
                            required_item_list=['githost', 'gitfileset', 'gitmotd', 'localfilesets',
                                                'run_non_fileset_folders', 'gui_show_dev_filesets',
-                                                'python_call','skip_dbs'],
+                                                'skip_dbs'],
                            defaults=['https://raw.githubusercontent.com/tdcoa/sql/master/',
                                      'filesets.yaml',
                                      'motd.txt',
@@ -443,21 +445,10 @@ class tdcoa:
                                         self.utils.log('    %s' % giturl)
                                         response = requests.get(giturl)
                                         if response.status_code == 200:
-
-                                            # save logic for non binary write files
-                                            if any(x in file_dict['gitfile'] for x in self.settings['text_format_extensions']):
-                                                filecontent = response.text
-                                                self.utils.log('    saving file to', savefile)
-                                                with open(savefile, 'w') as fh:
-                                                    fh.write(filecontent)
-
-                                            # save logic for binary write files
-                                            else:
-                                                filecontent = response.content
-                                                self.utils.log('    saving file to', savefile)
-                                                with open(savefile, 'wb') as fh:
-                                                    fh.write(filecontent)
-
+                                            filecontent = response.content
+                                            self.utils.log('    saving file to', savefile)
+                                            with open(savefile, 'wb') as fh:
+                                                fh.write(filecontent)
                                         else:
                                             self.utils.log('Status Code: ' + str(
                                                 response.status_code) + '\nText: ' + response.text, error=True)
@@ -1057,7 +1048,7 @@ class tdcoa:
                                                         vis_file = os.path.join(workpath, sqlcmd['vis'].replace('.csv', '.py'))
                                                         self.utils.log('vis py file', vis_file)
                                                         self.utils.log('running vis file..')
-                                                        os.system('%s %s' %(self.settings['python_call'], vis_file))
+                                                        subprocess.run([sys.executable, vis_file])
                                                         self.utils.log('Vis file complete!')
 
                                                 if 'pptx' in sqlcmd:  # insert to pptx file
@@ -2219,7 +2210,7 @@ class tdcoa:
         self.utils.log('executing visualization', indent=trunk['log_indent']+2)
         self.utils.log('on file', trunk['special_commands']['vis'], indent=trunk['log_indent']+4)
         self.utils.log('using script', pypath, indent=trunk['log_indent']+4)
-        os.system('%s %s' %(self.settings['python_call'], pypath))
+        subprocess.run([sys.executable, pypath])
         return trunk
 
     def coasql_pptx(self, trunk):

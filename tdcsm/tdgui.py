@@ -1,4 +1,5 @@
 import subprocess, platform, os, copy #, yaml
+import sys
 from datetime import datetime
 from tkinter import *
 from tkinter.ttk import *
@@ -480,29 +481,6 @@ class coa():
         self.yaml_write(sysAll, syspath)
         self.button_click('reload_config')
         return True
-
-    def run_external(self, coa_function='execute_run()'):
-        # --> stupid langGO error  >:^(
-        # internal langGo processes throws wicked errors when called from inside TK
-        # works fine in script, so this is a work-around until that is fixed  :^(
-        # affects  coa.execute_run() and coa.upload_to_transcend
-        if self.split_dict(self.coa.systems, 'active', addifmissing=['True','False'])['True'] != {}:
-            # build and execute subprocess
-            cmd = []
-            cmd.append("from tdcsm.tdcoa import tdcoa;")
-            cmd.append("c=tdcoa(approot='%s'," %self.safepath( self.entryvar('approot')))
-            cmd.append("config='%s',"   %self.safepath(self.entryvar('config')))
-            cmd.append("systems='%s',"  %self.safepath(self.entryvar('systems')))
-            cmd.append("secrets='%s',"  %self.safepath(self.entryvar('secrets')))
-            cmd.append("skip_dbs=%s);"  %str(self.skip_dbs()))
-
-            coacmd = coa_function.strip()
-            if coacmd[:2] != 'c.': coacmd = 'c.%s' %coacmd
-            if coacmd[-1:] != ')': coacmd = '%s()' %coacmd
-            cmd.append(coacmd)
-            cmd = '%s -c "%s"' %(self.coa.settings['python_call'], ' '.join(cmd))
-            print(cmd)
-            os.system(cmd)
 
     def button_click(self, name='', **kwargs):
         print('button clicked',  name)
