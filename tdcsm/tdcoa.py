@@ -31,7 +31,7 @@ class tdcoa:
     systemspath = ''
     filesetpath = ''
     outputpath = ''
-    version = "0.4.0.0.5"
+    version = "0.4.0.1.0"
     skip_dbs = False    # skip ALL dbs connections / executions
     manual_run = False  # skip dbs executions in execute_run() but not upload_to_transcend()
                         # also skips /*{{save:}}*/ special command
@@ -347,10 +347,11 @@ class tdcoa:
         bp.append('---------------------------------------------------------------------')
         bp.append('--- add credentials below, all else should run & export automatically')
         bp.append('.SET MAXERROR 1')
-        bp.append('.logon host/username,password')
-        bp.append('.titledashes off')
-        bp.append(".separator '%s'" %self.bteq_sep)
-        bp.append('.width 1048575')
+        bp.append('.LOGON host/username,password')
+        bp.append('.TITLEDASHES off')
+        bp.append(".SEPARATOR '%s'" %self.bteq_sep)
+        bp.append(".SET NULL AS ''")
+        bp.append('.WIDTH 1048575')
         bp.append('---------------------------------------------------------------------')
         self.bteq_prefix = '\n'.join(bp)
 
