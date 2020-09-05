@@ -5,8 +5,8 @@ from tkinter import *
 from tkinter.ttk import *
 from PIL import Image
 from PIL import ImageTk
-from tdcsm.tdcoa import tdcoa
-import tdcsm
+from .tdcoa import tdcoa
+from tdcsm import tdcsm
 
 class coa():
 
@@ -31,7 +31,7 @@ class coa():
     font = 'Open Sans'
 
 
-    def __init__(self, approot='', secrets=''):
+    def __init__(self, approot='', secrets='', **kwargs):
         print('GUI for TDCOA started')
         #self.version = str(datetime.now()).replace('-','').replace(':','').split('.')[0].replace(' ','.')
         if approot != '': self.defaults['approot'] = approot
@@ -45,6 +45,10 @@ class coa():
         self.appsize = str(int(self.appwidth)) + 'x' + str(int(self.appheight))
         self.images = {'banner':{'file':'pic_TDCOA_Banner.gif', 'X':700, 'Y':27, 'scale':(self.appwidth - 20) / 700, 'object':None, 'alttext':'Teradata CSM Automation'}
                        ,'logo' :{'file':'pic_TDCOAdot.gif',     'X':330, 'Y':55, 'scale':0.5, 'object':None, 'alttext':'Teradata'}}
+        if 'test' in kwargs:
+            self.test = True
+            self.version = 'test.' + self.version
+
         self.run_gui()
 
     def set_defaults(self, **kwargs):
@@ -829,28 +833,21 @@ class coa():
         print('approot: ' + self.entryvar('approot') )
         print('config:  ' + self.entryvar('config') )
         print('systems: ' + self.entryvar('systems') )
-        print('secrets: ' + self.entryvar('secrets') )
 
-        self.coa = tdcoa(approot = self.entryvar('approot'), secrets = self.entryvar('secrets'))
+
+        self.coa = tdcoa(approot = self.entryvar('approot'))
         self.coa.deactivate_all()
-        # these 'clicks' will refresh both left and right treeviews
-        self.button_click('tv_systems_left')
-        self.button_click('tv_filesets_left')
-        # self.button_click('tv_systems_assisted_left')
-        # self.button_click('tv_filesets_assisted_left')
+        if self.test: self.coa.version = 'test.' + self.coa.version
+        self.entryvars['secrets'].set(self.first_file_that_exists(self.coa.settings['secrets'], os.path.join(self.entryvar('approot'),"secrets.yaml")))
+        self.coa.reload_config(skip_git = True, secretpath=self.entryvar('secrets'))
+        print('secrets: ' + self.entryvar('secrets') )
 
         self.upload_get_lastrun_folder()
 
-        # update our secrets file if default was different than coa.settings value (chicken/egg problem)
-        secrets_from_settings = self.coa.settings['secrets']
-        secrets_from_default =  self.entryvars['secrets'].get()
-        if secrets_from_default != secrets_from_settings:
-            self.entryvars['secrets'].set(self.first_file_that_exists(secrets_from_settings, secrets_from_default))
-            self.coa.secrets = self.entryvars['secrets'].get()
-            self.coa.reload_config(skip_git = True)
-            self.coa.deactivate_all()
-            self.button_click('tv_filesets_left')
-            # self.button_click('tv_filesets_assisted_left')
+        # these 'clicks' will refresh both left and right treeviews
+        self.button_click('tv_systems_left')
+        self.button_click('tv_filesets_left')
+
 
         # sync skip_dbs flag with coa.settings
         self.entryvars['skip_dbs_toggle'].set(value=self.validate_boolean(self.coa.settings['skip_dbs'],'int'))
