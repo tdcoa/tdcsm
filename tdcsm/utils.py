@@ -4,7 +4,7 @@ import shutil
 import numpy
 
 import pandas as pd
-from tdcsm.logging import Logger
+from .logging import Logger
 from pptx import Presentation
 from pptx.util import Inches, Pt
 import textwrap

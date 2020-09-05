@@ -18,7 +18,7 @@ import webbrowser
 
 import tdcsm
 from pathlib import Path
-from tdcsm.utils import Utils  # includes Logger class
+from .utils import Utils  # includes Logger class
 
 
 # todo create docstring for all methods
