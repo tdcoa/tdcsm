@@ -33,7 +33,7 @@ class tdcoa:
     systemspath = ''
     filesetpath = ''
     outputpath = ''
-    version = "0.4.0.1.1"
+    version = "0.4.0.1.2"
     skip_dbs = False    # skip ALL dbs connections / executions
     manual_run = False  # skip dbs executions in execute_run() but not upload_to_transcend()
                         # also skips /*{{save:}}*/ special command
@@ -1010,15 +1010,6 @@ class tdcoa:
                                                         sqlcmd['save'] = '%s.%s--%s' % (
                                                             sysname, setname, coasqlfile) + '%04d' % sqlcnt + '.csv'
 
-                                                    # ODBC CONNECTION ONLY:
-                                                    # df.read_sql() does not work properly for odbc connections.
-                                                    # Can directly execute using odbc connection but then there are no column names
-                                                    # This code block retrieves the column names before saving the csv file
-                                                    # Col names will be merged upon save
-                                                    col_names = []
-                                                    if conn['type'] not in ('sqlalchemy', 'teradataml'):
-                                                        col_names = self.utils.open_sql(conn, sql, columns=True, skip = skip_dbs)
-
                                                     # once built, append output folder, SiteID on the front, iterative counter if duplicates
                                                     # csvfile = os.path.join(outputfo, sqlcmd['save'])
                                                     csvfile = os.path.join(workpath, sqlcmd['save'])
@@ -1032,10 +1023,7 @@ class tdcoa:
                                                     self.utils.log('CSV save location', csvfile)
 
                                                     self.utils.log('saving file...')
-                                                    if conn['type'] in ('sqlalchemy', 'teradataml'):
-                                                        df.to_csv(csvfile)  # <---------------------- Save to .csv
-                                                    else:  # if odbc conn type, merge in column names
-                                                        df.to_csv(csvfile, header=col_names)  # <---------------------- Save to .csv
+                                                    df.to_csv(csvfile)  # <---------------------- Save to .csv
                                                     self.utils.log('file saved!')
                                                     csvfile_exists = os.path.exists(csvfile)
                                                 if 'vis' in sqlcmd:  # run visualization py file
@@ -1236,15 +1224,6 @@ class tdcoa:
                                                         sqlcmd['save'] = '%s.%s--%s' % (
                                                             sysname, setname, coasqlfile) + '%04d' % sqlcnt + '.csv'
 
-                                                    # ODBC CONNECTION ONLY:
-                                                    # df.read_sql() does not work properly for odbc connections.
-                                                    # Can directly execute using odbc connection but then there are no column names
-                                                    # This code block retrieves the column names before saving the csv file
-                                                    # Col names will be merged upon save
-                                                    col_names = []
-                                                    if conn['type'] not in ('sqlalchemy', 'teradataml'):
-                                                        col_names = self.utils.open_sql(conn, sql, columns=True, skip = self.skip_dbs)
-
                                                     # once built, append output folder, SiteID on the front, iterative counter if duplicates
                                                     # csvfile = os.path.join(outputfo, sqlcmd['save'])
                                                     csvfile = os.path.join(workpath, sqlcmd['save'])
@@ -1258,10 +1237,7 @@ class tdcoa:
                                                     self.utils.log('CSV save location', csvfile)
 
                                                     self.utils.log('saving file...')
-                                                    if conn['type'] in ('sqlalchemy', 'teradataml'):
-                                                        df.to_csv(csvfile)  # <---------------------- Save to .csv
-                                                    else:  # if odbc conn type, merge in column names
-                                                        df.to_csv(csvfile, header=col_names)  # <---------------------- Save to .csv
+                                                    df.to_csv(csvfile)  # <---------------------- Save to .csv
                                                     self.utils.log('file saved!')
                                                     csvfile_exists = os.path.exists(csvfile)
 
