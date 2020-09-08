@@ -532,7 +532,7 @@ class coa():
                 print('fileset: ', self.coa.filesetpath)
                 self.coa.deactivate_all()
                 self.entryvars['skip_dbs_toggle'].set(value=self.validate_boolean(self.coa.settings['skip_dbs'],'int'))
-                self.upload_get_lastrun_folder()
+                self.upload_get_lastrun_folder(lastrunfile='')
                 self.button_click('tv_systems_left') # this 'click' will refresh both left and right treeviews
                 self.button_click('tv_filesets_left')
             elif name == 'approot':
