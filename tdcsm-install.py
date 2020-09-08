@@ -6,9 +6,9 @@ def check_python():
 	if sys.version_info < (3, 0):
 		raise SystemExit("Python2 is not supported. Try rerunning with python3 or download the latest **64-bit** version from https://www.python.org/downloads/")
 	if sys.maxsize <= 2**32:
-		raise SystemExit("Only Python **64-bit** version is supported. Please uninstall and install the latest Python3 64-bit version")
-	if sys.version_info < (3, 8, 5):
-		raise SystemExit("Incorrect Python version %d.%d.%d. Must use a version >= 3.8.5" % (sys.version_info[:3]))
+		raise SystemExit("Only Python **64-bit** version is supported. Please uninstall the current version and install the latest Python3 64-bit version")
+	if sys.version_info < (3, 8, 0):
+		raise SystemExit("Python version %d.%d.%d is unsupported. Please upgrade to a version >= 3.8.0" % (sys.version_info[:3]))
 
 	try:
 		import tkinter
