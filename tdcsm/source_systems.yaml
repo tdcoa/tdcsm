@@ -47,7 +47,7 @@ systems:
     collection:  "pdcr"
     use:         "DR/Test"
     # connection info:
-    host:        "tdprd.td.teradata.com"
+    host:        "tdprd2.td.teradata.com"
     logmech:     "ldap"
     driver:      "sqlalchemy"
     encryption:  "false"
