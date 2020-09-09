@@ -33,7 +33,7 @@ class tdcoa:
     systemspath = ''
     filesetpath = ''
     outputpath = ''
-    version = "0.4.0.1.2"
+    version = "0.4.0.2.01"
     skip_dbs = False    # skip ALL dbs connections / executions
     manual_run = False  # skip dbs executions in execute_run() but not upload_to_transcend()
                         # also skips /*{{save:}}*/ special command
@@ -71,39 +71,21 @@ class tdcoa:
         self.motd_url = 'file://' + os.path.abspath(os.path.join(self.approot, 'motd.html'))
 
         # filesets.yaml is validated at download time
-
         self.reload_config(skip_dbs=skip_dbs)
-        if os.path.exists(self.filesetpath) and os.path.exists(self.systemspath):
-            self.update_sourcesystem_yaml()
 
+    def add_filesets_to_systems(self):
+        # read in fileset.yaml file to dictionary:
+        self.utils.log('adding all filesets to all systems (in memory, not disk)')
+        for sysname, sysobject in self.systems.items():  # iterate systems object...
+            i = 0
+            if 'filesets' not in sysobject or type(sysobject['filesets']) != dict: sysobject['filesets']={}
+            for fsname, fsobject in self.filesets.items(): # iterate fileset master yaml...
+                if fsname not in sysobject['filesets']:
+                    sysobject['filesets'][fsname] = {'active':False}  # add if missing
+                    i+=1
+            self.utils.log('added %i new filesets to' %i, sysname)
 
-    # Function to add Source system yaml file with all the fileset entries in the filesets.yaml file and set active to false
-    def update_sourcesystem_yaml(self):
-        with open(self.systemspath, 'r') as fh:
-            filesetstr = fh.read()
-        sourcesysyaml = yaml.load(filesetstr, Loader=yaml.FullLoader)
-        fh.close()
-        with open(self.filesetpath, 'r') as fh:
-            filesetstr = fh.read()
-        filesetsyaml = yaml.load(filesetstr, Loader=yaml.FullLoader)
-        fh.close()
-        filesets = []
-        for fileset, filesetobj in filesetsyaml.items():
-            filesets.append(fileset)
-
-        for sysname in sourcesysyaml['systems'].keys():
-            sys_filesets = list(sourcesysyaml['systems'][sysname]['filesets'].keys())
-            missing_filesets = list(set(filesets) - set(sys_filesets))
-            for fileset in missing_filesets:
-                sourcesysyaml['systems'][sysname]['filesets'][fileset] = {}
-                sourcesysyaml['systems'][sysname]['filesets'][fileset]['active'] = 'False'
-
-        with open(self.systemspath, 'w') as fh:
-            fh.write(yaml.dump(sourcesysyaml))
-        fh.close()
-        self.utils.log('Updated the Sourcesystem yaml file with all the fileset entries in the filesets.yaml file')
-
-    def reload_config(self, configpath='', secretpath='', systemspath='', refresh_defaults=False, skip_dbs=False, skip_git=False):
+    def reload_config(self, config='', secrets='', systems='', refresh_defaults=False, skip_dbs=False, skip_git=False):
         """Reloads configuration YAML files (config & secrets) used as
         process driver.  This will also perform any local environment checks,
         such as creating missing folders (download|sql|run|output), change
@@ -140,9 +122,9 @@ class tdcoa:
         self.transcend = {}
         self.settings = {}
 
-        configpath = self.configpath if configpath == '' else configpath
-        secretpath = self.secretpath if secretpath == '' else secretpath
-        systemspath = self.systemspath if systemspath == '' else systemspath
+        configpath = self.configpath if config == ''    else os.path.join(self.approot,  config)
+        secretpath = self.secretpath if secrets == ''   else os.path.join(self.approot, secrets)
+        systemspath = self.systemspath if systems == '' else os.path.join(self.approot, systems)
         self.refresh_defaults = refresh_defaults
 
         self.utils.bufferlogs = True
@@ -150,15 +132,21 @@ class tdcoa:
         self.utils.log('time', str(dt.datetime.now()))
         self.utils.log('tdcoa version', self.version)
 
-
         # ensure all required configuration files are present:
         self.utils.log('checking core config files')
-        startfiles = ['secrets.yaml','config.yaml','source_systems.yaml','run_gui.py','run_gui','run_cmdline.py','run_cmdline']
+        # these all sit in approot by default, so these are both filenames AND relative paths:
+        startfiles = ['secrets.yaml','config.yaml','source_systems.yaml','run_gui.py','run_gui']
         startfilecontent = ''
         for startfile in startfiles:
             startfile_src = os.path.join(os.path.dirname(tdcsm.__file__), startfile)
             startfile_ovr = os.path.join(self.approot,'0_override', startfile)
-            startfile_dst = os.path.join(self.approot, startfile)
+
+
+            # honor parameter overrides:
+            if   startfile == 'secrets.yaml': startfile_dst = secretpath
+            elif startfile == 'config.yaml': startfile_dst = configpath
+            elif startfile == 'source_systems.yaml': startfile_dst = systemspath
+            else: startfile_dst = os.path.join(self.approot, startfile)
 
             # remove files if "refresh defaults" is requested via __init__ param
             if self.refresh_defaults and os.path.isfile(startfile_dst) and startfiles != 'secrets.yaml':
@@ -185,8 +173,6 @@ class tdcoa:
                     self.utils.log('   Adding from internal string (should not happen)')
                 with open(startfile_dst, 'w') as f2:
                     f2.write(startfilecontent)
-
-
 
         # load secrets.yaml
         with open(secretpath, 'r') as fh:
@@ -273,13 +259,6 @@ class tdcoa:
             self.settings['localfilesets'] = os.path.join(self.folders['download'], 'filesets.yaml')
         self.filesetpath = os.path.join(self.approot, self.settings['localfilesets'])
 
-        # # download filesets.yaml every instantiation (now that download folder exists)
-        # if os.path.isfile(self.filesetpath):
-        #     try:
-        #         os.remove(self.filesetpath)
-        #     except FileNotFoundError as e:
-        #         pass
-
         githost = self.settings['githost']
         if githost[-1:] != '/':
             githost = githost + '/'
@@ -327,11 +306,14 @@ class tdcoa:
 
             # todo add default dbsversion and collection
             self.utils.check_setting(self.systems[sysname],
-                               required_item_list=['active', 'siteid', 'use', 'host', 'username', 'password',
-                                                   'logmech', 'driver', 'encryption','manual_run','dbsversion','collection'],
+                               required_item_list=['active', 'siteid', 'use', 'host',
+                                                   'username', 'password',
+                                                   'logmech', 'driver', 'encryption','dbsversion','collection',
+                                                   'filesets'],
                                defaults=['True', 'siteid123', 'unknown', 'customer.host.missing.com',
-                                         'username_missing', 'password_missing', '', 'sqlalchemy', '', 'False',
-                                         '16.20','pdcr'])
+                                         'username_missing', 'password_missing',
+                                         'TD2', 'sqlalchemy', 'False','16.20','pdcr',
+                                         {}])
 
             if sysobject['logmech'].strip() == '':
                 logmech = ''
@@ -341,8 +323,14 @@ class tdcoa:
                                                                           sysobject['password'],
                                                                           sysobject['host'],
                                                                           logmech)
-        self.utils.log('done!')
-        self.utils.log('time', str(dt.datetime.now()))
+
+        # add filesets to systems, in memory only:
+        self.add_filesets_to_systems()
+
+        # not sure this is ever explicitly re-set
+        self.configpath = configpath
+        self.secretpath = secretpath
+        self.systemspath = systemspath
 
         self.bteq_sep = '|'
         bp=[]
@@ -357,6 +345,9 @@ class tdcoa:
         bp.append('.WIDTH 1048575')
         bp.append('---------------------------------------------------------------------')
         self.bteq_prefix = '\n'.join(bp)
+
+        self.utils.log('done!')
+        self.utils.log('time', str(dt.datetime.now()))
 
     def download_files(self, motd=True):
         self.utils.log('download_files started', header=True)
@@ -462,9 +453,7 @@ class tdcoa:
 
                         else:  # not found
                             self.utils.log(' not found in filesets.yaml', sys_setname)
-        # Update the Sourcesystem yaml file with all the available filesets in the filesets.yaml
-        if os.path.exists(self.filesetpath) and os.path.exists(self.systemspath):
-            self.update_sourcesystem_yaml()
+
         self.utils.log('\ndone!')
         self.utils.log('time', str(dt.datetime.now()))
 
@@ -1948,14 +1937,16 @@ class tdcoa:
         tmp.append('  secrets:    "secrets.yaml"')
         tmp.append('  systems:    "source_systems.yaml"')
         tmp.append('  text_format_extensions: [".sql", ".yaml", ".txt", ".csv", ".py"]')
+        tmp.append('  gui_show_dev_filesets:   "False"')
         tmp.append('  run_non_fileset_folders: "True"')
+        tmp.append('  skip_dbs:   "False"')
         tmp.append('  write_to_perm: "True"')
         return '\n'.join(tmp)
 
     def yaml_systems(self):
         tmp = []
         tmp.append('systems:')
-        tmp.append('  Transcend_Source:')
+        tmp.append('  Transcend:')
         tmp.append('    siteid:      "TDCLOUD14TD03"  ')
         tmp.append('    active:      "True"')
         tmp.append('    host:        "tdprdcop3.td.teradata.com"')
@@ -1970,14 +1961,6 @@ class tdcoa:
         tmp.append('    filesets:')
         tmp.append('      demo:')
         tmp.append('        active:     "True"')
-        tmp.append('      level1_how_much:')
-        tmp.append('        active: "False"')
-        tmp.append('        startdate:  "Current_Date - 365"')
-        tmp.append('        enddate:    "Current_Date - 1"')
-        tmp.append('      dbql_core:')
-        tmp.append('        active: "False"')
-        tmp.append('        startdate:  "Current_Date - 45"')
-        tmp.append('        enddate:    "Current_Date - 1"')
         return '\n'.join(tmp)
 
 # ------------- everything below here is new /

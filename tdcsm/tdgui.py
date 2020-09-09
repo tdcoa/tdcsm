@@ -45,9 +45,11 @@ class coa():
         self.appsize = str(int(self.appwidth)) + 'x' + str(int(self.appheight))
         self.images = {'banner':{'file':'pic_TDCOA_Banner.gif', 'X':700, 'Y':27, 'scale':(self.appwidth - 20) / 700, 'object':None, 'alttext':'Teradata CSM Automation'}
                        ,'logo' :{'file':'pic_TDCOAdot.gif',     'X':330, 'Y':55, 'scale':0.5, 'object':None, 'alttext':'Teradata'}}
-        if 'test' in kwargs:
-            self.test = True
-            self.version = 'test.' + self.version
+        if 'versionprefix' in kwargs:
+            self.versionprefix = kwargs['versionprefix']
+            self.version = self.versionprefix + '.' + self.version
+        else:
+            self.versionprefix = ''
 
         self.run_gui()
 
@@ -527,7 +529,7 @@ class coa():
                 self.coa.secretpath   = os.path.join(self.coa.approot, self.entryvar('secrets'))
                 self.coa.systemspath  = os.path.join(self.coa.approot, self.entryvar('systems'))
                 self.coa.filesetpath  = os.path.join(self.coa.approot, self.entryvar('filesets'))
-                self.coa.update_sourcesystem_yaml()
+                # self.coa.update_sourcesystem_yaml()
                 self.coa.reload_config(skip_dbs=self.skip_dbs(), skip_git=self.skip_git)
                 print('approot: ', self.coa.approot)
                 print('config: ', self.coa.configpath)
@@ -836,12 +838,12 @@ class coa():
 
 
         self.coa = tdcoa(approot = self.entryvar('approot'))
-        self.coa.deactivate_all()
-        if self.test: self.coa.version = 'test.' + self.coa.version
+        self.version = self.coa.version
         self.entryvars['secrets'].set(self.first_file_that_exists(self.coa.settings['secrets'], os.path.join(self.entryvar('approot'),"secrets.yaml")))
-        self.coa.reload_config(skip_git = True, secretpath=self.entryvar('secrets'))
+        self.coa.reload_config(skip_git = True, secrets=self.entryvar('secrets'))
         print('secrets: ' + self.entryvar('secrets') )
 
+        self.coa.deactivate_all()
         self.upload_get_lastrun_folder()
 
         # these 'clicks' will refresh both left and right treeviews
