@@ -408,7 +408,7 @@ class coa():
         lastrunfilepath = os.path.join(self.entryvar('approot'), lastrunfile)
 
         # open up breadcrumb file, extract folder location, and return if exists
-        if os.path.exists(lastrunfilepath):
+        if os.path.isfile(lastrunfilepath):
             print('breadcrumb found:', lastrunfilepath)
             with open(lastrunfilepath,'r') as fh:
                 lastrunfolder = str(fh.read())
