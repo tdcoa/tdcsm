@@ -6,11 +6,11 @@ from tkinter.ttk import *
 from PIL import Image
 from PIL import ImageTk
 from .tdcoa import tdcoa
-from tdcsm import tdcsm
+import tdcsm
 
 class coa():
 
-    version = "0.4.0.2"
+    version = "0.4.0.3"
     debug = False
 
     entryvars = {}
@@ -43,7 +43,7 @@ class coa():
         else:
             self.localos='Mac'
         self.appsize = str(int(self.appwidth)) + 'x' + str(int(self.appheight))
-        self.images = {'banner':{'file':'pic_TDCOA_Banner.gif', 'X':700, 'Y':27, 'scale':(self.appwidth - 20) / 700, 'object':None, 'alttext':'Teradata CSM Automation'}
+        self.images = {'banner':{'file':'pic_TDCOA_Banner.gif', 'X':700, 'Y':27, 'scale':(self.appwidth - 20) / 700, 'object':None, 'alttext':''}
                        ,'logo' :{'file':'pic_TDCOAdot.gif',     'X':330, 'Y':55, 'scale':0.5, 'object':None, 'alttext':'Teradata'}}
         if 'versionprefix' in kwargs:
             self.versionprefix = kwargs['versionprefix']
