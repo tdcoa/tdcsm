@@ -1,80 +1,88 @@
 systems:
-  # this is actual information for running on Transcend
-  # as if it were a customer system
-  # (the information for uploading to Transcend is in config.yaml)
+### This is where you define CUSTOMER SYSTEM information, including
+###   site_id, dbs version, pdcr, and connection details.
+###   Additionally you can define fileset override parameters, which
+###   override all other parameter locations.
+
+### Teradata Transcend information is listed here for your convenience.
+###   Also, a sample
+###   To setup your customer, copy/paste an existing system below, then
+###   modify as needed. Be mindful of indenting, it is important in YAML!
+
+### For more details please see:
+###  YAML Format:  https://www.youtube.com/watch?v=o9pT9cWzbnI
+###  COA:  https://teradata.sharepoint.com/teams/Sales/ConsumptionAnalytics
+###  SiteID:  SELECT * FROM TABLE (SYSLIB.MonitorSystemPhysicalConfig()) AS cfg;
+
   Transcend:
-    siteid:      "TDCLOUD14TD03"  # this is the actual SiteID for Transcend Prod (on-prem)
     active:      "True"
-    manual_run:  "False"
-    host:        "tdprd.td.teradata.com"
-    username:    "{td_quicklook}"
-    password:    "{td_password}"
-    logmech:     "ldap"
-    driver:      "sqlalchemy" # valid values: "sqlalchemy", "teradataml", or an odbc driver name
-    encryption:  "false"
-    use:         "test"   # prod/qa/dr/dev/etc
-    some_value:  "Bear"
+    # these are the actual settings for Transcend Prod:
+    siteid:      "TRANSCEND02"
     dbsversion:  "16.20"
     collection:  "pdcr"
+    use:         "Production"
+    # connection info:
+    host:        "tdprd.td.teradata.com"
+    logmech:     "ldap"
+    driver:      "sqlalchemy"
+    encryption:  "false"
+    username:    "{td_quicklook}"
+    password:    "{td_password}"
+    # other name/value pairs (anything you want)
+    some_value:  "Bear"
+    # Optional (advanced) fileset definitions, for scripting or overrides
+    # if this doesn't make sense, just stick with the GUI, which makes
+    # this section irrelevant.
     filesets:
       demo:
         active:     "True"
         some_value: "Aardvark"
 
+
   TranscendAWS:
-    siteid:      "TRNAWS01"  # this is the actual SiteID for Transcend Prod (on-prem)
     active:      "True"
-    manual_run:  "False"
-    host:        "tdprd.td.teradata.com"
-    username:    "{td_quicklook}"
-    password:    "{td_password}"
-    logmech:     "ldap"
-    driver:      "sqlalchemy" # valid values: "sqlalchemy", "teradataml", or an odbc driver name
-    encryption:  "false"
-    use:         "test"   # prod/qa/dr/dev/etc
-    some_value:  "Bear"
+    # these are the actual settings for Transcend AWS:
+    siteid:      "TRNAWS01"
     dbsversion:  "16.20"
     collection:  "pdcr"
+    use:         "DR/Test"
+    # connection info:
+    host:        "tdprd2.td.teradata.com"
+    logmech:     "ldap"
+    driver:      "sqlalchemy"
+    encryption:  "false"
+    username:    "{td_quicklook}"
+    password:    "{td_password}"
+    # other name/value pairs (anything you want)
+    some_value:  "Bear"
+    # Optional (advanced) fileset definitions, for scripting or overrides
+    # if this doesn't make sense, just stick with the GUI, which makes
+    # this section irrelevant.
     filesets:
       demo:
         active:     "True"
-        some_value: "Aardvark"
 
 
   Axeda_SystemABC:
-    siteid:      "Enter_Site_ID_Here"  # Enter
     active:      "True"
-    manual_run:  "False"
-    host:        "127.0.0.10"
+    # system info:   YOU WILL NEED TO REPLACE THESE VALUES!
+    siteid:      "Enter_Site_ID_Here"
+    dbsversion:  "16.20"
+    collection:  "pdcr"
+    use:         "test"   # prod/qa/dr/dev/etc
+    # connection info:
+    host:        "127.0.0.10"  # this is default for Axeda connections
     username:    "{custsys_username}"
     password:    "{custsys_password}"
     logmech:     "ldap"
-    driver:      "sqlalchemy" # valid values: "sqlalchemy", "teradataml", or an odbc driver name
+    driver:      "sqlalchemy"
     encryption:  "false"
-    use:         "test"   # prod/qa/dr/dev/etc
+    # other name/value pairs (anything you want)
     some_value:  "Bear"
-    dbsversion:  "16.20"
-    collection:  "pdcr"
+    # Optional (advanced) fileset definitions, for scripting or overrides
+    # if this doesn't make sense, just stick with the GUI, which makes
+    # this section irrelevant.
     filesets:
       demo:
         active:     "True"
         some_value: "Aardvark"
-
-
-  # this is intended as a mock-up, to alter for your customer:
-  Customer_System_Example:
-    siteid:      "custabcprod01"
-    active:      "false"
-    manual_run:  "True"
-    host:        "prod.custabc.com"
-    username:    "{custsys_username}"
-    password:    "{custsys_password}"
-    logmech:     ""
-    driver:      "sqlalchemy" # valid values: "sqlalchemy", "teradataml", or an odbc driver name
-    encryption:  "false"
-    use:         "prod"
-    dbsversion:  "16.20"
-    collection:  "dbc"
-    filesets:
-      demo:
-        active: "False"

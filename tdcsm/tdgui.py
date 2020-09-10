@@ -5,12 +5,12 @@ from tkinter import *
 from tkinter.ttk import *
 from PIL import Image
 from PIL import ImageTk
-from tdcsm.tdcoa import tdcoa
-import tdcsm
+from .tdcoa import tdcoa
+from tdcsm import tdcsm
 
 class coa():
 
-    version = "0.4.0.1.2"
+    version = "0.4.0.2"
     debug = False
 
     entryvars = {}
@@ -31,7 +31,7 @@ class coa():
     font = 'Open Sans'
 
 
-    def __init__(self, approot='', secrets=''):
+    def __init__(self, approot='', secrets='', **kwargs):
         print('GUI for TDCOA started')
         #self.version = str(datetime.now()).replace('-','').replace(':','').split('.')[0].replace(' ','.')
         if approot != '': self.defaults['approot'] = approot
@@ -45,6 +45,12 @@ class coa():
         self.appsize = str(int(self.appwidth)) + 'x' + str(int(self.appheight))
         self.images = {'banner':{'file':'pic_TDCOA_Banner.gif', 'X':700, 'Y':27, 'scale':(self.appwidth - 20) / 700, 'object':None, 'alttext':'Teradata CSM Automation'}
                        ,'logo' :{'file':'pic_TDCOAdot.gif',     'X':330, 'Y':55, 'scale':0.5, 'object':None, 'alttext':'Teradata'}}
+        if 'versionprefix' in kwargs:
+            self.versionprefix = kwargs['versionprefix']
+            self.version = self.versionprefix + '.' + self.version
+        else:
+            self.versionprefix = ''
+
         self.run_gui()
 
     def set_defaults(self, **kwargs):
@@ -369,18 +375,6 @@ class coa():
                 msg = msg.replace(secret, '%s%s%s' % (secret[:1], '*' * (len(secret) - 2), secret[-1:]))
         return str(msg)
 
-    # def yaml_write(self, dict2write={}, filepath=''):
-    #     with open(filepath, 'w') as fh:
-    #         fh.write(yaml.dump(dict2write))
-    #
-    # def yaml_read(self, filepath=''):
-    #     if os.path.isfile(filepath):
-    #         with open(filepath, 'r') as fh:
-    #             txt = fh.read()
-    #     else:
-    #         txt = 'no_such_file: "%s"' %filepath
-    #     return yaml.load(txt)
-
 # =================== END: HELPER FUNCTIONS ==============================
 
 
@@ -410,8 +404,9 @@ class coa():
                     self.entryvars[nm].insert('','end',text=str(itm))
 
     def upload_get_lastrun_folder (self, lastrunfile='.last_run_output_path.txt'):
-        lastrunfilepath = os.path.join(self.entryvar('approot'), lastrunfile)
         print("updating 'Output Folder' textbox...")
+        lastrunfilepath = os.path.join(self.entryvar('approot'), lastrunfile)
+
         # open up breadcrumb file, extract folder location, and return if exists
         if os.path.exists(lastrunfilepath):
             print('breadcrumb found:', lastrunfilepath)
@@ -523,7 +518,7 @@ class coa():
                 self.coa.secretpath   = os.path.join(self.coa.approot, self.entryvar('secrets'))
                 self.coa.systemspath  = os.path.join(self.coa.approot, self.entryvar('systems'))
                 self.coa.filesetpath  = os.path.join(self.coa.approot, self.entryvar('filesets'))
-                self.coa.update_sourcesystem_yaml()
+                # self.coa.update_sourcesystem_yaml()
                 self.coa.reload_config(skip_dbs=self.skip_dbs(), skip_git=self.skip_git)
                 print('approot: ', self.coa.approot)
                 print('config: ', self.coa.configpath)
@@ -546,6 +541,7 @@ class coa():
             elif name == 'execute_run':
                 self.button_click('opendir_run')
                 self.coa.execute_run()
+                print('#### EXECUTE COMPLETE! ####')
                 self.upload_get_lastrun_folder()
             elif name == 'make_customer_files':
                 self.coa.make_customer_files2()
@@ -624,7 +620,6 @@ class coa():
 
         except Exception as err:   # TODO: I know, bad practice...
             print('\nERROR: \n%s\n' %str(err))
-            #self.button_click('reload_config')
 
 # =================== END: PROGRAM BEHAVIOR ==============================
 
@@ -829,28 +824,21 @@ class coa():
         print('approot: ' + self.entryvar('approot') )
         print('config:  ' + self.entryvar('config') )
         print('systems: ' + self.entryvar('systems') )
+
+
+        self.coa = tdcoa(approot = self.entryvar('approot'))
+        self.version = self.coa.version
+        self.entryvars['secrets'].set(self.first_file_that_exists(self.coa.settings['secrets'], os.path.join(self.entryvar('approot'),"secrets.yaml")))
+        self.coa.reload_config(skip_git = True, secrets=self.entryvar('secrets'))
         print('secrets: ' + self.entryvar('secrets') )
 
-        self.coa = tdcoa(approot = self.entryvar('approot'), secrets = self.entryvar('secrets'))
         self.coa.deactivate_all()
+        self.upload_get_lastrun_folder()
+
         # these 'clicks' will refresh both left and right treeviews
         self.button_click('tv_systems_left')
         self.button_click('tv_filesets_left')
-        # self.button_click('tv_systems_assisted_left')
-        # self.button_click('tv_filesets_assisted_left')
 
-        self.upload_get_lastrun_folder()
-
-        # update our secrets file if default was different than coa.settings value (chicken/egg problem)
-        secrets_from_settings = self.coa.settings['secrets']
-        secrets_from_default =  self.entryvars['secrets'].get()
-        if secrets_from_default != secrets_from_settings:
-            self.entryvars['secrets'].set(self.first_file_that_exists(secrets_from_settings, secrets_from_default))
-            self.coa.secrets = self.entryvars['secrets'].get()
-            self.coa.reload_config(skip_git = True)
-            self.coa.deactivate_all()
-            self.button_click('tv_filesets_left')
-            # self.button_click('tv_filesets_assisted_left')
 
         # sync skip_dbs flag with coa.settings
         self.entryvars['skip_dbs_toggle'].set(value=self.validate_boolean(self.coa.settings['skip_dbs'],'int'))
