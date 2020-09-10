@@ -10,7 +10,7 @@ from tdcsm import tdcsm
 
 class coa():
 
-    version = "0.4.0.1.2"
+    version = "0.4.0.2"
     debug = False
 
     entryvars = {}
@@ -375,18 +375,6 @@ class coa():
                 msg = msg.replace(secret, '%s%s%s' % (secret[:1], '*' * (len(secret) - 2), secret[-1:]))
         return str(msg)
 
-    # def yaml_write(self, dict2write={}, filepath=''):
-    #     with open(filepath, 'w') as fh:
-    #         fh.write(yaml.dump(dict2write))
-    #
-    # def yaml_read(self, filepath=''):
-    #     if os.path.isfile(filepath):
-    #         with open(filepath, 'r') as fh:
-    #             txt = fh.read()
-    #     else:
-    #         txt = 'no_such_file: "%s"' %filepath
-    #     return yaml.load(txt)
-
 # =================== END: HELPER FUNCTIONS ==============================
 
 
@@ -416,8 +404,9 @@ class coa():
                     self.entryvars[nm].insert('','end',text=str(itm))
 
     def upload_get_lastrun_folder (self, lastrunfile='.last_run_output_path.txt'):
-        lastrunfilepath = os.path.join(self.entryvar('approot'), lastrunfile)
         print("updating 'Output Folder' textbox...")
+        lastrunfilepath = os.path.join(self.entryvar('approot'), lastrunfile)
+
         # open up breadcrumb file, extract folder location, and return if exists
         if os.path.exists(lastrunfilepath):
             print('breadcrumb found:', lastrunfilepath)
@@ -552,6 +541,7 @@ class coa():
             elif name == 'execute_run':
                 self.button_click('opendir_run')
                 self.coa.execute_run()
+                print('#### EXECUTE COMPLETE! ####')
                 self.upload_get_lastrun_folder()
             elif name == 'make_customer_files':
                 self.coa.make_customer_files2()
@@ -630,7 +620,6 @@ class coa():
 
         except Exception as err:   # TODO: I know, bad practice...
             print('\nERROR: \n%s\n' %str(err))
-            #self.button_click('reload_config')
 
 # =================== END: PROGRAM BEHAVIOR ==============================
 

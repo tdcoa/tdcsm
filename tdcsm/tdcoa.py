@@ -33,7 +33,7 @@ class tdcoa:
     systemspath = ''
     filesetpath = ''
     outputpath = ''
-    version = "0.4.0.2.01"
+    version = "0.4.0.2"
     skip_dbs = False    # skip ALL dbs connections / executions
     manual_run = False  # skip dbs executions in execute_run() but not upload_to_transcend()
                         # also skips /*{{save:}}*/ special command
@@ -1105,7 +1105,7 @@ class tdcoa:
         # after logging is done, move the log file too...
         runlogsrc = os.path.join(self.approot, self.folders['run'], 'runlog.txt')
         runlogdst = os.path.join(outputpath, 'runlog.txt')
-        shutil.move(runlogsrc, runlogdst)
+        if os.path.isfile(runlogsrc): shutil.move(runlogsrc, runlogdst)
 
     def collect_data(self, name=''):
         self.utils.log('collect_data started', header=True)
