@@ -1,12 +1,6 @@
 # Substitutions can be used in both the config.yaml (below),
-#   as well as all .coa.sql files generated in later steps.
-#   format is {name} --> value   (all instances)
-#   Order of config substitution is:
-#      - secrets.yaml
-#      - config.yaml: substitutions, folders, settings, transcend
-#   Order of sql substitution is, per file set:
-#      - config.yaml: system, substitutions, filesets (in download folder)
-
+# as well as all .coa.sql files as part of the "Prepare SQL" step.
+#   format is {name} --> value
 
 substitutions:
   account:            "Demo Customer"

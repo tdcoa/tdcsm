@@ -33,7 +33,7 @@ class tdcoa:
     systemspath = ''
     filesetpath = ''
     outputpath = ''
-    version = "0.4.0.3"
+    version = "0.4.0.4"
     skip_dbs = False    # skip ALL dbs connections / executions
     manual_run = False  # skip dbs executions in execute_run() but not upload_to_transcend()
                         # also skips /*{{save:}}*/ special command
@@ -1923,7 +1923,7 @@ class tdcoa:
         tmp = []
         tmp.append('systems:')
         tmp.append('  Transcend:')
-        tmp.append('    siteid:      "TDCLOUD14TD03"  ')
+        tmp.append('    siteid:      "TRANSCEND02"  ')
         tmp.append('    active:      "True"')
         tmp.append('    host:        "tdprdcop3.td.teradata.com"')
         tmp.append('    username:    "{td_quicklook}"')

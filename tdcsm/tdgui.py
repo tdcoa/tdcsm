@@ -10,7 +10,7 @@ import tdcsm
 
 class coa():
 
-    version = "0.4.0.3"
+    version = "0.4.0.4"
     debug = False
 
     entryvars = {}
@@ -695,67 +695,7 @@ class coa():
         self.newframe_LEB(frmConfigFiles, labeltext='  Config File:', btntext='Open File'  , btn_width=10, btncommand='config'  , style='%s-normal' %stylename).pack(fill=X)
         self.newframe_LEB(frmConfigFiles, labeltext=' Systems File:', btntext='Open File'  , btn_width=10, btncommand='systems' , style='%s-normal' %stylename).pack(fill=X)
         self.newframe_LEB(frmConfigFiles, labeltext=' Secrets File:', btntext=''           , btn_width=10, btncommand='secrets' , style='%s-normal' %stylename).pack(fill=X)
-        self.newframe_LEB(frmConfigFiles, labeltext='FileSets File:', btntext='Open File'  , btn_width=10, btncommand='filesets', style='%s-normal' %stylename).pack(fill=X)
-
-        #
-        # #-------------- TAB: NORMAL RUN ------------------
-        # frmNormalrun_N  = Frame(tabNormalrun, style="normalrun-normal.TFrame"); frmNormalrun_N.pack(side=TOP,    padx=5,  fill=BOTH, expand=True, anchor=N)
-        # Label(frmNormalrun_N, text='   Step 2: Select Systems and FileSets:', style='normalrun-bold.TLabel').pack(fill=X, anchor=N)
-        # self.newframe_Tx2(frmNormalrun_N, treetext='SYSTEMS',  treelabel_left='Active', treelabel_right='Inactive', width=120, treeheight=5, style = 'normalrun-normal').pack(side=LEFT , fill=BOTH, expand=True)
-        # self.newframe_Tx2(frmNormalrun_N, treetext='FILESETS', treelabel_left='Active', treelabel_right='Inactive', width=150, treeheight=5, style = 'normalrun-normal').pack(side=RIGHT, fill=BOTH, expand=True)
-        #
-        # frmNormalrun_S  = Frame(tabNormalrun, style="normalrun-normal.TFrame"); frmNormalrun_S.pack(side=BOTTOM, padx=15, fill=BOTH, expand=True, anchor=S)
-        # Label(frmNormalrun_S, text='   Step 3: NORMAL RUN - YOU HAVE ACCESS TO THE CUSTOMER SYSTEM DIRECTLY:', style='normalrun-bold.TLabel').pack(fill=X, anchor=N)
-        #
-        # frmNormalrun_S1  = Frame(frmNormalrun_S, padding=5, style="normalrun-normal.TFrame"); frmNormalrun_S1.pack(side=TOP, fill=X, expand=True, anchor=N)
-        # self.separator(frmNormalrun_S, style='normalrun-normal', width=8)
-        # frmNormalrun_S2  = Frame(frmNormalrun_S, padding=5, style="normalrun-normal.TFrame"); frmNormalrun_S2.pack(side=TOP, fill=X, expand=True, anchor=N)
-        # self.separator(frmNormalrun_S, style='normalrun-normal', width=8)
-        # frmNormalrun_S3  = Frame(frmNormalrun_S, padding=5, style="normalrun-normal.TFrame"); frmNormalrun_S3.pack(side=TOP, fill=X, expand=True, anchor=N)
-        # self.separator(frmNormalrun_S, style='normalrun-normal', width=8)
-        # frmNormalrun_S4  = Frame(frmNormalrun_S, padding=5, style="normalrun-normal.TFrame"); frmNormalrun_S4.pack(side=TOP, fill=X, expand=True, anchor=N)
-        #
-        # Label(frmNormalrun_S1, text='Open\nInternet:     ', style='normalrun-bold.TLabel').pack(side=LEFT, anchor=W)
-        # self.newframe_CLB(frmNormalrun_S1, btntext='Download Files',      btncommand='download_files',      style='normalrun-normal').pack(fill=X, expand=True)
-        # self.newframe_CLB(frmNormalrun_S1, btntext='Prepare SQL',         btncommand='prepare_sql',         style='normalrun-normal').pack(fill=X, expand=True)
-        # Label(frmNormalrun_S2, text='Customer  \nVPN:', style='normalrun-bold.TLabel').pack(side=LEFT, anchor=W)
-        # self.newframe_CLB(frmNormalrun_S2, btntext='Execute Run',         btncommand='execute_run',         style='normalrun-normal').pack(fill=X, expand=True)
-        # Label(frmNormalrun_S3, text='Teradata  \nVPN:', style='normalrun-bold.TLabel').pack(side=LEFT, anchor=W)
-        # self.newframe_LEB(frmNormalrun_S3, labeltext='Output Folder:', btntext='Open', btncommand='last_output_folder', lbl_width=15, style='normalrun-normal').pack(fill=X, expand=True)
-        # self.newframe_CLB(frmNormalrun_S3, btntext='Upload to Transcend', btncommand='upload_to_transcend', style='normalrun-normal').pack(fill=X, expand=True)
-        # self.newframe_CLB(frmNormalrun_S4, btntext='Run All Checked', btncommand='run_all_checked', style='normalrun-normal', labeltext=' Check All\n<---------', checkcommand=self.toggle_all_chk_normalrun ).pack(fill=X)
-        #
-        #
-        #
-        # #-------------- TAB: ASSISTED RUN ------------------
-        # frmAssistedrun_N  = Frame(tabAssistedrun, style="assistedrun-normal.TFrame"); frmAssistedrun_N.pack(side=TOP,    padx=5,  fill=BOTH, expand=True, anchor=N)
-        # Label(frmAssistedrun_N, text='   Step 2: Select Systems and FileSets:', style='assistedrun-bold.TLabel').pack(fill=X, anchor=N)
-        # self.newframe_Tx2(frmAssistedrun_N, treetext='SYSTEMS (Assisted)',  treelabel_left='Active', treelabel_right='Inactive', width=120, treeheight=5, style = 'assistedrun-normal').pack(side=LEFT , fill=BOTH, expand=True)
-        # self.newframe_Tx2(frmAssistedrun_N, treetext='FILESETS (Assisted)', treelabel_left='Active', treelabel_right='Inactive', width=150, treeheight=5, style = 'assistedrun-normal').pack(side=RIGHT, fill=BOTH, expand=True)
-        #
-        # frmAssistedrun_S  = Frame(tabAssistedrun, style="assistedrun-normal.TFrame"); frmAssistedrun_S.pack(side=BOTTOM, padx=15, fill=BOTH, expand=True, anchor=S)
-        # Label(frmAssistedrun_S, text='   Step 3: ASSISTED RUN - YOU SEND FILES TO CUSTOMER CONTACT FOR EXECUTION:', style='assistedrun-bold.TLabel').pack(fill=X, anchor=N)
-        #
-        # frmAssistedrun_S1  = Frame(frmAssistedrun_S, padding=5, style="assistedrun-normal.TFrame"); frmAssistedrun_S1.pack(side=TOP, fill=X, expand=True, anchor=N)
-        # self.separator(frmAssistedrun_S, style='normalrun-normal', width=8)
-        # frmAssistedrun_S2  = Frame(frmAssistedrun_S, padding=5, style="assistedrun-normal.TFrame"); frmAssistedrun_S2.pack(side=TOP, fill=X, expand=True, anchor=N)
-        # self.separator(frmAssistedrun_S, style='normalrun-normal', width=8)
-        # frmAssistedrun_S3  = Frame(frmAssistedrun_S, padding=5, style="assistedrun-normal.TFrame"); frmAssistedrun_S3.pack(side=TOP, fill=X, expand=True, anchor=N)
-        # self.separator(frmAssistedrun_S, style='normalrun-normal', width=8)
-        # frmAssistedrun_S4  = Frame(frmAssistedrun_S, padding=5, style="assistedrun-normal.TFrame"); frmAssistedrun_S4.pack(side=TOP, fill=X, expand=True, anchor=N)
-        #
-        # Label(frmAssistedrun_S1, text='Open\nInternet:     ', style='assistedrun-bold.TLabel').pack(side=LEFT, anchor=W)
-        # self.newframe_CLB(frmAssistedrun_S1, btntext='Download Files',      btncommand='download_files',      style='assistedrun-normal').pack(fill=X, expand=True)
-        # Label(frmAssistedrun_S2, text='No\nInternet      \nNeeded:', style='assistedrun-bold.TLabel').pack(side=LEFT, anchor=W)
-        # self.newframe_CLB(frmAssistedrun_S2, btntext='Prepare SQL',         btncommand='prepare_sql',         style='assistedrun-normal').pack(fill=X, expand=True)
-        # self.newframe_CLB(frmAssistedrun_S2, btntext='Make Customer Files', btncommand='make_customer_files', style='assistedrun-normal').pack(fill=X, expand=True)
-        # self.newframe_LEB(frmAssistedrun_S2, labeltext='Output Folder:', btntext='Open', btncommand='last_output_folder', lbl_width=15, style='assistedrun-normal').pack(fill=X, expand=True)
-        # self.newframe_CLB(frmAssistedrun_S2, show_chkbox=False,  btntext='Process Return Data',  btncommand='process_data',        style='assistedrun-normal').pack(fill=X, expand=True)
-        # Label(frmAssistedrun_S3, text='Teradata   \nVPN:', style='assistedrun-bold.TLabel').pack(side=LEFT, anchor=W)
-        # self.newframe_CLB(frmAssistedrun_S3, show_chkbox=False,  btntext='Upload to Transcend', btncommand='upload_to_transcend', style='assistedrun-normal').pack(fill=X, expand=True)
-        # self.newframe_CLB(frmAssistedrun_S4, btntext='Run All Checked', btncommand='run_all_checked_assist', style='assistedrun-normal', labeltext=' Check All\n<---------', checkcommand=self.toggle_all_chk_assistedrun ).pack(fill=X)
-        #
-        #
+        self.newframe_LEB(frmConfigFiles, labeltext='FileSets File:', btntext='Open File'  , btn_width=10, btncommand='filesets', style='%s-normal' %stylename) # pack(fill=X)
 
 
 

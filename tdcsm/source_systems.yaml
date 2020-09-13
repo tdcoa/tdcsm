@@ -17,17 +17,17 @@ systems:
   Transcend:
     active:      "True"
     # these are the actual settings for Transcend Prod:
-    siteid:      "TRANSCEND02"
-    dbsversion:  "16.20"
-    collection:  "pdcr"
+    siteid:      "TRANSCEND02"  # must match CIS value (what CS&S uses)
+    dbsversion:  "16.20"        # first two values of TD-DBMS version: 16.xx, 15.xx, etc.
+    collection:  "pdcr"         # pdcr or dbc
     use:         "Production"
     # connection info:
-    host:        "tdprd.td.teradata.com"
-    logmech:     "ldap"
-    driver:      "sqlalchemy"
-    encryption:  "false"
-    username:    "{td_quicklook}"
-    password:    "{td_password}"
+    host:        "tdprd.td.teradata.com"  # IP or DNS
+    logmech:     "ldap"             # TD2 (default), ldap, krb5, ntlm, etc.
+    driver:      "sqlalchemy"       # internal only, don't change
+    encryption:  "false"            # true or false (default)
+    username:    "{td_quicklook}"   # must match value in "secrets.yaml"
+    password:    "{td_password}"    # must match value in "secrets.yaml"
     # other name/value pairs (anything you want)
     some_value:  "Bear"
     # Optional (advanced) fileset definitions, for scripting or overrides
@@ -42,17 +42,17 @@ systems:
   TranscendAWS:
     active:      "True"
     # these are the actual settings for Transcend AWS:
-    siteid:      "TRNAWS01"
-    dbsversion:  "16.20"
-    collection:  "pdcr"
+    siteid:      "TRNAWS01"     # must match CIS value (what CS&S uses)
+    dbsversion:  "16.20"        # first two values of TD-DBMS version: 16.xx, 15.xx, etc.
+    collection:  "pdcr"         # pdcr or dbc
     use:         "DR/Test"
     # connection info:
-    host:        "tdprd2.td.teradata.com"
-    logmech:     "ldap"
-    driver:      "sqlalchemy"
-    encryption:  "false"
-    username:    "{td_quicklook}"
-    password:    "{td_password}"
+    host:        "tdprd2.td.teradata.com"  # IP or DNS
+    logmech:     "ldap"             # TD2 (default), ldap, krb5, ntlm, etc.
+    driver:      "sqlalchemy"       # leave as-is unless instructed otherwise
+    encryption:  "false"            # true or false (default)
+    username:    "{td_quicklook}"   # must match value in "secrets.yaml"
+    password:    "{td_password}"    # must match value in "secrets.yaml"
     # other name/value pairs (anything you want)
     some_value:  "Bear"
     # Optional (advanced) fileset definitions, for scripting or overrides
@@ -61,28 +61,3 @@ systems:
     filesets:
       demo:
         active:     "True"
-
-
-  Axeda_SystemABC:
-    active:      "True"
-    # system info:   YOU WILL NEED TO REPLACE THESE VALUES!
-    siteid:      "Enter_Site_ID_Here"
-    dbsversion:  "16.20"
-    collection:  "pdcr"
-    use:         "test"   # prod/qa/dr/dev/etc
-    # connection info:
-    host:        "127.0.0.10"  # this is default for Axeda connections
-    username:    "{custsys_username}"
-    password:    "{custsys_password}"
-    logmech:     "ldap"
-    driver:      "sqlalchemy"
-    encryption:  "false"
-    # other name/value pairs (anything you want)
-    some_value:  "Bear"
-    # Optional (advanced) fileset definitions, for scripting or overrides
-    # if this doesn't make sense, just stick with the GUI, which makes
-    # this section irrelevant.
-    filesets:
-      demo:
-        active:     "True"
-        some_value: "Aardvark"
