@@ -84,15 +84,20 @@ class Utils(Logger):
 
                 for colname, colpytype in dfcsv.dtypes.items():
                     coltype = ''
-                    if str(colpytype) == 'object':
-                        collen = dfcsv[colname].map(str).map(len).max() + 100
-                        coltype = 'VARCHAR(%i)  CHARACTER SET UNICODE ' % collen
-                        coldefs[colname] = {'type': 'varchar(%i)' % collen, 'len': collen, 'quote': "'", 'null': "''"}
+                    self.log('column: %s is python type: %s' %(colname, colpytype))
 
                     if str(colpytype)[:3] == 'int':
                         coltype = 'BIGINT'
                         coldefs[colname] = {'type': 'bigint', 'len': 0, 'quote': '', 'null': 'NULL'}
+                    if str(colpytype)[:5] == 'float':
+                        coltype = 'DECIMAL(32,10)'
+                        coldefs[colname] = {'type': 'decimal(32,10)', 'len': 32, 'quote': '', 'null': 'NULL'}
+                    else: # str(colpytype) == 'object':
+                        collen = dfcsv[colname].map(str).map(len).max() + 100
+                        coltype = 'VARCHAR(%i)  CHARACTER SET UNICODE ' % collen
+                        coldefs[colname] = {'type': 'varchar(%i)' % collen, 'len': collen, 'quote': "'", 'null': "''"}
 
+                    self.log('    translated to db type: %s' %coltype)
                     tmp = '"%s"' % str(colname)
                     sql.append('%s%s%s' % (delim, tmp.ljust(30), coltype))
                     delim = ','

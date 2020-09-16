@@ -369,6 +369,11 @@ class coa():
             else:
                 print(self.stripsecrets('%s%s%s'  %(' '*lvl, str(n+':').ljust(20), str(v)), secretdict))
 
+    @staticmethod
+    def print_complete(sectionname=''):
+        msg = '\n' + str('#'*10) + " '" +  sectionname + "' complete! " + str('#'*10) + '\n'
+        print(msg)
+
     def stripsecrets(self, msg='', secretdict={}):
         for nm, secret in secretdict.items():
             if secret in msg:
@@ -511,7 +516,6 @@ class coa():
         print('%s' %argstr)
 
         try:
-
             if name == 'reload_config':
                 self.coa.approot      = self.entryvar('approot')
                 self.coa.configpath   = os.path.join(self.coa.approot, self.entryvar('config'))
@@ -530,30 +534,37 @@ class coa():
                 self.upload_get_lastrun_folder(lastrunfile='')
                 self.button_click('tv_systems_left') # this 'click' will refresh both left and right treeviews
                 self.button_click('tv_filesets_left')
+                self.print_complete(name)
             elif name == 'approot':
                 approot = kwargs['entrytext'].replace(r':\U',r':\\U')
                 self.open_folder_explorer(approot, createifmissing=True)
             elif name == 'download_files':
                 self.coa.download_files(self.motd)
                 self.motd = False
+                self.print_complete(name)
             elif name == 'prepare_sql':
                 self.coa.prepare_sql()
+                self.print_complete(name)
             elif name == 'execute_run':
                 self.button_click('opendir_run')
                 self.coa.execute_run()
-                print('#### EXECUTE COMPLETE! ####')
                 self.upload_get_lastrun_folder()
+                self.print_complete(name)
             elif name == 'make_customer_files':
                 self.coa.make_customer_files2()
                 self.upload_get_lastrun_folder()
-                self.open_folder_explorer(os.path.join(self.entryvar('approot'), kwargs['entrytext']), createifmissing=True)
+                if 'entrytext' in kwargs:
+                    self.open_folder_explorer(os.path.join(self.entryvar('approot'), kwargs['entrytext']), createifmissing=True)
+                self.print_complete(name)
             elif name == 'process_data':
                 self.button_click('opendir_run')
                 self.coa.process_return_data2(os.path.join(self.coa.approot, self.entryvar('last_output_folder')))
+                self.print_complete(name)
             elif name == 'upload_to_transcend':
                 with open(os.path.join(self.entryvar('approot'), '.last_run_output_path.txt'), 'w') as fh:
                     fh.write(self.entryvar('last_output_folder'))
                 self.coa.upload_to_transcend()
+                self.print_complete(name)
             elif name == 'motd':
                 self.coa.display_motd()
             elif name == 'last_output_folder':
