@@ -1,0 +1,3 @@
+cd "$(dirname "$0")"
+echo LOADING, PLEASE WAIT...
+python3 -c "from tdcsm.tdgui import coa;c=coa()"
