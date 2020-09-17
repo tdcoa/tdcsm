@@ -55,32 +55,34 @@ def create_shortcut():
 	import stat
 	from textwrap import dedent
 
-	print("Creating a desktop shortcut...", end='')
+	print("Creating a desktop shortcut...", flush=True, end='')
 
 	(Path.home() / 'tdcsm').mkdir(exist_ok=True)
 
 	if system() == "Windows":
-		shortcut = Path.home() / "Desktop" / "tdcsm-cmd.bat"
-		with open(shortcut, "w") as fh:
-			fh.write(dedent(f"""\
-				@echo off
-				set "PATH={venv_bin().parent};%PATH%"
-				cd "{Path.home() / 'tdcsm'}"
-				tdcsm gui
-				"""))
-
+		locations = [Path.home() / 'tdcsm', *filter(Path.exists, (Path.home() / d / "Desktop" for d in ['.', 'OneDrive - Teradata']))]
+		sfx = 'bat'
+		tdcsm_cmd = dedent(f"""\
+			@echo off
+			set "PATH={venv_bin().parent};%PATH%"
+			cd "{Path.home() / 'tdcsm'}"
+			tdcsm gui
+			""")
 	else:
+		locations = [Path.home() / 'tdcsm', Path.home() / "Desktop"]
 		sfx = 'command' if system() == 'Darwin' else 'sh'
-		shortcut = Path.home() / "Desktop" / f"tdcsm-cmd.{sfx}"
-		with open(shortcut, "w") as fh:
-			fh.write(dedent(f"""\
-				#! /bin/sh
-				export PATH="{venv_bin().parent}:$PATH"
-				cd "{Path.home() / 'tdcsm'}"
-				tdcsm gui
-				"""))
+		tdcsm_cmd = dedent(f"""\
+			#! /bin/sh
+			export PATH="{venv_bin().parent}:$PATH"
+			cd "{Path.home() / 'tdcsm'}"
+			tdcsm gui
+			""")
 
-	shortcut.chmod(shortcut.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+	for loc in locations:
+		shortcut = loc / f"tdcsm-cmd.{sfx}"
+		with shortcut.open("w") as fh:
+			fh.write(tdcsm_cmd)
+		shortcut.chmod(shortcut.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
 	print("done", end='')
 

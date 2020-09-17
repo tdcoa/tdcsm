@@ -170,21 +170,21 @@ class Utils(Logger):
         if sql.replace(';', '').strip() == '':
             sql = ''
 
-        else:
-            # replace --comments with /* comments */
-            newsql = []
-            for line in sql.split('\n'):
-                if line.strip()[:2] != '/*':  # skip comment-starting  lines
-                    lineparts = line.split('--')
-                    if len(lineparts) != 1:
-                        firstpart = lineparts[0].strip()
-                        secondpart = line[len(firstpart) + 2:].strip()
-                        newsql.append('%s /* %s */' % (firstpart, secondpart))
-                    else:
-                        newsql.append(line)
-                else:
-                    newsql.append(line)
-            sql = '\n'.join(newsql).strip()
+        # else:
+        #     # replace --comments with /* comments */
+        #     newsql = []
+        #     for line in sql.split('\n'):
+        #         if line.strip()[:2] != '/*':  # skip comment-starting  lines
+        #             lineparts = line.split('--')
+        #             if len(lineparts) != 1:
+        #                 firstpart = lineparts[0].strip()
+        #                 secondpart = line[len(firstpart) + 2:].strip()
+        #                 newsql.append('%s /* %s */' % (firstpart, secondpart))
+        #             else:
+        #                 newsql.append(line)
+        #         else:
+        #             newsql.append(line)
+        #     sql = '\n'.join(newsql).strip()
 
         return sql
 
