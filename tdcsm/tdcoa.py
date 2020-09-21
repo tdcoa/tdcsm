@@ -33,7 +33,7 @@ class tdcoa:
     systemspath = ''
     filesetpath = ''
     outputpath = ''
-    version = "0.4.0.7"
+    version = "0.4.0.8"
     skip_dbs = False    # skip ALL dbs connections / executions
     manual_run = False  # skip dbs executions in execute_run() but not upload_to_transcend()
                         # also skips /*{{save:}}*/ special command
@@ -266,6 +266,13 @@ class tdcoa:
         giturl = githost + self.settings['gitfileset']
         self.utils.log('downloading "filesets.yaml" from github')
         self.utils.log('  requesting url', giturl)
+
+        # add skip_git check from config.settings
+        if 'skip_git' in self.settings and self.settings['skip_git']=='True':
+            skip_git = True
+            self.utils.log('setting found in config.yaml', 'skip_git: "True"')
+
+        # skip git download if requested
         if skip_git:
             self.utils.log('filesets.yaml download skipped, using cached local copy', warning=True)
         else:
@@ -278,24 +285,37 @@ class tdcoa:
                     self.utils.log('filesets.yaml saved')
             except Exception as ex:
                 self.utils.log('filesets.yaml could not be downloaded, using cached local copy', warning=True)
-                self.utils.log('Error: %s' %str(ex), indent=2)
+                # self.utils.log('Error: %s' %str(ex), indent=2)
 
         # load filesets dictionary (active only)
         self.utils.log('loading dictionary', 'filesets (active only)')
-        with open(self.filesetpath, 'r') as fh:
-            filesetstr = fh.read()
-        filesetyaml = yaml.load(filesetstr, Loader=yaml.FullLoader)
-        if not filesetyaml:
-            msg = 'filesets.yaml appears empty, please make sure it contains valid yaml configuration.\n'
-            msg = msg + 'when in doubt: delete the existing filesets.yaml file from the "download" folder,\n'
-            msg = msg + 'and run the process again.  When missing, it will create a default file of\n'
-            msg = msg + 'the correct format.  When executing the "download_sql" command, the program\n'
-            msg = msg + 'will also re-download the latest filesets.yaml from github.'
-            self.utils.log(msg, error=True)
-            raise IOError(msg)
-        for setname, setobject in filesetyaml.items():
-            if str(setobject['active']).strip().lower() == 'true':
-                self.filesets.update({setname: setobject})
+        if not os.path.isfile(self.filesetpath):
+            self.utils.log('the filesets.yaml file is not found at the expected location: \n\t%s\n' %self.filesetpath, error=True)
+            self.utils.log('this might be caused by a network disallowing downloads from GitHub.com, or being offline entirely')
+            self.utils.log('downloading the filesets.yaml is a HARD REQUIREMENT, as that file defines all filesets in real-time')
+            self.utils.log('\nRecommended Actions:')
+            self.utils.log('  1) manually download the fileset definition file here:\n    https://raw.githubusercontent.com/tdcoa/sql/master/filesets/filesets.yaml')
+            self.utils.log('  2) save to your "1_download" folder as "filesets.yaml"')
+            self.utils.log('  3) to prevent waiting for the connection timeout, open your "config.yaml" file and in the "settings" section add:\n    skip_git: "True" # (remember to match the indent)')
+            self.utils.log('  4) click the "Reload Configs" button')
+            self.utils.log('  5) plan to manually refresh the filesets.yaml file periodically\n\n')
+            self.utils.log('Finally Note: all other fileset collateral is likewise downloaded from github, so you are likely to hit similar errors during the Download phase.\n\n')
+
+        else:
+            with open(self.filesetpath, 'r') as fh:
+                filesetstr = fh.read()
+            filesetyaml = yaml.load(filesetstr, Loader=yaml.FullLoader)
+            if not filesetyaml:
+                msg = 'filesets.yaml appears empty, please make sure it contains valid yaml configuration.\n'
+                msg = msg + 'when in doubt: delete the existing filesets.yaml file from the "download" folder,\n'
+                msg = msg + 'and run the process again.  When missing, it will create a default file of\n'
+                msg = msg + 'the correct format.  When executing the "download_sql" command, the program\n'
+                msg = msg + 'will also re-download the latest filesets.yaml from github.'
+                self.utils.log(msg, error=True)
+                raise IOError(msg)
+            for setname, setobject in filesetyaml.items():
+                if str(setobject['active']).strip().lower() == 'true':
+                    self.filesets.update({setname: setobject})
 
         # load systems (no longer active only)
         self.utils.log('loading system dictionaries')
@@ -343,6 +363,7 @@ class tdcoa:
         bp.append(".SEPARATOR '%s'" %self.bteq_sep)
         bp.append(".SET NULL AS ''")
         bp.append('.WIDTH 1048575')
+        bp.append('.RETLIMIT * *')
         bp.append('---------------------------------------------------------------------')
         self.bteq_prefix = '\n'.join(bp)
 
