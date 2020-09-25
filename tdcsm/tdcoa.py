@@ -367,6 +367,9 @@ class tdcoa:
         bp.append('---------------------------------------------------------------------')
         self.bteq_prefix = '\n'.join(bp)
 
+        self.substitutions['YYYYMMDD'] = dt.datetime.today().strftime('%Y%m%d')
+        self.substitutions['YYYYMM'] = dt.datetime.today().strftime('%Y%m')
+
         self.utils.log('done!')
         self.utils.log('time', str(dt.datetime.now()))
 
