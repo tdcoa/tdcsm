@@ -10,7 +10,7 @@ import tdcsm
 
 class coa():
 
-    version = "0.4.0.8"
+    version = "0.4.0.9"
     debug = False
 
     entryvars = {}
@@ -531,6 +531,7 @@ class coa():
                 print('fileset: ', self.coa.filesetpath)
                 self.coa.deactivate_all()
                 self.entryvars['skip_dbs_toggle'].set(value=self.validate_boolean(self.coa.settings['skip_dbs'],'int'))
+                self.entryvars['bteq_delim'].set(value=self.coa.bteq_delim)
                 self.upload_get_lastrun_folder(lastrunfile='')
                 self.button_click('tv_systems_left') # this 'click' will refresh both left and right treeviews
                 self.button_click('tv_filesets_left')
@@ -613,6 +614,9 @@ class coa():
                 print('opening %s' %dir)
                 pth = os.path.join(self.entryvar('approot'), self.coa.folders[dir])
                 self.open_folder_explorer(pth , createifmissing=False)
+            elif name == 'bteq_delim':
+                self.coa.bteq_delim = kwargs['entrytext']
+                print('bteq delimiter updated')
             elif name == 'print_systems':
                 self.print_dict(self.coa.systems, 'systems', 0, self.coa.secrets)
             elif name == 'print_filesets':
@@ -762,6 +766,7 @@ class coa():
         self.newframe_LC(frmHelp_E, labeltext='Skip_DBS Flag (debugging)', checkcommand='skip_dbs_toggle', style='help-normal').pack(anchor=S)
         self.newframe_LC(frmHelp_E, labeltext='Skip_Git Flag (debugging)', checkcommand='skip_git_toggle', style='help-normal').pack(anchor=S)
         self.newframe_LC(frmHelp_E, labeltext='Show Hidden Filesets (debugging)', checkcommand='show_hiddenfilesets_toggle', style='help-normal').pack(anchor=S)
+        self.newframe_LEB(frmHelp_E, labeltext='BTEQ Delimiter', btntext='Update', btncommand='bteq_delim', style = 'help-normal', lbl_width=20, btn_width=8).pack(anchor=S)
         frmHelp_W  = Frame(frmHelp, padding=5, style="help-normal.TFrame"); frmHelp_W.pack(side=LEFT, expand=False, anchor=W)
         Label(frmHelp_W, text='Print Dictionary:', style='help-bold.TLabel').pack(fill=X, anchor=N)
         self.newbutton(frmHelp_W, btntext = 'Systems',  btncommand='print_systems',  btnwidth=15, style = 'help-normal', side=TOP)
@@ -781,6 +786,7 @@ class coa():
         self.version = self.coa.version
         self.entryvars['secrets'].set(self.first_file_that_exists(self.coa.settings['secrets'], os.path.join(self.entryvar('approot'),"secrets.yaml")))
         self.coa.reload_config(skip_git = True, secrets=self.entryvar('secrets'))
+        self.entryvars['bteq_delim'].set(value=self.coa.bteq_delim)
         print('secrets: ' + self.entryvar('secrets') )
 
         self.coa.deactivate_all()

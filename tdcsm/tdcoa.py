@@ -33,7 +33,7 @@ class tdcoa:
     systemspath = ''
     filesetpath = ''
     outputpath = ''
-    version = "0.4.0.8"
+    version = "0.4.0.9"
     skip_dbs = False    # skip ALL dbs connections / executions
     manual_run = False  # skip dbs executions in execute_run() but not upload_to_transcend()
                         # also skips /*{{save:}}*/ special command
@@ -352,7 +352,7 @@ class tdcoa:
         self.secretpath = secretpath
         self.systemspath = systemspath
 
-        self.bteq_sep = '|'
+        self.bteq_delim = '|~|'
         bp=[]
         bp.append('---------------------------------------------------------------------')
         bp.append('--- add credentials below, all else should run & export automatically')
@@ -360,7 +360,7 @@ class tdcoa:
         bp.append('.logmech TD2 --- example options: NTLM, KRB5, LDAP, TD2')
         bp.append('.LOGON host/username,password')
         bp.append('.TITLEDASHES off')
-        bp.append(".SEPARATOR '%s'" %self.bteq_sep)
+        bp.append(".SEPARATOR '%s'" %self.bteq_delim)
         bp.append(".SET NULL AS ''")
         bp.append('.WIDTH 1048575')
         bp.append('.RETLIMIT * *')
@@ -2129,15 +2129,25 @@ class tdcoa:
         return trunk
 
     def coafile_convert_psv2csv(self, trunk):
-        """Tests csv files for pipe-delimited (for bteq), and if true, convert to comma delimited"""
+        """Tests csv files for pipe-delimited or self.bteq_delim, and if true, convert to comma delimited"""
         self.utils.log('subfunction called', trunk['function_name'], indent=trunk['log_indent'])
 
         # open file and determine whether .csv or .psv:
         self.utils.log('opening file', trunk['filepath_in'], indent=trunk['log_indent']+2)
         filetext = open(trunk['filepath_in'],'r').read()
-        sep = ',' if filetext.count(',') > filetext.count('|') else '|'
+
+        # iterate to the best-fit delimiter amonst candidates, with bias towards earlier found
+        self.utils.log('testing for best-fit delimiter candidate...')
+        sep = self.bteq_delim
+        for sepc in [',,', ',', '::', ':', ';;', ';', '||', '|']:
+            if (filetext.count(sepc)*len(sepc)*1.1) > (filetext.count(sep)*len(sep)): sep = sepc
+        self.utils.log('delimiter %s wins with %i instances found' %(str(sep), filetext.count(sep)))
+
         filetext = None # be kind
         self.utils.log('file delimiter determined as', sep, indent=trunk['log_indent']+4)
+
+        # if sep is greater than 1 character, it's treated as regex... let's undo that
+        if len(sep) > 1: sep = ''.join(['\\'+ c for c in sep])
 
         if sep != ',':
             df = pd.read_csv(trunk['filepath_in'], sep=sep)
