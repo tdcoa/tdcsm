@@ -187,7 +187,10 @@ def replace_placeholders(pptpath: Path, datapath: Path, output: Optional[Path] =
 
 	ppt = pptx.Presentation(pptpath)
 	for ph in find_placeholders(ppt):
-		ph.replace(datapath)
+		try:
+			ph.replace(datapath)
+		except FileNotFoundError as err:
+			logger.warning("Ignoring missing '%s', while creating '%s'", err.filename, pptpath.name)
 	ppt.save(output if output is not None else pptpath)
 
 	logger.debug('finished - load_csv cache_info: %s', str(load_csv.cache_info()))

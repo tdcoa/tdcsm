@@ -51,6 +51,16 @@ def test_ppt_multival(pptxdir: Path) -> None:
 	assert [para.font.name for para in shapes[0].shapes[0].text_frame.paragraphs] == ['Arial', 'Arial', 'Arial']
 
 
+def test_missing_pic(pptxdir: Path) -> None:
+	"assert missing pic file doesn't cause an exception"
+	replace_placeholders(pptxdir / "test_missing_pic.pptx", pptxdir)
+
+
+def test_missing_csv(pptxdir: Path) -> None:
+	"assert missing CSV file doesn't cause an exception"
+	replace_placeholders(pptxdir / "test_missing_csv.pptx", pptxdir)
+
+
 def test_ppt_all(pptxdir: Path) -> None:
 	"assert values being replaced are same as source"
 	replace_placeholders(pptxdir / "test_all.pptx", pptxdir)
