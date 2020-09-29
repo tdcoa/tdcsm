@@ -33,7 +33,7 @@ class tdcoa:
     systemspath = ''
     filesetpath = ''
     outputpath = ''
-    version = "0.4.1.0"
+    version = "0.4.1.1"
     skip_dbs = False    # skip ALL dbs connections / executions
     manual_run = False  # skip dbs executions in execute_run() but not upload_to_transcend()
                         # also skips /*{{save:}}*/ special command
@@ -2152,18 +2152,15 @@ class tdcoa:
         # if sep is greater than 1 character, it's treated as regex... let's undo that
         if len(sep) > 1: sep = ''.join(['\\'+ c for c in sep])
 
-        if sep != ',':
-            df = pd.read_csv(trunk['filepath_in'], sep=sep)
-            df = df.applymap(lambda x: x.strip() if isinstance(x, str) else x) # trim whitespace from data
-            df = df.rename(columns=lambda x: x.strip()) # trim whitespace from column headers
-            df = df.where(pd.notnull(df), None) # handle nulls
-            self.utils.log('records found', str(len(df)), indent=trunk['log_indent']+4)
-            self.utils.log('columns', str(list(df.columns)), indent=trunk['log_indent']+4)
-            if trunk['filepath_in'][-4:] == '.psv': trunk['filepath_in'] = trunk['filepath_in'][-4:] + '.csv'
-            df.to_csv(trunk['filepath_in'], quotechar='"', quoting=csv.QUOTE_NONNUMERIC)
-            self.utils.log('file converted to .csv', indent=trunk['log_indent']+4)
-        else:
-            self.utils.log('file already .csv, no change', indent=trunk['log_indent']+4)
+        df = pd.read_csv(trunk['filepath_in'], sep=sep)
+        df = df.applymap(lambda x: x.strip() if isinstance(x, str) else x) # trim whitespace from data
+        df = df.rename(columns=lambda x: x.strip()) # trim whitespace from column headers
+        df = df.where(pd.notnull(df), None) # handle nulls
+        self.utils.log('records found', str(len(df)), indent=trunk['log_indent']+4)
+        self.utils.log('columns', str(list(df.columns)), indent=trunk['log_indent']+4)
+        if trunk['filepath_in'][-4:] == '.psv': trunk['filepath_in'] = trunk['filepath_in'][-4:] + '.csv'
+        df.to_csv(trunk['filepath_in'], quotechar='"', quoting=csv.QUOTE_NONNUMERIC)
+        self.utils.log('file converted to .csv', indent=trunk['log_indent']+4)
 
         return trunk
 
