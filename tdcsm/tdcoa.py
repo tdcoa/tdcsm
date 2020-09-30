@@ -1036,7 +1036,7 @@ class tdcoa:
                                                     self.utils.log('CSV save location', csvfile)
 
                                                     self.utils.log('saving file...')
-                                                    df.to_csv(csvfile)  # <---------------------- Save to .csv
+                                                    df.to_csv(csvfile, index=False)  # <---------------------- Save to .csv
                                                     self.utils.log('file saved!')
                                                     csvfile_exists = os.path.exists(csvfile)
                                                 if 'vis' in sqlcmd:  # run visualization py file
@@ -1250,7 +1250,7 @@ class tdcoa:
                                                     self.utils.log('CSV save location', csvfile)
 
                                                     self.utils.log('saving file...')
-                                                    df.to_csv(csvfile)  # <---------------------- Save to .csv
+                                                    df.to_csv(csvfile, index=False)  # <---------------------- Save to .csv
                                                     self.utils.log('file saved!')
                                                     csvfile_exists = os.path.exists(csvfile)
 
@@ -2152,15 +2152,18 @@ class tdcoa:
         # if sep is greater than 1 character, it's treated as regex... let's undo that
         if len(sep) > 1: sep = ''.join(['\\'+ c for c in sep])
 
-        df = pd.read_csv(trunk['filepath_in'], sep=sep)
-        df = df.applymap(lambda x: x.strip() if isinstance(x, str) else x) # trim whitespace from data
-        df = df.rename(columns=lambda x: x.strip()) # trim whitespace from column headers
-        df = df.where(pd.notnull(df), None) # handle nulls
-        self.utils.log('records found', str(len(df)), indent=trunk['log_indent']+4)
-        self.utils.log('columns', str(list(df.columns)), indent=trunk['log_indent']+4)
-        if trunk['filepath_in'][-4:] == '.psv': trunk['filepath_in'] = trunk['filepath_in'][-4:] + '.csv'
-        df.to_csv(trunk['filepath_in'], quotechar='"', quoting=csv.QUOTE_NONNUMERIC)
-        self.utils.log('file converted to .csv', indent=trunk['log_indent']+4)
+        if sep != ',':
+            df = pd.read_csv(trunk['filepath_in'], sep=sep)
+            df = df.applymap(lambda x: x.strip() if isinstance(x, str) else x) # trim whitespace from data
+            df = df.rename(columns=lambda x: x.strip()) # trim whitespace from column headers
+            df = df.where(pd.notnull(df), None) # handle nulls
+            self.utils.log('records found', str(len(df)), indent=trunk['log_indent']+4)
+            self.utils.log('columns', str(list(df.columns)), indent=trunk['log_indent']+4)
+            if trunk['filepath_in'][-4:] == '.psv': trunk['filepath_in'] = trunk['filepath_in'][-4:] + '.csv'
+            df.to_csv(trunk['filepath_in'], index=False, quotechar='"', quoting=csv.QUOTE_NONNUMERIC)
+            self.utils.log('file converted to .csv', indent=trunk['log_indent']+4)
+        else:
+            self.utils.log('file already .csv, no change', indent=trunk['log_indent']+4)
 
         return trunk
 
