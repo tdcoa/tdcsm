@@ -23,22 +23,22 @@ def phlist(fname: Path) -> List[str]:
 def test_ppt_pic(pptxdir: Path) -> None:
 	"assert pic type placeholder exists"
 	assert phlist(pptxdir / "test_pic.pptx") == [
-		'type=pic, data=alldates.png, slide#=1, shape=Rectangle 3'
+		'type=pic, data=alldates.png, pat={{pic:alldates.png}}, location=(slide#=1, shape=Rectangle 3, row=None, col=None)'
 	]
 
 
 def test_ppt_col(pptxdir: Path) -> None:
 	"assert table column type placeholders exist"
 	assert phlist(pptxdir / "test_col.pptx") == [
-		'type=col, data=dates.csv, slide#=1, shape=Table 4, loc=0',
-		'type=col, data=dates.csv, slide#=1, shape=Table 4, loc=1'
+		'type=col, data=dates.csv, pat={{col:dates.csv[1]}}, location=(slide#=1, shape=Table 4, row=0, col=0)',
+		'type=col, data=dates.csv, pat={{col:dates.csv[2]}}, location=(slide#=1, shape=Table 4, row=0, col=1)'
 	]
 
 
 def test_ppt_val(pptxdir: Path) -> None:
 	"assert val type placeholder exists"
 	assert phlist(pptxdir / "test_val.pptx") == [
-		'type=val, data=birthday.csv, slide#=1, shape=Content Placeholder 1, loc={{val:birthday.csv[1:2]}}'
+		'type=val, data=birthday.csv, pat={{val:birthday.csv[1:2]}}, location=(slide#=1, shape=Content Placeholder 1, row=None, col=None)'
 	]
 
 
