@@ -103,8 +103,9 @@ class ColPlaceHolder(Placeholder):
 	def replace(self, datapath: Path) -> None:
 		logger.debug("Replacing: %s[%d]", self.datafile, self.colnum)
 		data = (r[self.colnum - 1] for r in load_csv(datapath / self.datafile))
+		font = None
 		for tf, datum in zip(self.loc.ftext_iter(), data):
-			repl_text(tf, None, str(datum))
+			font = repl_text(tf, None, str(datum), font)
 
 	@classmethod
 	def parse(cls, loc: Location, data: str, pat: str) -> Placeholder:
@@ -141,7 +142,7 @@ class ValPlaceHolder(Placeholder):
 		return cls(loc, m.group(1), pat, int(m.group(2)), int(m.group(3)))
 
 
-def repl_text(tf: TextFrame, src: Optional[str], tgt: str) -> None:
+def repl_text(tf: TextFrame, src: Optional[str], tgt: str, dflt_font: Optional[Font] = None) -> Optional[Font]:
 	"replace src text with tgt text in a shape's text_frame object"
 	logger.debug("repl_text() %s with %s", src, tgt)
 	fnm = fsz = fbd = fil = fco = None
@@ -150,11 +151,11 @@ def repl_text(tf: TextFrame, src: Optional[str], tgt: str) -> None:
 		"save current font properties"
 		nonlocal fnm, fsz, fbd, fil, fco
 
-		fnm = font.name
-		fsz = font.size
-		fbd = font.bold
-		fil = font.italic
-		fco = font.color
+		fnm = font.name or fnm
+		fsz = font.size or fsz
+		fbd = font.bold or fbd
+		fil = font.italic or fil
+		fco = font.color or fco
 		logger.debug("repl_text(), saving style: Font Name: %s, Size: %s, Bold: %s, Ital: %s", fnm, fsz, fbd, fil)
 
 	def reapply_style(font: Font) -> None:
@@ -176,6 +177,9 @@ def repl_text(tf: TextFrame, src: Optional[str], tgt: str) -> None:
 			elif fco.type is not None:
 				logger.debug('Unknown color type: %d', fco.type)
 
+	if dflt_font is not None:
+		save_style(dflt_font)
+
 	for para in tf.paragraphs:
 		if src is None or src in para.text:  # src == None => replace any value
 			save_style(para.font)
@@ -188,7 +192,9 @@ def repl_text(tf: TextFrame, src: Optional[str], tgt: str) -> None:
 			else:
 				para.text = para.text.replace(src, tgt)
 			reapply_style(para.font)
-			return
+			return para.font
+
+	return None
 
 
 @lru_cache
@@ -248,8 +254,6 @@ def replace_placeholders(pptpath: Path, datapath: Path, output: Optional[Path] =
 		except FileNotFoundError as err:
 			logger.warning("Ignoring missing '%s', while creating '%s'", err.filename, pptpath.name)
 	ppt.save(output if output is not None else pptpath)
-
-	logger.debug('finished - load_csv cache_info: %s', str(load_csv.cache_info()))
 
 
 def run(ppttmpl: Path, pptout: Optional[Path] = None, data: Optional[Path] = None, debug: bool = False) -> None:
