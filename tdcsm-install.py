@@ -65,6 +65,7 @@ def create_shortcut():
 		tdcsm_cmd = dedent(f"""\
 			@echo off
 			set "PATH={venv_bin().parent};%PATH%"
+			{venv_bin()} -m pip install --upgrade tdcsm
 			cd "{Path.home() / 'tdcsm'}"
 			tdcsm gui
 			""")
@@ -74,6 +75,7 @@ def create_shortcut():
 		tdcsm_cmd = dedent(f"""\
 			#! /bin/sh
 			export PATH="{venv_bin().parent}:$PATH"
+			{venv_bin()} -m pip install --upgrade tdcsm
 			cd "{Path.home() / 'tdcsm'}"
 			tdcsm gui
 			""")
