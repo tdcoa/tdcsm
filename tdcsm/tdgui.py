@@ -10,7 +10,7 @@ import tdcsm
 
 class coa():
 
-    version = "0.4.1.2"
+    version = "0.4.1.3"
     debug = False
 
     entryvars = {}
@@ -44,7 +44,8 @@ class coa():
             self.localos='Mac'
         self.appsize = str(int(self.appwidth)) + 'x' + str(int(self.appheight))
         self.images = {'banner':{'file':'pic_TDCOA_Banner.gif', 'X':700, 'Y':27, 'scale':(self.appwidth - 20) / 700, 'object':None, 'alttext':''}
-                       ,'logo' :{'file':'pic_TDCOAdot.gif',     'X':330, 'Y':55, 'scale':0.5, 'object':None, 'alttext':'Teradata'}}
+                       ,'logo' :{'file':'pic_TDCOAdot.gif',     'X':330, 'Y':55, 'scale':0.5, 'object':None, 'alttext':'Teradata'}
+                       ,'logo' :{'file':'pic_TDCOAdot2.gif',    'X':330, 'Y':55, 'scale':0.5, 'object':None, 'alttext':'Teradata'}}
         if 'versionprefix' in kwargs:
             self.versionprefix = kwargs['versionprefix']
             self.version = self.versionprefix + '.' + self.version
@@ -75,31 +76,31 @@ class coa():
 # =================== BEGIN: MAKE NEW GUI OBJECT COLLECTIONS ==============================
     def define_styles(self, app=None):
         Style(app).theme_use('clam') #clam, alt, default, classic, aqua
-        colors = {  'config'   :'#FDFF95',
-                    'normalrun':'#CAFBFE',
-                    'assistedrun':'#7EFDFF',
-                    'execute'  :'#FEBF25',
-                    'upload'   :'#FE2525',
-                    'help'     :'#D7DCBA'}
+        colors = {  'config'     :'#FFE0A4',
+                    'normalrun'  :'#C6E7E7',
+                    'assistedrun':'#C6E7E7',
+                    'execute'    :'#C6E7E7',
+                    'upload'     :'#C6E7E7',
+                    'help'       :'#BFBFBF'}
         font = self.font
         fontsize = self.fontsize
-        Style(app).configure("TButton"    ,foreground="#ffffff", background="#646464", font=(font, str(fontsize))  )
-        Style(app).configure("TFrame"     ,foreground="#ffffff", background="#000000", font=(font, str(fontsize))  )
-        Style(app).configure("TNotebook"  ,foreground="#ffffff", background="#000000", font=(font, str(fontsize))  )
-        Style(app).configure("TLabel"     ,foreground="#ffffff", background="#000000", font=(font, str(fontsize))  )
-        Style(app).configure("title.TLabel",foreground="#ffffff", background="#000000", font=(font,str(fontsize*2), 'bold')  )
+        Style(app).configure("TButton"    ,foreground="#ffffff", background="#404040", font=(font, str(fontsize))  )
+        Style(app).configure("TFrame"     ,foreground="#ffffff", background="#394951", font=(font, str(fontsize))  )
+        Style(app).configure("TNotebook"  ,foreground="#ffffff", background="#394951", font=(font, str(fontsize))  )
+        Style(app).configure("TLabel"     ,foreground="#ffffff", background="#394951", font=(font, str(fontsize))  )
+        Style(app).configure("title.TLabel",foreground="#ffffff", background="#394951", font=(font,str(fontsize*2), 'bold')  )
 
         for name, hex in colors.items():
-            Style(app).configure("%s-normal.TFrame"       %name, foreground="#000000",   background=colors[name], font=(font, str(fontsize))  )
-            Style(app).configure("%s-normal.TButton"      %name, foreground="#000000",   background=self.shade(colors[name]), font=(font, str(fontsize)), padding=(1,1,1,1)  )
+            Style(app).configure("%s-normal.TFrame"       %name, foreground="#394951",   background=colors[name], font=(font, str(fontsize))  )
+            Style(app).configure("%s-normal.TButton"      %name, foreground="#394951",   background=self.shade(colors[name]), font=(font, str(fontsize)), padding=(1,1,1,1)  )
             Style(app).map(      "%s-normal.TButton"      %name, background=[("disabled",self.shade(colors[name],0.4))])
-            Style(app).configure("%s-normal.TCheckbutton" %name, foreground="#000000",   background=colors[name])
-            Style(app).configure("%s-separator.TFrame"    %name, foreground="#000000",   background=colors[name], font=(font, str(fontsize))  )
-            Style(app).configure("%s-normal.TLabel"       %name, foreground="#000000",   background=colors[name], font=(font, str(fontsize))  )
-            Style(app).configure("%s-bold.TLabel"         %name, foreground="#000000",   background=colors[name], font=(font, str(fontsize), 'bold')  )
-            Style(app).configure("%s-header.TLabel"       %name, foreground="#000000",   background=colors[name], font=(font, str(fontsize*2), 'bold')  )
-            Style(app).configure("%s-normal.Treeview"     %name, foreground="#000000",   background=self.tint(colors[name],0.8), font=(font, str(fontsize))  )
-            Style(app).configure("%s-normal.TEntry"       %name, foreground="#000000",   fieldbackground=self.tint(colors[name],0.7), font=(font, str(fontsize*10)), padding=(1,1,1,1)  )
+            Style(app).configure("%s-normal.TCheckbutton" %name, foreground="#394951",   background=colors[name])
+            Style(app).configure("%s-separator.TFrame"    %name, foreground="#394951",   background=colors[name], font=(font, str(fontsize))  )
+            Style(app).configure("%s-normal.TLabel"       %name, foreground="#394951",   background=colors[name], font=(font, str(fontsize))  )
+            Style(app).configure("%s-bold.TLabel"         %name, foreground="#394951",   background=colors[name], font=(font, str(fontsize), 'bold')  )
+            Style(app).configure("%s-header.TLabel"       %name, foreground="#394951",   background=colors[name], font=(font, str(fontsize*2), 'bold')  )
+            Style(app).configure("%s-normal.Treeview"     %name, foreground="#394951",   background=self.tint(colors[name],0.8), font=(font, str(fontsize))  )
+            Style(app).configure("%s-normal.TEntry"       %name, foreground="#394951",   fieldbackground=self.tint(colors[name],0.7), font=(font, str(fontsize*10)), padding=(1,1,1,1)  )
 
     def newframe_LEB(self, parent, labeltext='not set', btntext='not set', btncommand='test', style = 'default', lbl_width=12, btn_width=6):
         if btncommand not in self.entryvars: self.entryvars[btncommand] = StringVar()
@@ -190,15 +191,20 @@ class coa():
         s = Frame(parent, borderwidth=width, style='%s-sep.TFrame' %style)
         s.pack(fill=X, expand=True)
 
-    def newImage(self, parent, image_name=''):
+    def newImage(self, parent, image_name='', format=True):
         i = self.images[image_name]
         x = int(i['X']*i['scale'])
         y = int(i['Y']*i['scale'])
-        c = Canvas(parent, width=x+20, height=y+20, bg='black', bd=0, highlightthickness=0)
+        c = Canvas(parent, width=x+20, height=y+20, bg='#394951', bd=0, highlightthickness=0)
         pix = os.path.join(os.path.dirname(tdcsm.__file__), i['file'])
         try:
-            img = Image.open(pix).resize((x,y), Image.ANTIALIAS)
-            i['object'] = ImageTk.PhotoImage(img)
+            if format:
+                img = Image.open(pix).resize((x,y), Image.ANTIALIAS)
+                i['object'] = ImageTk.PhotoImage(img)
+            else:
+                img = PhotoImage(file=pix)
+                i['object'] = img
+
             c.create_image(10,10, anchor=NW, image=i['object'])
             print('created Image: %s' %image_name)
         except:
@@ -547,7 +553,7 @@ class coa():
                 self.coa.prepare_sql()
                 self.print_complete(name)
             elif name == 'execute_run':
-                self.button_click('opendir_run')
+                #self.button_click('opendir_run')
                 self.coa.execute_run()
                 self.upload_get_lastrun_folder()
                 self.print_complete(name)
@@ -648,7 +654,7 @@ class coa():
         # SETUP APPLICATION, app, appframe, title
         app = Tk()
         self.app = app
-        self.title = "TD Consumption Analytics (COA)"
+        self.title = " Teradata Consumption Analytics and Collateral Automation Tool"
         self.define_styles(app)
         self.set_defaults()
         app.wm_title(self.title)
@@ -657,8 +663,8 @@ class coa():
 
         #-------------- Page Setup ------------------
         appframe = Frame(app, style="TFrame"); appframe.pack(fill=BOTH, expand=True)
-        self.newImage(appframe, image_name='banner').pack(anchor=NW)
-        Label(appframe, style="title.TLabel", text='TD Consumption Analytics (COA)').pack(anchor=NW)
+        # self.newImage(appframe, image_name='banner').pack(anchor=NW)
+        Label(appframe, style="title.TLabel", text=self.title).pack(anchor=NW)
 
 
         self.tabcontrol = Notebook(appframe, padding=5)
@@ -670,7 +676,7 @@ class coa():
         Button(bottomframe, text="MOTD",           width=7,  command=lambda:self.button_click("motd")).pack(padx=3, side=RIGHT)
         Button(bottomframe, text="Reload Configs", width=14, command=lambda:self.button_click("reload_config")).pack(padx=3, side=RIGHT)
         #Label(appframe, style="TLabel", text='version "%s"' %self.version).pack(anchor='center')
-        self.newImage(bottomframe, image_name='logo').pack(side=LEFT)
+        self.newImage(bottomframe, image_name='logo', format=False).pack(side=LEFT)
 
         tabConfig   = Frame(tabcontrol, style="config-normal.TFrame"); tabConfig.pack(fill=X, expand=True, anchor='n')
         tabobjConfig = tabcontrol.add(tabConfig,  text='Config Files')
@@ -761,14 +767,33 @@ class coa():
         #-------------- TAB: HELP ------------------
         frmHelp  = Frame(tabHelp, padding=5, style="help-normal.TFrame"); frmHelp.pack(fill=BOTH, expand=True, anchor=N)
         frmHelp_N  = Frame(frmHelp, padding=5, style="help-normal.TFrame"); frmHelp_N.pack(side=TOP, fill=BOTH, expand=True, anchor=N)
-        Label(frmHelp_N, text='This page contains mostly debugging information right now... MORE COMING SOON!', style='help-bold.TLabel').pack(fill=X, anchor=N)
+
+        helpmsg = """If you need help for any reason, there are a few options available:
+
+        - COA SharePoint Site:
+             https://teradata.sharepoint.com/teams/Sales/ConsumptionAnalytics/SitePages/COA.aspx
+             This site has videos, user guides, install instructions, and more.
+
+        - COA Weekly Office Hours:
+             Please feel free to bring questions, issues, suggestions, and requests to our weekly office hours.
+             Most SEs/CSMs have this already, but if you don't - reach out to Stephen.Hilton@Teradata.com and he will add you.
+
+        - Reach out to peers on Channel STX_400 of MSTeams 'Sales Technology Exchange (STX)'
+
+        - Email Stephen.Hilton@Teradata.com, preferably with the subject beginning with "COA:"
+
+        You are currently running:
+        """
+
+        Label(frmHelp_N, text=helpmsg, style='help-bold.TLabel').pack(fill=X, anchor=N)
         frmHelp_E  = Frame(frmHelp, padding=5, style="help-normal.TFrame"); frmHelp_E.pack(side=RIGHT, fill=X, expand=False, anchor=E)
-        self.newframe_LC(frmHelp_E, labeltext='Skip_DBS Flag (debugging)', checkcommand='skip_dbs_toggle', style='help-normal').pack(anchor=S)
-        self.newframe_LC(frmHelp_E, labeltext='Skip_Git Flag (debugging)', checkcommand='skip_git_toggle', style='help-normal').pack(anchor=S)
-        self.newframe_LC(frmHelp_E, labeltext='Show Hidden Filesets (debugging)', checkcommand='show_hiddenfilesets_toggle', style='help-normal').pack(anchor=S)
+        Label(frmHelp_E, text='Other GUI Options (for debugging):', style='help-bold.TLabel').pack(fill=X, anchor=N)
+        self.newframe_LC(frmHelp_E, labeltext='Skip_DBS Flag', checkcommand='skip_dbs_toggle', style='help-normal').pack(anchor=S)
+        self.newframe_LC(frmHelp_E, labeltext='Skip_Git Flag', checkcommand='skip_git_toggle', style='help-normal').pack(anchor=S)
+        self.newframe_LC(frmHelp_E, labeltext='Show Hidden Filesets', checkcommand='show_hiddenfilesets_toggle', style='help-normal').pack(anchor=S)
         self.newframe_LEB(frmHelp_E, labeltext='BTEQ Delimiter', btntext='Update', btncommand='bteq_delim', style = 'help-normal', lbl_width=20, btn_width=8).pack(anchor=S)
         frmHelp_W  = Frame(frmHelp, padding=5, style="help-normal.TFrame"); frmHelp_W.pack(side=LEFT, expand=False, anchor=W)
-        Label(frmHelp_W, text='Print Dictionary:', style='help-bold.TLabel').pack(fill=X, anchor=N)
+        Label(frmHelp_W, text='Print Dictionary (for debugging):', style='help-bold.TLabel').pack(fill=X, anchor=N)
         self.newbutton(frmHelp_W, btntext = 'Systems',  btncommand='print_systems',  btnwidth=15, style = 'help-normal', side=TOP)
         self.newbutton(frmHelp_W, btntext = 'Config',   btncommand='print_config',   btnwidth=15, style = 'help-normal', side=TOP)
         self.newbutton(frmHelp_W, btntext = 'FileSets', btncommand='print_filesets', btnwidth=15, style = 'help-normal', side=TOP)
