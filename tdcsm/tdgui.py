@@ -10,7 +10,7 @@ import tdcsm
 
 class coa():
 
-    version = "0.4.1.3"
+    version = "0.4.1.4"
     debug = False
 
     entryvars = {}

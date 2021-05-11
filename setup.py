@@ -5,10 +5,10 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="tdcsm",
-    version="0.4.1.2",
+    version="0.4.1.4",
     author="Stephen Hilton",
     author_email="Stephen@FamilyHilton.com",
-    description="Teradata tools for CSMs",
+    description="Teradata tools for CSMs (deprecated)",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/tdcoa/tdcsm",
