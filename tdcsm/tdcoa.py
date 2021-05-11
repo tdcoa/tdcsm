@@ -363,7 +363,7 @@ class tdcoa:
         bp.append('.SET SESSION TRANSACTION BTET;')
         bp.append(".SEPARATOR '%s';" %self.bteq_delim)
         bp.append(".SET NULL AS '';")
-        bp.append('.WIDTH 64000;')
+        bp.append('.WIDTH 32000;')
         bp.append('.RETLIMIT * *;')
         bp.append('.SHOW CONTROLS;')
         bp.append('---------------------------------------------------------------------')
